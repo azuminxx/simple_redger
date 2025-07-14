@@ -16,16 +16,6 @@
       "js/app.js"
     ],
     "css": [
-      "css/style.css"
-    ]
-  },
-  "config": {
-    "html": "config.html",
-    "js": [
-      "js/config.js"
-    ],
-    "css": [
-      "css/config.css"
     ]
   }
 } 

@@ -3,12 +3,9 @@
     "scope": "ALL",
     "desktop": {
         "js": [
-            "js/config.js",
             "js/app.js"
         ],
         "css": [
-            "css/style.css",
-            "css/config.css"
         ]
     },
     "mobile": {
