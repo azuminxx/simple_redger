@@ -1,0 +1,31 @@
+{
+  "manifest_version": 1,
+  "version": "1.0.0",
+  "type": "APP",
+  "name": {
+    "ja": "シンプル台帳",
+    "en": "Simple Ledger"
+  },
+  "description": {
+    "ja": "kintoneカスタマイズビュー用のシンプルな台帳アプリ",
+    "en": "Simple ledger app for kintone custom view"
+  },
+  "icon": "icon.png",
+  "desktop": {
+    "js": [
+      "js/app.js"
+    ],
+    "css": [
+      "css/style.css"
+    ]
+  },
+  "config": {
+    "html": "config.html",
+    "js": [
+      "js/config.js"
+    ],
+    "css": [
+      "css/config.css"
+    ]
+  }
+} 
