@@ -146,56 +146,6 @@ class FormBuilder {
     }
 
     /**
-     * ボタングループを作成
-     */
-    static createButtonGroup(appId) {
-        const buttonGroup = DOMHelper.createElement('div', {}, 'button-group');
-
-        const searchButton = DOMHelper.createElement('button', {}, 'search-button');
-        searchButton.textContent = '検索';
-        searchButton.addEventListener('click', () => {
-            if (window.searchEngine) {
-                window.searchEngine.searchRecords(appId);
-            }
-        });
-
-        const clearButton = DOMHelper.createElement('button', {}, 'clear-button');
-        clearButton.textContent = 'クリア';
-        clearButton.addEventListener('click', () => this.clearForm(appId));
-
-        buttonGroup.appendChild(searchButton);
-        buttonGroup.appendChild(clearButton);
-
-        return buttonGroup;
-    }
-
-    /**
-     * フォームをクリア
-     */
-    static clearForm(appId) {
-        const tabContent = document.querySelector(`#tab-${appId}`);
-        if (!tabContent) return;
-        
-        // テキスト入力をクリア
-        const inputs = tabContent.querySelectorAll('input[type="text"], input[type="number"], input[type="date"], input[type="datetime-local"]');
-        inputs.forEach(input => {
-            input.value = '';
-        });
-
-        // セレクトボックスをリセット
-        const selects = tabContent.querySelectorAll('select');
-        selects.forEach(select => {
-            select.selectedIndex = 0;
-        });
-
-        // チェックボックスをクリア
-        const checkboxes = tabContent.querySelectorAll('input[type="checkbox"]');
-        checkboxes.forEach(checkbox => {
-            checkbox.checked = false;
-        });
-    }
-
-    /**
      * フィールド入力要素のHTMLを生成
      */
     createFieldInput(field, appName, appId) {

@@ -42,56 +42,6 @@ class TableRenderer {
     }
 
     /**
-     * 統合テーブルを作成（通常版・未使用）
-     */
-    createIntegratedTable(integratedData) {
-        const table = DOMHelper.createElement('table', {}, 'integrated-table');
-
-        // colgroup要素でカラム幅を定義
-        const colgroup = this.createColgroup();
-        table.appendChild(colgroup);
-
-        // ヘッダーを作成（2行構成）
-        const thead = DOMHelper.createElement('thead');
-        
-        // 1行目：台帳名（結合あり）
-        const ledgerRow = this.createLedgerHeaderRow();
-        thead.appendChild(ledgerRow);
-        
-        // 2行目：フィールド名
-        const fieldRow = this.createFieldHeaderRow();
-        thead.appendChild(fieldRow);
-
-        table.appendChild(thead);
-
-        // ボディを作成
-        const tbody = DOMHelper.createElement('tbody');
-
-        integratedData.forEach(record => {
-            const row = DOMHelper.createElement('tr');
-
-            CONFIG.integratedTableConfig.columns.forEach(column => {
-                const td = DOMHelper.createElement('td');
-                const value = record[column.key];
-                
-                if (value === null || value === undefined || value === '') {
-                    td.textContent = '-';
-                    td.className = 'null-value';
-                } else {
-                    td.textContent = value;
-                }
-
-                row.appendChild(td);
-            });
-
-            tbody.appendChild(row);
-        });
-
-        table.appendChild(tbody);
-        return table;
-    }
-
-    /**
      * 台帳名ヘッダー行を作成（結合あり）
      */
     createLedgerHeaderRow() {

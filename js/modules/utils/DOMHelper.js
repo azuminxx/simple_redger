@@ -53,9 +53,9 @@ class DOMHelper {
      */
     static getLedgerNameFromKey(key) {
         // 統合キーは表示されなくなったため、この処理は実際には使用されない
-        if (key === CONFIG.integrationKey) {
-            return '共通';
-        }
+        // if (key === CONFIG.integrationKey) {
+        //     return '共通';
+        // }
         
         // キーから台帳名を抽出（例：'PC台帳_PC番号' → 'PC台帳'）
         const parts = key.split('_');

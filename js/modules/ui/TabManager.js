@@ -203,64 +203,6 @@ class TabManager {
     }
 
     /**
-     * 統合検索タブのコンテンツを作成
-     */
-    async createIntegratedTabContent() {
-        const integratedTabContent = DOMHelper.createElement('div', {
-            id: 'integrated-tab-content'
-        }, 'tab-content');
-
-        const loadingMessage = DOMHelper.createElement('div', {}, 'loading-message');
-        loadingMessage.textContent = '統合検索条件を読み込み中...';
-        integratedTabContent.appendChild(loadingMessage);
-
-        try {
-            const formBuilder = new FormBuilder();
-            const formHTML = await formBuilder.buildSearchForm('integrated');
-            loadingMessage.remove();
-
-            const formContainer = DOMHelper.createElement('div', {}, 'search-form-container');
-            formContainer.innerHTML = formHTML;
-
-            const buttonGroup = this.createIntegratedButtonGroup();
-            formContainer.appendChild(buttonGroup);
-
-            integratedTabContent.appendChild(formContainer);
-        } catch (error) {
-            loadingMessage.remove();
-            const errorMessage = DOMHelper.createElement('div', {}, 'error-message');
-            errorMessage.textContent = '統合検索条件の読み込みに失敗しました';
-            integratedTabContent.appendChild(errorMessage);
-        }
-
-        return integratedTabContent;
-    }
-
-    /**
-     * 統合検索用のボタングループを作成
-     */
-    createIntegratedButtonGroup() {
-        const buttonGroup = DOMHelper.createElement('div', {}, 'button-group');
-
-        const searchButton = DOMHelper.createElement('button', {}, 'search-button');
-        searchButton.textContent = '統合検索';
-        searchButton.addEventListener('click', () => {
-            if (window.searchEngine) {
-                this.executeIntegratedSearch();
-            }
-        });
-
-        const clearButton = DOMHelper.createElement('button', {}, 'clear-button');
-        clearButton.textContent = 'クリア';
-        clearButton.addEventListener('click', () => this.clearIntegratedForm());
-
-        buttonGroup.appendChild(searchButton);
-        buttonGroup.appendChild(clearButton);
-
-        return buttonGroup;
-    }
-
-    /**
      * 指定されたタブのフォームをクリア
      */
     clearForm(appId) {
