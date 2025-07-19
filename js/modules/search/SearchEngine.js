@@ -16,20 +16,18 @@ class SearchEngine {
 
             const query = await this.buildSearchQuery(searchConditions, appId);
             
-            console.log(`App ${appId}（${CONFIG.apps[appId].name}）で検索実行:`, query);
+            console.log(`🔍 ${CONFIG.apps[appId].name}で検索実行: ${query}`);
             
             // メインの台帳を検索
             const records = await this.searchRecordsWithQuery(appId, query);
-            console.log(`${CONFIG.apps[appId].name}の検索結果（${records.length}件）:`, records);
+            console.log(`✓ ${CONFIG.apps[appId].name}の検索結果: ${records.length}件`);
             
             if (records.length > 0) {
                 // 統合キーを抽出して他の台帳も検索
                 const integratedData = await window.dataIntegrator.searchAllLedgersWithIntegrationKeys(appId, records);
                 
                 if (integratedData) {
-                    console.log('=== 統合データベース ===');
-                    console.log(`統合されたレコード数: ${integratedData.length}件`);
-                    console.log('統合データ:', integratedData);
+                    console.log(`📊 統合データ生成完了: ${integratedData.length}件`);
                     
                     // テーブル表示
                     if (window.tableRenderer) {
@@ -135,7 +133,6 @@ class SearchEngine {
     searchRecordsWithQuery(appId, query) {
         return this.createCursor(appId, query)
             .then((cursorId) => {
-                console.log('検索用カーソルが作成されました:', cursorId);
                 return this.getAllRecordsFromCursor(cursorId);
             });
     }
@@ -170,8 +167,6 @@ class SearchEngine {
             return kintone.api(kintone.api.url('/k/v1/records/cursor.json', true), 'GET', body)
                 .then((response) => {
                     allRecords.push(...response.records);
-                    
-                    console.log('現在までに取得したレコード数:', allRecords.length);
                     
                     if (response.next) {
                         return fetchRecords();

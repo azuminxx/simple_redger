@@ -84,7 +84,7 @@ const CONFIG = {
      */
     initialize: function(fieldInfoAPI) {
         this.fieldInfoAPI = fieldInfoAPI;
-        console.log('CONFIG初期化完了');
+        console.log('⚙️ CONFIG初期化完了');
     },
 
     /**

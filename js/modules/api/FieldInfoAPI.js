@@ -13,13 +13,11 @@ class FieldInfoAPI {
     async getAppFields(appId) {
         // キャッシュから取得を試行
         if (this.fieldCache.has(appId)) {
-            console.log(`App ${appId}のフィールド情報をキャッシュから取得`);
             return this.fieldCache.get(appId);
         }
 
         // 既に同じアプリの情報を取得中の場合は、そのPromiseを返す
         if (this.loadingPromises.has(appId)) {
-            console.log(`App ${appId}のフィールド情報取得中...`);
             return this.loadingPromises.get(appId);
         }
 
@@ -43,8 +41,6 @@ class FieldInfoAPI {
      */
     async fetchAppFields(appId) {
         try {
-            console.log(`App ${appId}のフィールド情報をAPIから取得中...`);
-            
             const response = await kintone.api(
                 kintone.api.url('/k/v1/app/form/fields', true),
                 'GET',
@@ -52,11 +48,11 @@ class FieldInfoAPI {
             );
 
             const processedFields = this.processFieldData(response.properties);
-            console.log(`App ${appId}のフィールド情報取得完了:`, processedFields);
+            console.log(`✓ App ${appId}(${CONFIG.apps[appId]?.name || 'Unknown'}) フィールド情報取得完了 (${processedFields.length}件)`);
             
             return processedFields;
         } catch (error) {
-            console.error(`App ${appId}のフィールド情報取得エラー:`, error);
+            console.error(`✗ App ${appId}のフィールド情報取得エラー:`, error);
             throw new Error(`フィールド情報の取得に失敗しました (App ${appId}): ${error.message}`);
         }
     }
@@ -119,7 +115,6 @@ class FieldInfoAPI {
 
         // ドロップダウン・ラジオボタン・チェックボックスの選択肢を処理
         if (fieldInfo.type === 'DROP_DOWN' || fieldInfo.type === 'RADIO_BUTTON' || fieldInfo.type === 'CHECK_BOX') {
-            console.log(`選択肢フィールド検出: ${fieldCode} (${fieldInfo.type})`);
             baseConfig.options = this.extractOptions(fieldInfo);
         }
 
@@ -168,7 +163,6 @@ class FieldInfoAPI {
      */
     extractOptions(fieldInfo) {
         if (!fieldInfo.options) {
-            console.log(`${fieldInfo.label}: 選択肢が存在しません`);
             return [];
         }
 
@@ -190,7 +184,6 @@ class FieldInfoAPI {
             options.push(option.label);
         });
 
-        console.log(`${fieldInfo.label}: 選択肢を${options.length}個取得（index順） ->`, options);
         return options;
     }
 
