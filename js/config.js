@@ -35,19 +35,13 @@ const CONFIG = {
     // 台帳アプリ設定
     apps: {
         6: {
-            name: 'PC台帳',
-            // 表示したいフィールドを順序付きで指定
-            displayFields: ['PC番号', 'ユーザーID', 'PC用途', 'test1', 'sample']
+            name: 'PC台帳'
         },
         7: {
-            name: '内線台帳',
-            // 表示したいフィールドを順序付きで指定
-            displayFields: ['内線番号', '電話機種別']
+            name: '内線台帳'
         },
         8: {
-            name: '座席台帳',
-            // 表示したいフィールドを順序付きで指定
-            displayFields: ['座席拠点','階数', '座席番号','座席部署']
+            name: '座席台帳'
         }
     },
 
@@ -55,24 +49,22 @@ const CONFIG = {
     integratedTableConfig: {
         columns: [
             // PC台帳グループ
-            { key: 'PC台帳_PC番号', label: 'PC番号', width: '120px' },
-            { key: 'PC台帳_ユーザーID', label: 'ユーザーID', width: '100px' },
-            { key: 'PC台帳_PC用途', label: 'PC用途', width: '110px' },
-            { key: 'PC台帳_test1', label: 'test1', width: '100px' },
-            { key: 'PC台帳_sample', label: 'sample', width: '100px' },
+            { key: 'PC台帳_PC番号', label: 'PC番号', width: '120px', appId: 6, fieldCode: 'PC番号' },
+            { key: 'PC台帳_ユーザーID', label: 'ユーザーID', width: '100px', appId: 6, fieldCode: 'ユーザーID' },
+            { key: 'PC台帳_ユーザー名', label: 'ユーザー名', width: '120px', appId: 6, fieldCode: 'ユーザー名', isUserListDerived: true },
+            { key: 'PC台帳_PC用途', label: 'PC用途', width: '110px', appId: 6, fieldCode: 'PC用途' },
+            { key: 'PC台帳_test1', label: 'test1', width: '100px', appId: 6, fieldCode: 'test1' },
+            { key: 'PC台帳_sample', label: 'sample', width: '100px', appId: 6, fieldCode: 'sample' },
             
             // 内線台帳グループ
-            { key: '内線台帳_内線番号', label: '内線番号', width: '90px' },
-            { key: '内線台帳_電話機種別', label: '電話機種別', width: '100px' },
+            { key: '内線台帳_内線番号', label: '内線番号', width: '90px', appId: 7, fieldCode: '内線番号' },
+            { key: '内線台帳_電話機種別', label: '電話機種別', width: '100px', appId: 7, fieldCode: '電話機種別' },
             
             // 座席台帳グループ
-            { key: '座席台帳_座席拠点', label: '座席拠点', width: '80px' },
-            { key: '座席台帳_階数', label: '階数', width: '60px' },
-            { key: '座席台帳_座席番号', label: '座席番号', width: '120px' },
-            { key: '座席台帳_座席部署', label: '座席部署', width: '80px' },
-            
-            // ユーザー名
-            { key: 'ユーザー名', label: 'ユーザー名', width: '120px' }
+            { key: '座席台帳_座席拠点', label: '座席拠点', width: '80px', appId: 8, fieldCode: '座席拠点' },
+            { key: '座席台帳_階数', label: '階数', width: '60px', appId: 8, fieldCode: '階数' },
+            { key: '座席台帳_座席番号', label: '座席番号', width: '120px', appId: 8, fieldCode: '座席番号' },
+            { key: '座席台帳_座席部署', label: '座席部署', width: '80px', appId: 8, fieldCode: '座席部署' }
         ]
     },
 
@@ -85,6 +77,20 @@ const CONFIG = {
     initialize: function(fieldInfoAPI) {
         this.fieldInfoAPI = fieldInfoAPI;
         console.log('⚙️ CONFIG初期化完了');
+    },
+
+    /**
+     * 指定されたアプリの表示フィールドを取得
+     */
+    getDisplayFields: function(appId, excludeUserListDerived = false) {
+        let columns = this.integratedTableConfig.columns.filter(column => column.appId == appId);
+        
+        // ユーザーリスト由来のフィールドを除外する場合
+        if (excludeUserListDerived) {
+            columns = columns.filter(column => !column.isUserListDerived);
+        }
+        
+        return columns.map(column => column.fieldCode);
     },
 
     /**
@@ -128,51 +134,10 @@ const CONFIG = {
     },
 
     /**
-     * 統合テーブル用のカラム設定を動的生成
+     * 統合テーブル用のカラム設定を取得（動的生成は不要、静的設定を返す）
      */
     async generateIntegratedTableColumns() {
-        try {
-            const fieldsMap = await this.getAllAppFields();
-            const columns = [];
-
-            // 各台帳のフィールドを追加（displayFieldsで指定された順序で）
-            Object.entries(this.apps).forEach(([appId, appConfig]) => {
-                const fields = fieldsMap[appId] || [];
-                const displayFields = appConfig.displayFields || [];
-                
-                // displayFieldsで指定された順序でフィールドを処理
-                displayFields.forEach(fieldCode => {
-                    // 統合キーは除外
-                    if (fieldCode !== this.integrationKey) {
-                        const field = fields.find(f => f.code === fieldCode);
-                        if (field) {
-                            const columnKey = `${appConfig.name}_${field.code}`;
-                            // 静的設定から対応する幅を取得
-                            const staticColumn = this.integratedTableConfig.columns.find(col => col.key === columnKey);
-                            const width = staticColumn ? staticColumn.width : '120px'; // デフォルト幅
-                            
-                            columns.push({
-                                key: columnKey,
-                                label: field.label,
-                                width: width
-                            });
-                        } else {
-                            console.warn(`${appConfig.name}にフィールド「${fieldCode}」が見つかりません`);
-                        }
-                    }
-                });
-            });
-
-            // ユーザー名カラムを追加
-            const userNameColumn = this.integratedTableConfig.columns.find(col => col.key === 'ユーザー名');
-            const userNameWidth = userNameColumn ? userNameColumn.width : '120px';
-            columns.push({ key: 'ユーザー名', label: 'ユーザー名', width: userNameWidth });
-
-            return columns;
-        } catch (error) {
-            console.error('統合テーブルカラム生成エラー:', error);
-            // エラー時は静的設定にフォールバック
-            return this.integratedTableConfig.columns;
-        }
+        // 静的設定をそのまま返す（動的生成は不要）
+        return this.integratedTableConfig.columns;
     }
 }; 

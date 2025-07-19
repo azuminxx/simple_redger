@@ -137,7 +137,7 @@ class DataIntegrator {
 
                 const appConfig = CONFIG.apps[appId];
                 const ledgerName = appConfig.name;
-                const displayFields = appConfig.displayFields || [];
+                const displayFields = CONFIG.getDisplayFields(appId);
                 
                 if (matchingRecord) {
                     // レコードが存在する場合、displayFieldsで指定されたフィールドのみを追加
@@ -166,11 +166,11 @@ class DataIntegrator {
                 }
             }
 
-            // ユーザーリストからユーザー名を取得
+            // ユーザーリストからユーザー名を取得してPC台帳のデータとして設定
             if (recordUserId && userMap.has(recordUserId)) {
-                integratedRecord['ユーザー名'] = userMap.get(recordUserId);
+                integratedRecord['PC台帳_ユーザー名'] = userMap.get(recordUserId);
             } else {
-                integratedRecord['ユーザー名'] = null;
+                integratedRecord['PC台帳_ユーザー名'] = null;
             }
 
             integratedData.push(integratedRecord);

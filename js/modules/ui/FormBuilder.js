@@ -10,7 +10,8 @@ class FormBuilder {
             const fieldsMap = await CONFIG.getAllAppFields();
             const appConfig = CONFIG.apps[appId];
             const fields = fieldsMap[appId] || [];
-            const displayFields = appConfig.displayFields || [];
+            // ユーザーリスト由来のフィールドは検索フォームから除外
+            const displayFields = CONFIG.getDisplayFields(appId, true);
             
             let formHTML = '<div class="search-form">';
 
