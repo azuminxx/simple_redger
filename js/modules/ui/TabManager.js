@@ -7,16 +7,16 @@ class TabManager {
     }
 
     /**
-     * 検索メニューを初期化
+     * 検索メニューを初期化（非同期対応）
      */
-    initializeSearchMenu() {
+    async initializeSearchMenu() {
         const searchMenuContainer = document.getElementById(CONFIG.system.searchMenuId);
         if (!searchMenuContainer) {
             console.error(CONFIG.system.messages.elementNotFound);
             return;
         }
 
-        const tabContainer = this.createTabContainer();
+        const tabContainer = await this.createTabContainer();
         searchMenuContainer.appendChild(tabContainer);
 
         const firstAppId = Object.keys(CONFIG.apps)[0];
@@ -24,18 +24,27 @@ class TabManager {
     }
 
     /**
-     * タブコンテナを作成
+     * タブコンテナを作成（非同期対応）
      */
-    createTabContainer() {
+    async createTabContainer() {
         const tabContainer = DOMHelper.createElement('div', {}, 'tab-container');
 
         const tabMenu = this.createTabMenu();
         tabContainer.appendChild(tabMenu);
 
-        Object.keys(CONFIG.apps).forEach(appId => {
-            const tabContent = this.createTabContent(appId);
-            tabContainer.appendChild(tabContent);
-        });
+        // 各タブのコンテンツを非同期で作成
+        for (const appId of Object.keys(CONFIG.apps)) {
+            try {
+                const tabContent = await this.createTabContent(appId);
+                tabContainer.appendChild(tabContent);
+            } catch (error) {
+                console.error(`App ${appId}のタブ作成エラー:`, error);
+                
+                // エラー時はエラー表示のタブを作成
+                const errorTabContent = this.createErrorTabContent(appId, error);
+                tabContainer.appendChild(errorTabContent);
+            }
+        }
 
         return tabContainer;
     }
@@ -60,18 +69,61 @@ class TabManager {
     }
 
     /**
-     * タブコンテンツを作成
+     * タブコンテンツを作成（非同期対応）
      */
-    createTabContent(appId) {
+    async createTabContent(appId) {
         const appConfig = CONFIG.apps[appId];
         
         const tabContent = DOMHelper.createElement('div', {
             id: `tab-${appId}`
         }, 'tab-content');
 
-        const searchForm = FormBuilder.createSearchForm(appId, appConfig);
-        tabContent.appendChild(searchForm);
+        // ローディング表示を追加
+        const loadingMessage = DOMHelper.createElement('div', {}, 'loading-message');
+        loadingMessage.textContent = 'フィールド情報を読み込み中...';
+        tabContent.appendChild(loadingMessage);
 
+        try {
+            // 非同期でフォームを作成
+            const searchForm = await FormBuilder.createSearchForm(appId, appConfig);
+            
+            // ローディングメッセージを削除
+            tabContent.removeChild(loadingMessage);
+            
+            // フォームを追加
+            tabContent.appendChild(searchForm);
+        } catch (error) {
+            // ローディングメッセージを削除
+            tabContent.removeChild(loadingMessage);
+            
+            // エラーメッセージを表示
+            const errorMessage = DOMHelper.createElement('div', {}, 'error-message');
+            errorMessage.textContent = `タブの初期化に失敗しました: ${error.message}`;
+            tabContent.appendChild(errorMessage);
+            
+            throw error;
+        }
+
+        return tabContent;
+    }
+
+    /**
+     * エラー用タブコンテンツを作成
+     */
+    createErrorTabContent(appId, error) {
+        const tabContent = DOMHelper.createElement('div', {
+            id: `tab-${appId}`
+        }, 'tab-content error-tab');
+
+        const errorMessage = DOMHelper.createElement('div', {}, 'error-message');
+        errorMessage.innerHTML = `
+            <h4>タブの初期化に失敗しました</h4>
+            <p>アプリID: ${appId}</p>
+            <p>エラー: ${error.message}</p>
+            <button onclick="location.reload()">ページを再読み込み</button>
+        `;
+        
+        tabContent.appendChild(errorMessage);
         return tabContent;
     }
 

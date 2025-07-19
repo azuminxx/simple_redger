@@ -6,6 +6,7 @@
           "js/config.js",
           "js/modules/utils/DOMHelper.js",
           "js/modules/utils/CSSGenerator.js",
+          "js/modules/api/FieldInfoAPI.js",
           "js/modules/ui/FormBuilder.js",
           "js/modules/ui/TabManager.js",
           "js/modules/search/SearchEngine.js",

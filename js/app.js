@@ -419,10 +419,10 @@
 
             // 全ての検索が完了したらデータを統合
             return Promise.all(searchPromises)
-                .then((results) => {
+                .then(async (results) => {
                     // 最後の結果がユーザーリストデータ
                     const userListData = results.pop();
-                    return this.integrateAllLedgerDataWithUserList(allLedgerData, integrationKeys, userListData);
+                    return await this.integrateAllLedgerDataWithUserList(allLedgerData, integrationKeys, userListData);
                 });
         }
 
@@ -484,7 +484,7 @@
         /**
          * 全台帳のデータを統合キーで統合し、ユーザーリストからユーザー名を取得
          */
-        integrateAllLedgerDataWithUserList(allLedgerData, integrationKeys, userListData) {
+        async integrateAllLedgerDataWithUserList(allLedgerData, integrationKeys, userListData) {
             const integratedData = [];
 
             // ユーザーリストをユーザーIDでマップ化
@@ -497,7 +497,7 @@
                 }
             });
 
-            integrationKeys.forEach(integrationKey => {
+            for (const integrationKey of integrationKeys) {
                 const integratedRecord = {
                     [CONFIG.integrationKey]: integrationKey
                 };
@@ -505,7 +505,7 @@
                 // 各台帳からこの統合キーに対応するレコードを取得
                 let recordUserId = null;
                 
-                Object.entries(allLedgerData).forEach(([appId, records]) => {
+                for (const [appId, records] of Object.entries(allLedgerData)) {
                     const matchingRecord = records.find(record => {
                         const keyField = record[CONFIG.integrationKey];
                         return keyField && keyField.value === integrationKey;
@@ -534,14 +534,19 @@
                         });
                     } else {
                         // レコードが存在しない場合、nullで埋める
-                        const fields = CONFIG.getAppFields(appId);
-                        fields.forEach(field => {
-                            if (field.code !== CONFIG.integrationKey) {
-                                integratedRecord[`${ledgerName}_${field.code}`] = null;
-                            }
-                        });
+                        try {
+                            const fields = await CONFIG.getAppFields(appId);
+                            fields.forEach(field => {
+                                if (field.code !== CONFIG.integrationKey) {
+                                    integratedRecord[`${ledgerName}_${field.code}`] = null;
+                                }
+                            });
+                        } catch (error) {
+                            console.error(`App ${appId}のフィールド情報取得エラー:`, error);
+                            // エラー時は処理を続行
+                        }
                     }
-                });
+                }
 
                 // ユーザーリストからユーザー名を取得
                 if (recordUserId && userMap.has(recordUserId)) {
@@ -551,7 +556,7 @@
                 }
 
                 integratedData.push(integratedRecord);
-            });
+            }
 
             return integratedData;
         }

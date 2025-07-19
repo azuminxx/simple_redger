@@ -15,7 +15,8 @@ const CONFIG = {
             noResults: '検索結果が0件のため、統合検索は実行されません。',
             searchError: '検索中にエラーが発生しました。',
             elementNotFound: 'search-menu要素が見つかりません',
-            noIntegrationKeys: '統合キーが見つかりませんでした。'
+            noIntegrationKeys: '統合キーが見つかりませんでした。',
+            fieldInfoLoadError: 'フィールド情報の取得に失敗しました。'
         }
     },
 
@@ -25,17 +26,6 @@ const CONFIG = {
         visibleRows: 100,     // 表示する行数
         bufferRows: 10,       // 上下のバッファ行数
         containerHeight: 500  // テーブルコンテナの高さ（px）
-    },
-
-    // 共通フィールド定義（重複排除）
-    commonFields: {
-        'PC番号': { code: 'PC番号', label: 'PC番号', type: 'text', placeholder: 'PC番号を入力' },
-        '内線番号': { code: '内線番号', label: '内線番号', type: 'text', placeholder: '内線番号を入力' },
-        'ユーザーID': { code: 'ユーザーID', label: 'ユーザーID', type: 'text', placeholder: 'ユーザーIDを入力' },
-        '座席番号': { code: '座席番号', label: '座席番号', type: 'text', placeholder: '座席番号を入力' },
-        'ユーザー名': { code: 'ユーザー名', label: 'ユーザー名', type: 'text', placeholder: 'ユーザー名を入力' },
-        '階数': { code: '階数', label: '階数', type: 'text', placeholder: '階数を入力' },
-        '座席部署': { code: '座席部署', label: '座席部署', type: 'text', placeholder: '座席部署を入力' }
     },
     
     // 統合テーブル表示設定
@@ -68,66 +58,184 @@ const CONFIG = {
     userList: {
         appId: 13,
         name: 'ユーザーリスト',
-        fields: ['ユーザーID', 'ユーザー名']
+        fields: ['ユーザーID', 'ユーザー名'] // 静的定義は残す（フィールドコードのみ）
     },
     
+    // 台帳アプリ設定（動的フィールド情報取得対応）
     apps: {
         6: {
             name: 'PC台帳',
-            fields: [
-                'PC番号', '内線番号', 'ユーザーID', '座席番号',
-                { 
-                    code: 'PC用途', 
-                    label: 'PC用途', 
-                    type: 'dropdown', 
-                    options: ['', '個人専用', 'CO/TOブース', 'RPA用', '拠点設備用', '会議用', '在庫']
-                }
-            ]
+            // fieldsプロパティは削除し、動的取得に移行
         },
         7: {
             name: '内線台帳',
-            fields: [
-                'PC番号', '内線番号', 'ユーザーID', '座席番号',
-                { 
-                    code: '電話機種別', 
-                    label: '電話機種別', 
-                    type: 'dropdown', 
-                    options: ['', 'ACD', 'ビジネス']
-                }
-            ]
+            // fieldsプロパティは削除し、動的取得に移行
         },
         8: {
             name: '座席台帳',
-            fields: [
-                'PC番号', '内線番号', 'ユーザーID', '座席番号', '階数', '座席部署',
-                { 
-                    code: '座席拠点', 
-                    label: '座席拠点', 
-                    type: 'dropdown', 
-                    options: ['', '埼玉', '池袋', '文京', '浦和']
-                }
-            ]
+            // fieldsプロパティは削除し、動的取得に移行
         }
     },
 
-    // フィールド設定を解決するヘルパー関数
-    resolveField: function(fieldRef) {
-        if (typeof fieldRef === 'string') {
-            return this.commonFields[fieldRef];
-        }
-        return fieldRef;
+    // フィールド情報API インスタンス（初期化時に設定）
+    fieldInfoAPI: null,
+
+    // 動的フィールド情報キャッシュ
+    dynamicFields: {},
+
+    /**
+     * システムを初期化（フィールド情報APIを設定）
+     */
+    initialize: function(fieldInfoAPI) {
+        this.fieldInfoAPI = fieldInfoAPI;
     },
 
-    // アプリのフィールド設定を解決
-    getAppFields: function(appId) {
-        const app = this.apps[appId];
-        if (!app) return [];
-        
-        return app.fields.map(field => this.resolveField(field)).filter(Boolean);
+    /**
+     * アプリのフィールド設定を動的に取得
+     */
+    async getAppFields(appId) {
+        if (!this.fieldInfoAPI) {
+            throw new Error('FieldInfoAPIが初期化されていません');
+        }
+
+        try {
+            // キャッシュから取得を試行
+            if (this.dynamicFields[appId]) {
+                return this.dynamicFields[appId];
+            }
+
+            // APIから動的取得
+            const fields = await this.fieldInfoAPI.getAppFields(appId);
+            this.dynamicFields[appId] = fields;
+            
+            return fields;
+        } catch (error) {
+            console.error(`App ${appId}のフィールド情報取得エラー:`, error);
+            throw error;
+        }
     },
     
-    // ユーザーリストのフィールド設定を解決
-    getUserListFields: function() {
-        return this.userList.fields.map(field => this.resolveField(field)).filter(Boolean);
+    /**
+     * ユーザーリストのフィールド設定を動的に取得
+     */
+    async getUserListFields() {
+        return this.getAppFields(this.userList.appId);
+    },
+
+    /**
+     * 複数アプリのフィールド情報を一括取得
+     */
+    async getAllAppFields() {
+        if (!this.fieldInfoAPI) {
+            throw new Error('FieldInfoAPIが初期化されていません');
+        }
+
+        try {
+            const appIds = Object.keys(this.apps).map(id => parseInt(id));
+            appIds.push(this.userList.appId); // ユーザーリストも含める
+
+            const fieldsMap = await this.fieldInfoAPI.getMultipleAppFields(appIds);
+            
+            // キャッシュに保存
+            Object.entries(fieldsMap).forEach(([appId, fields]) => {
+                this.dynamicFields[appId] = fields;
+            });
+
+            return fieldsMap;
+        } catch (error) {
+            console.error('全アプリのフィールド情報取得エラー:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * 特定のフィールドコードの情報を取得
+     */
+    async getFieldByCode(appId, fieldCode) {
+        const fields = await this.getAppFields(appId);
+        return fields.find(field => field.code === fieldCode);
+    },
+
+    /**
+     * 統合テーブル用のカラム設定を動的生成
+     */
+    async generateIntegratedTableColumns() {
+        try {
+            const fieldsMap = await this.getAllAppFields();
+            const columns = [];
+
+            // 統合キーカラムを追加
+            columns.push({ key: this.integrationKey, label: this.integrationKey, width: '280px' });
+
+            // 各台帳のフィールドを追加
+            Object.entries(this.apps).forEach(([appId, appConfig]) => {
+                const fields = fieldsMap[appId] || [];
+                
+                fields.forEach(field => {
+                    // 統合キーは除外
+                    if (field.code !== this.integrationKey) {
+                        columns.push({
+                            key: `${appConfig.name}_${field.code}`,
+                            label: field.label,
+                            width: this.calculateColumnWidth(field)
+                        });
+                    }
+                });
+            });
+
+            // ユーザー名カラムを追加
+            columns.push({ key: 'ユーザー名', label: 'ユーザー名', width: '120px' });
+
+            return columns;
+        } catch (error) {
+            console.error('統合テーブルカラム生成エラー:', error);
+            // エラー時は静的設定にフォールバック
+            return this.integratedTableConfig.columns;
+        }
+    },
+
+    /**
+     * フィールドタイプに基づいてカラム幅を計算
+     */
+    calculateColumnWidth(field) {
+        const widthMap = {
+            'text': '120px',
+            'number': '100px',
+            'dropdown': '110px',
+            'date': '120px',
+            'datetime-local': '150px',
+            'checkbox': '80px',
+            'radio': '100px'
+        };
+
+        return widthMap[field.type] || this.system.defaultColumnWidth;
+    },
+
+    /**
+     * フィールド情報キャッシュをクリア
+     */
+    clearFieldsCache: function(appId = null) {
+        if (appId) {
+            delete this.dynamicFields[appId];
+            if (this.fieldInfoAPI) {
+                this.fieldInfoAPI.clearCache(appId);
+            }
+        } else {
+            this.dynamicFields = {};
+            if (this.fieldInfoAPI) {
+                this.fieldInfoAPI.clearCache();
+            }
+        }
+    },
+
+    /**
+     * 後方互換性のための旧メソッド（非推奨）
+     */
+    resolveField: function(fieldRef) {
+        console.warn('resolveField()は非推奨です。動的フィールド取得を使用してください。');
+        if (typeof fieldRef === 'string') {
+            return { code: fieldRef, label: fieldRef, type: 'text', placeholder: `${fieldRef}を入力` };
+        }
+        return fieldRef;
     }
 }; 
