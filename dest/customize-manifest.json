@@ -3,9 +3,19 @@
     "scope": "ALL",
     "desktop": {
         "js": [
-            "js/app.js"
+          "js/config.js",
+          "js/modules/utils/DOMHelper.js",
+          "js/modules/utils/CSSGenerator.js",
+          "js/modules/ui/FormBuilder.js",
+          "js/modules/ui/TabManager.js",
+          "js/modules/search/SearchEngine.js",
+          "js/modules/search/DataIntegrator.js",
+          "js/modules/virtual/VirtualScroll.js",
+          "js/modules/ui/TableRenderer.js",
+          "js/main.js"
         ],
         "css": [
+          "css/style.css"
         ]
     },
     "mobile": {

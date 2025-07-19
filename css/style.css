@@ -1,0 +1,319 @@
+/* kintoneのタイトルバーを非表示 */
+.gaia-argoui-app-titlebar {
+    display: none;
+}
+
+/* グローバルナビゲーションを非表示 */
+#header-global-navigation-root {
+    display: none;
+}
+
+/* 検索メニューエリア */
+#search-menu {
+    padding: 10px;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    margin-bottom: 10px;
+}
+
+/* 検索結果表示エリア */
+#search-results {
+    padding: 10px;
+    background-color: #ffffff;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    min-height: 100px;
+}
+
+/* 結果がない場合のメッセージ */
+#search-results:empty::before {
+    content: "検索を実行すると、結果がここに表示されます。";
+    color: #6c757d;
+    font-style: italic;
+    display: block;
+    text-align: center;
+    padding: 40px 20px;
+}
+
+/* タブコンテナ */
+.tab-container {
+    width: 100%;
+}
+
+/* タブメニュー */
+.tab-menu {
+    display: flex;
+    border-bottom: 2px solid #dee2e6;
+    margin-bottom: 20px;
+    gap: 2px;
+}
+
+.tab-button {
+    padding: 12px 20px;
+    border: none;
+    background-color: #e9ecef;
+    color: #495057;
+    cursor: pointer;
+    border-radius: 8px 8px 0 0;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.tab-button:hover {
+    background-color: #dee2e6;
+    color: #212529;
+}
+
+.tab-button.active {
+    background-color: #007bff;
+    color: white;
+    font-weight: 600;
+}
+
+/* タブコンテンツ */
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* 検索フォーム */
+.search-form {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 200px));
+    gap: 5px;
+    margin-bottom: 10px;
+    justify-content: start;
+}
+
+.field-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.field-group label {
+    font-weight: 600;
+    color: #495057;
+    font-size: 14px;
+}
+
+.field-group input,
+.field-group select {
+    padding: 8px 12px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 14px;
+    transition: border-color 0.2s ease;
+    max-width: 150px;
+    width: 100%;
+}
+
+.field-group input:focus,
+.field-group select:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.1);
+}
+
+/* ボタングループ */
+.button-group {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 10px;
+}
+
+.search-button,
+.clear-button {
+    padding: 10px 30px;
+    border: none;
+    border-radius: 4px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 14px;
+}
+
+.search-button {
+    background-color: #007bff;
+    color: white;
+}
+
+.search-button:hover {
+    background-color: #0056b3;
+    transform: translateY(-1px);
+}
+
+.clear-button {
+    background-color: #6c757d;
+    color: white;
+}
+
+.clear-button:hover {
+    background-color: #545b62;
+    transform: translateY(-1px);
+}
+
+/* 統合結果テーブル */
+.integrated-results {
+    margin-top: 20px;
+}
+
+.integrated-results h3 {
+    margin-bottom: 5px;
+    color: #495057;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+/* 統合テーブルコンテナ */
+.integrated-table-container {
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    overflow: hidden;
+    background-color: white;
+}
+
+/* 仮想スクロール用のヘッダーテーブル（固定） */
+.virtual-header {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    table-layout: fixed;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background-color: white;
+    border-bottom: 2px solid #dee2e6;
+}
+
+/* 仮想スクロールコンテナ */
+.virtual-scroll-container {
+    height: 500px;
+    overflow: auto;
+    position: relative;
+}
+
+/* 仮想スクロールスペーサー */
+.virtual-scroll-spacer {
+    width: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+}
+
+/* 仮想スクロールコンテンツ */
+.virtual-scroll-content {
+    position: relative;
+    z-index: 1;
+}
+
+/* 仮想スクロール用のボディテーブル */
+.virtual-body {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    table-layout: fixed;
+}
+
+/* ヘッダーとボディの幅同期を強制 */
+.virtual-header,
+.virtual-body {
+    min-width: fit-content;
+}
+
+/* 統合テーブル共通スタイル */
+.integrated-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    table-layout: fixed;
+}
+
+.integrated-table th,
+.integrated-table td {
+    padding: 12px 8px;
+    text-align: left;
+    border-right: 1px solid #dee2e6;
+    border-bottom: 1px solid #dee2e6;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    box-sizing: border-box;
+}
+
+.integrated-table th:first-child,
+.integrated-table td:first-child {
+    border-left: 1px solid #dee2e6;
+}
+
+.integrated-table thead tr:first-child th {
+    border-top: 1px solid #dee2e6;
+}
+
+/* ヘッダースタイル */
+.integrated-table th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+    color: #495057;
+    font-size: 13px;
+}
+
+.header-ledger-cell {
+    background-color: #e9ecef;
+    text-align: center;
+    font-weight: 700;
+    color: #212529;
+    border-bottom: 2px solid #adb5bd;
+}
+
+.header-field-cell {
+    background-color: #f8f9fa;
+    font-size: 12px;
+}
+
+/* ボディスタイル */
+.integrated-table td {
+    font-size: 13px;
+    color: #495057;
+}
+
+.integrated-table tbody tr:nth-child(even) {
+    background-color: #f8f9fa;
+}
+
+.integrated-table tbody tr:hover {
+    background-color: #e3f2fd;
+}
+
+/* null値の表示 */
+.null-value {
+    color: #adb5bd;
+    font-style: italic;
+    text-align: center;
+}
+
+/* 統合テーブルのスクロールバー */
+.integrated-table-container::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.integrated-table-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+.integrated-table-container::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 4px;
+}
+
+.integrated-table-container::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+} 
