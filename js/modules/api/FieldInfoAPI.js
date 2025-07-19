@@ -214,43 +214,6 @@ class FieldInfoAPI {
             throw error;
         }
     }
-
-    /**
-     * キャッシュをクリア
-     */
-    clearCache(appId = null) {
-        if (appId) {
-            this.fieldCache.delete(appId);
-            console.log(`App ${appId}のフィールド情報キャッシュをクリア`);
-        } else {
-            this.fieldCache.clear();
-            console.log('全フィールド情報キャッシュをクリア');
-        }
-    }
-
-    /**
-     * 特定のフィールドタイプのフィールドのみを取得
-     */
-    getFieldsByType(appId, targetType) {
-        const fields = this.fieldCache.get(appId);
-        if (!fields) {
-            throw new Error(`App ${appId}のフィールド情報がキャッシュされていません`);
-        }
-
-        return fields.filter(field => field.type === targetType);
-    }
-
-    /**
-     * フィールドコードからフィールド情報を取得
-     */
-    getFieldByCode(appId, fieldCode) {
-        const fields = this.fieldCache.get(appId);
-        if (!fields) {
-            throw new Error(`App ${appId}のフィールド情報がキャッシュされていません`);
-        }
-
-        return fields.find(field => field.code === fieldCode);
-    }
 }
 
 // グローバルに公開
