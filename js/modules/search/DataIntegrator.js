@@ -124,9 +124,7 @@ class DataIntegrator {
         });
 
         for (const integrationKey of integrationKeys) {
-            const integratedRecord = {
-                [CONFIG.integrationKey]: integrationKey
-            };
+            const integratedRecord = {};
 
             // 各台帳からこの統合キーに対応するレコードを取得
             let recordUserId = null;
@@ -137,15 +135,15 @@ class DataIntegrator {
                     return keyField && keyField.value === integrationKey;
                 });
 
-                const ledgerName = CONFIG.apps[appId].name;
+                const appConfig = CONFIG.apps[appId];
+                const ledgerName = appConfig.name;
+                const displayFields = appConfig.displayFields || [];
                 
                 if (matchingRecord) {
-                    // レコードが存在する場合、全フィールドを追加（統合キーは除く）
-                    Object.entries(matchingRecord).forEach(([fieldCode, fieldValue]) => {
-                        if (fieldCode !== CONFIG.integrationKey && 
-                            fieldCode !== '$id' && 
-                            fieldCode !== '$revision') {
-                            
+                    // レコードが存在する場合、displayFieldsで指定されたフィールドのみを追加
+                    displayFields.forEach(fieldCode => {
+                        if (fieldCode !== CONFIG.integrationKey) {
+                            const fieldValue = matchingRecord[fieldCode];
                             const displayValue = fieldValue && fieldValue.value !== undefined 
                                 ? fieldValue.value 
                                 : fieldValue;
@@ -159,18 +157,12 @@ class DataIntegrator {
                         }
                     });
                 } else {
-                    // レコードが存在しない場合、nullで埋める
-                    try {
-                        const fields = await CONFIG.getAppFields(appId);
-                        fields.forEach(field => {
-                            if (field.code !== CONFIG.integrationKey) {
-                                integratedRecord[`${ledgerName}_${field.code}`] = null;
-                            }
-                        });
-                    } catch (error) {
-                        console.error(`App ${appId}のフィールド情報取得エラー:`, error);
-                        // エラー時は処理を続行
-                    }
+                    // レコードが存在しない場合、displayFieldsのフィールドをnullで埋める
+                    displayFields.forEach(fieldCode => {
+                        if (fieldCode !== CONFIG.integrationKey) {
+                            integratedRecord[`${ledgerName}_${fieldCode}`] = null;
+                        }
+                    });
                 }
             }
 
@@ -183,57 +175,6 @@ class DataIntegrator {
 
             integratedData.push(integratedRecord);
         }
-
-        return integratedData;
-    }
-
-    /**
-     * 全台帳のデータを統合キーで統合（旧版・未使用）
-     */
-    integrateAllLedgerData(allLedgerData, integrationKeys) {
-        const integratedData = [];
-
-        integrationKeys.forEach(integrationKey => {
-            const integratedRecord = {
-                [CONFIG.integrationKey]: integrationKey
-            };
-
-            // 各台帳からこの統合キーに対応するレコードを取得
-            Object.entries(allLedgerData).forEach(([appId, records]) => {
-                const matchingRecord = records.find(record => {
-                    const keyField = record[CONFIG.integrationKey];
-                    return keyField && keyField.value === integrationKey;
-                });
-
-                const ledgerName = CONFIG.apps[appId].name;
-                
-                if (matchingRecord) {
-                    // レコードが存在する場合、全フィールドを追加（統合キーは除く）
-                    Object.entries(matchingRecord).forEach(([fieldCode, fieldValue]) => {
-                        if (fieldCode !== CONFIG.integrationKey && 
-                            fieldCode !== '$id' && 
-                            fieldCode !== '$revision') {
-                            
-                            const displayValue = fieldValue && fieldValue.value !== undefined 
-                                ? fieldValue.value 
-                                : fieldValue;
-                            
-                            integratedRecord[`${ledgerName}_${fieldCode}`] = displayValue;
-                        }
-                    });
-                } else {
-                    // レコードが存在しない場合、nullで埋める
-                    const fields = CONFIG.getAppFields(appId);
-                    fields.forEach(field => {
-                        if (field.code !== CONFIG.integrationKey) {
-                            integratedRecord[`${ledgerName}_${field.code}`] = null;
-                        }
-                    });
-                }
-            });
-
-            integratedData.push(integratedRecord);
-        });
 
         return integratedData;
     }

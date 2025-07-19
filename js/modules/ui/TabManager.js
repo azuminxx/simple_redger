@@ -24,7 +24,7 @@ class TabManager {
     }
 
     /**
-     * タブコンテナを作成（非同期対応）
+     * タブコンテナを作成
      */
     async createTabContainer() {
         const tabContainer = DOMHelper.createElement('div', {}, 'tab-container');
@@ -32,7 +32,7 @@ class TabManager {
         const tabMenu = this.createTabMenu();
         tabContainer.appendChild(tabMenu);
 
-        // 各タブのコンテンツを非同期で作成
+        // 各台帳のタブコンテンツを作成
         for (const appId of Object.keys(CONFIG.apps)) {
             try {
                 const tabContent = await this.createTabContent(appId);
@@ -40,8 +40,15 @@ class TabManager {
             } catch (error) {
                 console.error(`App ${appId}のタブ作成エラー:`, error);
                 
-                // エラー時はエラー表示のタブを作成
-                const errorTabContent = this.createErrorTabContent(appId, error);
+                // エラー時は基本的なタブを作成
+                const errorTabContent = DOMHelper.createElement('div', {
+                    id: `tab-${appId}`
+                }, 'tab-content');
+                
+                const errorMessage = DOMHelper.createElement('div', {}, 'error-message');
+                errorMessage.textContent = `${CONFIG.apps[appId].name}のタブ初期化に失敗しました`;
+                errorTabContent.appendChild(errorMessage);
+                
                 tabContainer.appendChild(errorTabContent);
             }
         }
@@ -55,10 +62,10 @@ class TabManager {
     createTabMenu() {
         const tabMenu = DOMHelper.createElement('div', {}, 'tab-menu');
 
+        // 各台帳のタブを作成
         Object.entries(CONFIG.apps).forEach(([appId, appConfig]) => {
-            const tabButton = DOMHelper.createElement('button', {
-                'data-app': appId
-            }, 'tab-button');
+            const tabButton = DOMHelper.createElement('button', {}, 'tab-button');
+            tabButton.setAttribute('data-app', appId);
             tabButton.textContent = appConfig.name;
             tabButton.addEventListener('click', () => this.switchTab(appId));
             
@@ -84,17 +91,27 @@ class TabManager {
         tabContent.appendChild(loadingMessage);
 
         try {
-            // 非同期でフォームを作成
-            const searchForm = await FormBuilder.createSearchForm(appId, appConfig);
+            // FormBuilderインスタンスを作成
+            const formBuilder = new FormBuilder();
+            
+            // 指定されたappIdの検索フォームを作成
+            const formHTML = await formBuilder.buildSearchForm(appId);
             
             // ローディングメッセージを削除
             tabContent.removeChild(loadingMessage);
             
-            // フォームを追加
-            tabContent.appendChild(searchForm);
+            // フォームHTMLを直接挿入
+            tabContent.innerHTML = formHTML;
+            
+            // 個別タブ用の検索ボタンとクリアボタンを追加
+            const buttonGroup = this.createIndividualButtonGroup(appId);
+            tabContent.appendChild(buttonGroup);
+            
         } catch (error) {
             // ローディングメッセージを削除
-            tabContent.removeChild(loadingMessage);
+            if (tabContent.contains(loadingMessage)) {
+                tabContent.removeChild(loadingMessage);
+            }
             
             // エラーメッセージを表示
             const errorMessage = DOMHelper.createElement('div', {}, 'error-message');
@@ -131,17 +148,27 @@ class TabManager {
      * タブを切り替え
      */
     switchTab(appId) {
-        document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
-        document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-        
-        const targetButton = document.querySelector(`[data-app="${appId}"]`);
-        const targetContent = document.querySelector(`#tab-${appId}`);
-        
-        if (targetButton && targetContent) {
-            targetButton.classList.add('active');
-            targetContent.classList.add('active');
-            this.currentActiveTab = appId;
+        // 全てのタブボタンから active クラスを削除
+        const tabButtons = document.querySelectorAll('.tab-button');
+        tabButtons.forEach(button => button.classList.remove('active'));
+
+        // 全てのタブコンテンツを非表示
+        const tabContents = document.querySelectorAll('.tab-content');
+        tabContents.forEach(content => content.classList.remove('active'));
+
+        // 指定されたタブボタンに active クラスを追加
+        const activeButton = document.querySelector(`[data-app="${appId}"]`);
+        if (activeButton) {
+            activeButton.classList.add('active');
         }
+
+        // 指定されたタブコンテンツを表示
+        const activeContent = document.getElementById(`tab-${appId}`);
+        if (activeContent) {
+            activeContent.classList.add('active');
+        }
+
+        this.currentActiveTab = appId;
     }
 
     /**
@@ -149,6 +176,114 @@ class TabManager {
      */
     getCurrentActiveTab() {
         return this.currentActiveTab;
+    }
+
+    /**
+     * 個別タブ用のボタングループを作成
+     */
+    createIndividualButtonGroup(appId) {
+        const buttonGroup = DOMHelper.createElement('div', {}, 'button-group');
+
+        const searchButton = DOMHelper.createElement('button', {}, 'search-button');
+        searchButton.textContent = '検索';
+        searchButton.addEventListener('click', () => {
+            if (window.searchEngine) {
+                window.searchEngine.searchRecords(appId);
+            }
+        });
+
+        const clearButton = DOMHelper.createElement('button', {}, 'clear-button');
+        clearButton.textContent = 'クリア';
+        clearButton.addEventListener('click', () => this.clearForm(appId));
+
+        buttonGroup.appendChild(searchButton);
+        buttonGroup.appendChild(clearButton);
+
+        return buttonGroup;
+    }
+
+    /**
+     * 統合検索タブのコンテンツを作成
+     */
+    async createIntegratedTabContent() {
+        const integratedTabContent = DOMHelper.createElement('div', {
+            id: 'integrated-tab-content'
+        }, 'tab-content');
+
+        const loadingMessage = DOMHelper.createElement('div', {}, 'loading-message');
+        loadingMessage.textContent = '統合検索条件を読み込み中...';
+        integratedTabContent.appendChild(loadingMessage);
+
+        try {
+            const formBuilder = new FormBuilder();
+            const formHTML = await formBuilder.buildSearchForm('integrated');
+            loadingMessage.remove();
+
+            const formContainer = DOMHelper.createElement('div', {}, 'search-form-container');
+            formContainer.innerHTML = formHTML;
+
+            const buttonGroup = this.createIntegratedButtonGroup();
+            formContainer.appendChild(buttonGroup);
+
+            integratedTabContent.appendChild(formContainer);
+        } catch (error) {
+            loadingMessage.remove();
+            const errorMessage = DOMHelper.createElement('div', {}, 'error-message');
+            errorMessage.textContent = '統合検索条件の読み込みに失敗しました';
+            integratedTabContent.appendChild(errorMessage);
+        }
+
+        return integratedTabContent;
+    }
+
+    /**
+     * 統合検索用のボタングループを作成
+     */
+    createIntegratedButtonGroup() {
+        const buttonGroup = DOMHelper.createElement('div', {}, 'button-group');
+
+        const searchButton = DOMHelper.createElement('button', {}, 'search-button');
+        searchButton.textContent = '統合検索';
+        searchButton.addEventListener('click', () => {
+            if (window.searchEngine) {
+                this.executeIntegratedSearch();
+            }
+        });
+
+        const clearButton = DOMHelper.createElement('button', {}, 'clear-button');
+        clearButton.textContent = 'クリア';
+        clearButton.addEventListener('click', () => this.clearIntegratedForm());
+
+        buttonGroup.appendChild(searchButton);
+        buttonGroup.appendChild(clearButton);
+
+        return buttonGroup;
+    }
+
+    /**
+     * 指定されたタブのフォームをクリア
+     */
+    clearForm(appId) {
+        const tabContent = document.querySelector(`#tab-${appId}`);
+        if (!tabContent) return;
+        
+        // テキスト入力をクリア
+        const inputs = tabContent.querySelectorAll('input[type="text"], input[type="number"], input[type="date"], input[type="datetime-local"]');
+        inputs.forEach(input => {
+            input.value = '';
+        });
+
+        // セレクトボックスをリセット
+        const selects = tabContent.querySelectorAll('select');
+        selects.forEach(select => {
+            select.selectedIndex = 0;
+        });
+
+        // チェックボックスをクリア
+        const checkboxes = tabContent.querySelectorAll('input[type="checkbox"]');
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = false;
+        });
     }
 }
 

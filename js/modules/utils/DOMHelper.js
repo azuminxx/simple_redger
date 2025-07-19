@@ -52,6 +52,7 @@ class DOMHelper {
      * キーから台帳名を取得
      */
     static getLedgerNameFromKey(key) {
+        // 統合キーは表示されなくなったため、この処理は実際には使用されない
         if (key === CONFIG.integrationKey) {
             return '共通';
         }

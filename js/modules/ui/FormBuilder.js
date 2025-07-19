@@ -3,60 +3,38 @@
  */
 class FormBuilder {
     /**
-     * 検索フォームを作成（動的フィールド情報対応）
+     * 検索フォームを構築（動的フィールド対応）
      */
-    static async createSearchForm(appId, appConfig) {
-        const searchForm = DOMHelper.createElement('div', {}, 'search-form');
-
+    async buildSearchForm(appId) {
         try {
-            // 動的にフィールド情報を取得
-            const fields = await CONFIG.getAppFields(appId);
+            const fieldsMap = await CONFIG.getAllAppFields();
+            const appConfig = CONFIG.apps[appId];
+            const fields = fieldsMap[appId] || [];
+            const displayFields = appConfig.displayFields || [];
             
-            for (const field of fields) {
-                const fieldGroup = DOMHelper.createElement('div', {}, 'field-group');
+            let formHTML = '<div class="search-form">';
 
-                const label = DOMHelper.createElement('label');
-                label.textContent = field.label + ':';
-                label.setAttribute('for', `${field.code}-${appId}`);
-
-                let inputElement;
-
-                if (field.type === 'dropdown' || field.type === 'radio') {
-                    inputElement = this.createDropdownElement(field, appId);
-                } else if (field.type === 'checkbox') {
-                    inputElement = this.createCheckboxElement(field, appId);
-                } else if (field.type === 'number') {
-                    inputElement = this.createNumberInputElement(field, appId);
-                } else if (field.type === 'date') {
-                    inputElement = this.createDateInputElement(field, appId);
-                } else if (field.type === 'datetime-local') {
-                    inputElement = this.createDateTimeInputElement(field, appId);
-                } else {
-                    inputElement = this.createTextInputElement(field, appId);
+            // displayFieldsで指定された順序でフィールドを処理
+            displayFields.forEach(fieldCode => {
+                // 統合キーは除外
+                if (fieldCode !== CONFIG.integrationKey) {
+                    const field = fields.find(f => f.code === fieldCode);
+                    if (field) {
+                        formHTML += this.createFieldInput(field, appConfig.name, appId);
+                    } else {
+                        console.warn(`${appConfig.name}にフィールド「${fieldCode}」が見つかりません`);
+                    }
                 }
+            });
 
-                fieldGroup.appendChild(label);
-                fieldGroup.appendChild(inputElement);
-                searchForm.appendChild(fieldGroup);
-            }
+            formHTML += '</div>';
 
-            const buttonGroup = this.createButtonGroup(appId);
-            searchForm.appendChild(buttonGroup);
-
+            return formHTML;
         } catch (error) {
-            console.error(`App ${appId}のフォーム作成エラー:`, error);
-            
-            // エラー時はエラーメッセージを表示
-            const errorMessage = DOMHelper.createElement('div', {}, 'error-message');
-            errorMessage.textContent = `フィールド情報の取得に失敗しました: ${error.message}`;
-            searchForm.appendChild(errorMessage);
-            
-            // 最低限のボタンは表示
-            const buttonGroup = this.createButtonGroup(appId);
-            searchForm.appendChild(buttonGroup);
+            console.error('検索フォーム構築エラー:', error);
+            // エラー時は空のフォームを返す
+            return '<p>検索フォームの構築に失敗しました。</p>';
         }
-
-        return searchForm;
     }
 
     /**
@@ -214,6 +192,66 @@ class FormBuilder {
         checkboxes.forEach(checkbox => {
             checkbox.checked = false;
         });
+    }
+
+    /**
+     * フィールド入力要素のHTMLを生成
+     */
+    createFieldInput(field, appName, appId) {
+        const fieldId = `${field.code}-${appId}`;
+        let inputHTML = '';
+
+        inputHTML += `<div class="field-group">`;
+        inputHTML += `<label for="${fieldId}">${field.label}:</label>`;
+
+        if (field.type === 'dropdown' || field.type === 'radio') {
+            inputHTML += `<select id="${fieldId}" name="${field.code}">`;
+            inputHTML += `<option value="">選択してください</option>`;
+            
+            if (field.options && field.options.length > 0) {
+                field.options.forEach(option => {
+                    const optionValue = option.label || option.value || option;
+                    // 空の値やundefinedを除外
+                    if (optionValue && optionValue.toString().trim() !== '') {
+                        inputHTML += `<option value="${optionValue}">${optionValue}</option>`;
+                    }
+                });
+            }
+            
+            inputHTML += `</select>`;
+        } else if (field.type === 'checkbox') {
+            inputHTML += `<div class="checkbox-group">`;
+            
+            if (field.options && field.options.length > 0) {
+                field.options.forEach(option => {
+                    const optionValue = option.label || option.value || option;
+                    // 空の値やundefinedを除外
+                    if (optionValue && optionValue.toString().trim() !== '') {
+                        const checkboxId = `${fieldId}_${optionValue}`;
+                        inputHTML += `
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="${checkboxId}" name="${field.code}-${appId}" value="${optionValue}">
+                                ${optionValue}
+                            </label>
+                        `;
+                    }
+                });
+            }
+            
+            inputHTML += `</div>`;
+        } else if (field.type === 'number') {
+            inputHTML += `<input type="number" id="${fieldId}" name="${field.code}" placeholder="${field.label}を入力">`;
+        } else if (field.type === 'date') {
+            inputHTML += `<input type="date" id="${fieldId}" name="${field.code}">`;
+        } else if (field.type === 'datetime-local') {
+            inputHTML += `<input type="datetime-local" id="${fieldId}" name="${field.code}">`;
+        } else {
+            // text, textarea などのデフォルト
+            inputHTML += `<input type="text" id="${fieldId}" name="${field.code}" placeholder="${field.label}を入力">`;
+        }
+
+        inputHTML += `</div>`;
+        return inputHTML;
     }
 }
 

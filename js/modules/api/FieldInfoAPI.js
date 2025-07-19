@@ -169,15 +169,15 @@ class FieldInfoAPI {
     extractOptions(fieldInfo) {
         if (!fieldInfo.options) {
             console.log(`${fieldInfo.label}: 選択肢が存在しません`);
-            return [''];
+            return [];
         }
 
         // kintoneの選択肢は {label: "選択肢1", index: "0"} の形式
-        const options = ['']; // 空の選択肢を最初に追加
+        const options = [];
         
         // 選択肢をindex順にソートしてから処理
         const sortedOptions = Object.values(fieldInfo.options)
-            .filter(option => option.label) // labelが存在するもののみ
+            .filter(option => option.label && option.label.trim() !== '') // 空でないlabelのみ
             .sort((a, b) => {
                 // indexを数値として比較してソート
                 const indexA = parseInt(a.index) || 0;
@@ -190,7 +190,7 @@ class FieldInfoAPI {
             options.push(option.label);
         });
 
-        console.log(`${fieldInfo.label}: 選択肢を${options.length - 1}個取得（index順） ->`, options.slice(1));
+        console.log(`${fieldInfo.label}: 選択肢を${options.length}個取得（index順） ->`, options);
         return options;
     }
 

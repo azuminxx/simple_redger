@@ -32,16 +32,24 @@
 
                 // kintoneイベント登録
                 kintone.events.on('app.record.index.show', async (event) => {
+                    console.log('現在のビュー名:', event.viewName);
+                    console.log('設定されたビュー名:', CONFIG.system.viewName);
+                    
                     if (event.viewName != CONFIG.system.viewName) {
+                        console.log('ビュー名が一致しないため、処理をスキップします');
                         return;
                     }
 
                     try {
+                        console.log('統合台帳検索システムを初期化中...');
+                        
                         // フィールド情報を事前に取得
                         await this.preloadFieldInfo();
                         
                         // 検索メニューを初期化
                         await this.tabManager.initializeSearchMenu();
+                        
+                        console.log('統合台帳検索システムの初期化完了');
                     } catch (error) {
                         console.error('システム初期化エラー:', error);
                         alert(`${CONFIG.system.messages.fieldInfoLoadError}\n詳細: ${error.message}`);
