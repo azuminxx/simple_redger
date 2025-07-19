@@ -59,9 +59,16 @@ const CONFIG = {
             { key: '座席台帳_座席部署', label: '座席部署', width: '80px' },
             { key: '座席台帳_座席拠点', label: '座席拠点', width: '80px' },
             
-            // ユーザー台帳グループ
-            { key: 'ユーザー台帳_ユーザー名', label: 'ユーザー名', width: '120px' }
+            // ユーザー名（ユーザーリストから取得）
+            { key: 'ユーザー名', label: 'ユーザー名', width: '120px' }
         ]
+    },
+    
+    // ユーザーリスト設定（統合キーを持たない）
+    userList: {
+        appId: 13,
+        name: 'ユーザーリスト',
+        fields: ['ユーザーID', 'ユーザー名']
     },
     
     apps: {
@@ -100,10 +107,6 @@ const CONFIG = {
                     options: ['', '埼玉', '池袋', '文京', '浦和']
                 }
             ]
-        },
-        13: {
-            name: 'ユーザー台帳',
-            fields: ['PC番号', '内線番号', 'ユーザーID', '座席番号', 'ユーザー名']
         }
     },
 
@@ -121,5 +124,10 @@ const CONFIG = {
         if (!app) return [];
         
         return app.fields.map(field => this.resolveField(field)).filter(Boolean);
+    },
+    
+    // ユーザーリストのフィールド設定を解決
+    getUserListFields: function() {
+        return this.userList.fields.map(field => this.resolveField(field)).filter(Boolean);
     }
 }; 

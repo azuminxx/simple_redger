@@ -20,7 +20,7 @@ class DataIntegrator {
         const allLedgerData = {};
         allLedgerData[originalAppId] = originalRecords;
 
-        // 他の台帳を検索するPromiseを作成
+        // 他の台帳を検索するPromiseを作成（ユーザーリストは除外）
         const searchPromises = [];
         
         Object.keys(CONFIG.apps).forEach(appId => {
@@ -35,10 +35,20 @@ class DataIntegrator {
             }
         });
 
+        // ユーザーリストをユーザーIDで検索するPromiseを追加
+        const userListPromise = this.searchUserListByUserIds(allLedgerData)
+            .then(userListData => {
+                console.log(`ユーザーリストの検索結果（${userListData.length}件）:`, userListData);
+                return userListData;
+            });
+        searchPromises.push(userListPromise);
+
         // 全ての検索が完了したらデータを統合
         return Promise.all(searchPromises)
-            .then(() => {
-                return this.integrateAllLedgerData(allLedgerData, integrationKeys);
+            .then((results) => {
+                // 最後の結果がユーザーリストデータ
+                const userListData = results.pop();
+                return this.integrateAllLedgerDataWithUserList(allLedgerData, integrationKeys, userListData);
             });
     }
 
@@ -70,7 +80,110 @@ class DataIntegrator {
     }
 
     /**
-     * 全台帳のデータを統合キーで統合
+     * 全台帳からユーザーIDを抽出してユーザーリストを検索
+     */
+    searchUserListByUserIds(allLedgerData) {
+        const userIds = new Set();
+        
+        // 全台帳からユーザーIDを抽出
+        Object.values(allLedgerData).forEach(records => {
+            records.forEach(record => {
+                const userIdField = record['ユーザーID'];
+                if (userIdField && userIdField.value) {
+                    userIds.add(userIdField.value);
+                }
+            });
+        });
+
+        if (userIds.size === 0) {
+            console.log('ユーザーIDが見つかりませんでした。');
+            return Promise.resolve([]);
+        }
+
+        // ユーザーIDでユーザーリストを検索
+        const userIdList = Array.from(userIds).map(id => `"${id}"`).join(',');
+        const query = `ユーザーID in (${userIdList})`;
+        
+        return window.searchEngine.searchRecordsWithQuery(CONFIG.userList.appId, query);
+    }
+
+    /**
+     * 全台帳のデータを統合キーで統合し、ユーザーリストからユーザー名を取得
+     */
+    integrateAllLedgerDataWithUserList(allLedgerData, integrationKeys, userListData) {
+        const integratedData = [];
+
+        // ユーザーリストをユーザーIDでマップ化
+        const userMap = new Map();
+        userListData.forEach(user => {
+            const userId = user['ユーザーID'] && user['ユーザーID'].value;
+            const userName = user['ユーザー名'] && user['ユーザー名'].value;
+            if (userId) {
+                userMap.set(userId, userName || '');
+            }
+        });
+
+        integrationKeys.forEach(integrationKey => {
+            const integratedRecord = {
+                [CONFIG.integrationKey]: integrationKey
+            };
+
+            // 各台帳からこの統合キーに対応するレコードを取得
+            let recordUserId = null;
+            
+            Object.entries(allLedgerData).forEach(([appId, records]) => {
+                const matchingRecord = records.find(record => {
+                    const keyField = record[CONFIG.integrationKey];
+                    return keyField && keyField.value === integrationKey;
+                });
+
+                const ledgerName = CONFIG.apps[appId].name;
+                
+                if (matchingRecord) {
+                    // レコードが存在する場合、全フィールドを追加（統合キーは除く）
+                    Object.entries(matchingRecord).forEach(([fieldCode, fieldValue]) => {
+                        if (fieldCode !== CONFIG.integrationKey && 
+                            fieldCode !== '$id' && 
+                            fieldCode !== '$revision') {
+                            
+                            const displayValue = fieldValue && fieldValue.value !== undefined 
+                                ? fieldValue.value 
+                                : fieldValue;
+                            
+                            integratedRecord[`${ledgerName}_${fieldCode}`] = displayValue;
+                            
+                            // ユーザーIDを記録
+                            if (fieldCode === 'ユーザーID' && displayValue) {
+                                recordUserId = displayValue;
+                            }
+                        }
+                    });
+                } else {
+                    // レコードが存在しない場合、nullで埋める
+                    const fields = CONFIG.getAppFields(appId);
+                    fields.forEach(field => {
+                        if (field.code !== CONFIG.integrationKey) {
+                            integratedRecord[`${ledgerName}_${field.code}`] = null;
+                        }
+                    });
+                }
+            });
+
+            // ユーザーリストからユーザー名を取得
+            if (recordUserId && userMap.has(recordUserId)) {
+                integratedRecord['ユーザー名'] = userMap.get(recordUserId);
+            } else {
+                integratedRecord['ユーザー名'] = null;
+            }
+
+            integratedData.push(integratedRecord);
+        });
+
+        return integratedData;
+    }
+
+    /**
+     * 全台帳のデータを統合キーで統合（旧版・未使用）
      */
     integrateAllLedgerData(allLedgerData, integrationKeys) {
         const integratedData = [];
