@@ -141,6 +141,7 @@
 }
 
 .search-button,
+.add-search-button,
 .clear-button {
     padding: 10px 30px;
     border: none;
@@ -158,6 +159,16 @@
 
 .search-button:hover {
     background-color: #2980B9;
+    transform: translateY(-1px);
+}
+
+.add-search-button {
+    background-color: #27AE60;
+    color: white;
+}
+
+.add-search-button:hover {
+    background-color: #229954;
     transform: translateY(-1px);
 }
 

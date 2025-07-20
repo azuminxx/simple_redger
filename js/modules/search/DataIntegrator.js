@@ -140,29 +140,35 @@ class DataIntegrator {
                 const displayFields = CONFIG.getDisplayFields(appId);
                 
                 if (matchingRecord) {
-                    // レコードが存在する場合、displayFieldsで指定されたフィールドのみを追加
+                    // レコードが存在する場合、displayFieldsで指定されたフィールドを追加
                     displayFields.forEach(fieldCode => {
-                        if (fieldCode !== CONFIG.integrationKey) {
-                            const fieldValue = matchingRecord[fieldCode];
-                            const displayValue = fieldValue && fieldValue.value !== undefined 
-                                ? fieldValue.value 
-                                : fieldValue;
-                            
-                            integratedRecord[`${ledgerName}_${fieldCode}`] = displayValue;
-                            
-                            // ユーザーIDを記録
-                            if (fieldCode === 'ユーザーID' && displayValue) {
-                                recordUserId = displayValue;
-                            }
+                        const fieldValue = matchingRecord[fieldCode];
+                        const displayValue = fieldValue && fieldValue.value !== undefined 
+                            ? fieldValue.value 
+                            : fieldValue;
+                        
+                        integratedRecord[`${ledgerName}_${fieldCode}`] = displayValue;
+                        
+                        // ユーザーIDを記録
+                        if (fieldCode === 'ユーザーID' && displayValue) {
+                            recordUserId = displayValue;
                         }
                     });
+                    
+                    // 統合キーも追加（マージ処理で使用するため）
+                    const integrationKeyField = matchingRecord[CONFIG.integrationKey];
+                    const integrationKeyValue = integrationKeyField && integrationKeyField.value !== undefined 
+                        ? integrationKeyField.value 
+                        : integrationKeyField;
+                    integratedRecord[`${ledgerName}_${CONFIG.integrationKey}`] = integrationKeyValue;
                 } else {
                     // レコードが存在しない場合、displayFieldsのフィールドをnullで埋める
                     displayFields.forEach(fieldCode => {
-                        if (fieldCode !== CONFIG.integrationKey) {
-                            integratedRecord[`${ledgerName}_${fieldCode}`] = null;
-                        }
+                        integratedRecord[`${ledgerName}_${fieldCode}`] = null;
                     });
+                    
+                    // 統合キーもnullで追加
+                    integratedRecord[`${ledgerName}_${CONFIG.integrationKey}`] = null;
                 }
             }
 
@@ -177,6 +183,72 @@ class DataIntegrator {
         }
 
         return integratedData;
+    }
+
+    /**
+     * 2つの統合データをマージ（重複を除外）
+     * 統合キーが同じレコードは重複とみなし、新しいデータを優先
+     */
+    mergeIntegratedData(existingData, newData) {
+        if (!existingData || existingData.length === 0) {
+            return newData;
+        }
+        
+        if (!newData || newData.length === 0) {
+            return existingData;
+        }
+
+        // 既存データの統合キーをセットで管理（高速検索のため）
+        const existingKeys = new Set();
+        const mergedData = [...existingData];
+
+        // 既存データから統合キーを抽出
+        existingData.forEach(record => {
+            // 統合キーを各台帳のフィールドから探す
+            const integrationKey = this.extractIntegrationKeyFromRecord(record);
+            if (integrationKey) {
+                existingKeys.add(integrationKey);
+            }
+        });
+
+        // 新しいデータから重複していないものを追加
+        newData.forEach(record => {
+            const integrationKey = this.extractIntegrationKeyFromRecord(record);
+            
+            if (integrationKey) {
+                // 統合キーが存在する場合の重複チェック
+                if (!existingKeys.has(integrationKey)) {
+                    mergedData.push(record);
+                    existingKeys.add(integrationKey);
+                    console.log(`✅ 新規レコード追加: 統合キー=${integrationKey}`);
+                } else {
+                    console.log(`❌ 重複レコード除外: 統合キー=${integrationKey}`);
+                }
+            } else {
+                // 統合キーがnullの場合は、とりあえず追加
+                mergedData.push(record);
+            }
+        });
+        
+        return mergedData;
+    }
+
+    /**
+     * 統合レコードから統合キーを抽出
+     * 各台帳のフィールドから統合キーに対応する値を探す
+     */
+    extractIntegrationKeyFromRecord(record) {
+        // 各台帳から統合キーを探す
+        for (const [appId, appConfig] of Object.entries(CONFIG.apps)) {
+            const ledgerName = appConfig.name;
+            const keyFieldName = `${ledgerName}_${CONFIG.integrationKey}`;
+            
+            if (record[keyFieldName] && record[keyFieldName] !== null) {
+                return record[keyFieldName];
+            }
+        }
+        
+        return null;
     }
 }
 

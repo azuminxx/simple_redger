@@ -192,11 +192,20 @@ class TabManager {
             }
         });
 
+        const addSearchButton = DOMHelper.createElement('button', {}, 'add-search-button');
+        addSearchButton.textContent = '追加検索';
+        addSearchButton.addEventListener('click', () => {
+            if (window.searchEngine) {
+                window.searchEngine.addSearchRecords(appId);
+            }
+        });
+
         const clearButton = DOMHelper.createElement('button', {}, 'clear-button');
         clearButton.textContent = 'クリア';
         clearButton.addEventListener('click', () => this.clearForm(appId));
 
         buttonGroup.appendChild(searchButton);
+        buttonGroup.appendChild(addSearchButton);
         buttonGroup.appendChild(clearButton);
 
         return buttonGroup;

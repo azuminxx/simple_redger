@@ -4,6 +4,7 @@
 class TableRenderer {
     constructor() {
         this.virtualScroll = new VirtualScroll();
+        this.currentSearchResults = []; // 現在の検索結果を保持
     }
 
     /**
@@ -22,6 +23,9 @@ class TableRenderer {
         if (existingResults) {
             existingResults.remove();
         }
+
+        // 現在の検索結果を更新
+        this.currentSearchResults = integratedData;
 
         // データが0件の場合は0件メッセージを表示
         if (integratedData.length === 0) {
@@ -150,6 +154,20 @@ class TableRenderer {
         });
         
         return groups;
+    }
+
+    /**
+     * 現在の検索結果を取得
+     */
+    getCurrentSearchResults() {
+        return this.currentSearchResults;
+    }
+
+    /**
+     * 検索結果をクリア
+     */
+    clearSearchResults() {
+        this.currentSearchResults = [];
     }
 }
 

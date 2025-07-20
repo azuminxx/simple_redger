@@ -18,6 +18,11 @@ class SearchEngine {
             
             console.log(`🔍 ${CONFIG.apps[appId].name}で検索実行: ${query}`);
             
+            // 通常の検索では既存の結果をクリア
+            if (window.tableRenderer) {
+                window.tableRenderer.clearSearchResults();
+            }
+            
             // メインの台帳を検索
             const records = await this.searchRecordsWithQuery(appId, query);
             console.log(`✓ ${CONFIG.apps[appId].name}の検索結果: ${records.length}件`);
@@ -181,6 +186,55 @@ class SearchEngine {
         };
 
         return fetchRecords();
+    }
+
+    /**
+     * 追加検索を実行（既存の結果にマージ）
+     */
+    async addSearchRecords(appId) {
+        try {
+            const searchConditions = await this.getSearchConditions(appId);
+            
+            if (Object.keys(searchConditions).length === 0) {
+                alert(CONFIG.system.messages.noSearchCondition);
+                return;
+            }
+
+            const query = await this.buildSearchQuery(searchConditions, appId);
+            
+            console.log(`🔍 ${CONFIG.apps[appId].name}で追加検索実行: ${query}`);
+            
+            // メインの台帳を検索
+            const records = await this.searchRecordsWithQuery(appId, query);
+            console.log(`✓ ${CONFIG.apps[appId].name}の追加検索結果: ${records.length}件`);
+            
+            if (records.length > 0) {
+                // 統合キーを抽出して他の台帳も検索
+                const newIntegratedData = await window.dataIntegrator.searchAllLedgersWithIntegrationKeys(appId, records);
+                
+                if (newIntegratedData) {
+                    console.log(`📊 新規統合データ生成完了: ${newIntegratedData.length}件`);
+                    
+                    // 既存の検索結果と新しい結果をマージ
+                    const existingData = window.tableRenderer.getCurrentSearchResults();
+                    const mergedData = window.dataIntegrator.mergeIntegratedData(existingData, newIntegratedData);
+                    
+                    console.log(`🔄 データマージ完了: 既存${existingData.length}件 + 新規${newIntegratedData.length}件 → 統合${mergedData.length}件`);
+                    
+                    // テーブル表示
+                    if (window.tableRenderer) {
+                        window.tableRenderer.displayIntegratedTable(appId, mergedData);
+                    }
+                }
+            } else {
+                console.log(`${CONFIG.system.messages.noResults}（追加検索）`);
+                // 追加検索で0件の場合は既存の結果をそのまま保持
+                alert('追加検索の結果が0件でした。既存の検索結果はそのまま表示されます。');
+            }
+        } catch (error) {
+            console.error('追加検索エラー:', error);
+            alert(`追加検索中にエラーが発生しました。\n詳細: ${error.message}`);
+        }
     }
 }
 
