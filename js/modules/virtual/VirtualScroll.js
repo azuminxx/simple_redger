@@ -6,6 +6,7 @@ class VirtualScroll {
         this.fieldInfoCache = {};
         this.changeFlags = new Map(); // レコードの変更フラグを管理
         this.changedFields = new Map(); // 変更されたフィールドを記録 {recordIndex: Set(fieldKeys)}
+        this.originalValues = new Map(); // 元の値を保存 {recordIndex: Map(fieldKey: originalValue)}
         this.savedScrollTop = 0; // スクロール位置を保存
     }
     /**
@@ -48,8 +49,13 @@ class VirtualScroll {
             bodyTable: bodyTable
         };
         
+        // グローバルに保存（getRecordIdで使用）
+        window.virtualState = virtualState;
+        
         // 変更フラグを初期化
         this.initializeChangeFlags(integratedData);
+        
+        // 元の値は動的に管理（セル交換時のみ保存）
         
         // 初期レンダリング
         this.renderVirtualRows(virtualState);
@@ -106,9 +112,50 @@ class VirtualScroll {
     initializeChangeFlags(data) {
         this.changeFlags.clear();
         this.changedFields.clear();
+        this.originalValues.clear();
         for (let i = 0; i < data.length; i++) {
             this.changeFlags.set(i, false);
             this.changedFields.set(i, new Set());
+            this.originalValues.set(i, new Map());
+        }
+    }
+
+        /**
+     * 元の値を保存
+     */
+    saveOriginalValues(data) {
+        for (let i = 0; i < data.length; i++) {
+            const record = data[i];
+            const originalValuesMap = new Map();
+            
+            // 各フィールドの元の値を保存
+            CONFIG.integratedTableConfig.columns.forEach(column => {
+                if (!column.isChangeFlag) { // 変更フラグ列は除外
+                    originalValuesMap.set(column.key, record[column.key]);
+                }
+            });
+            
+            this.originalValues.set(i, originalValuesMap);
+        }
+    }
+
+    /**
+     * 指定レコードの元の値を現在の値でリセット（保存後に使用）
+     */
+    resetOriginalValues(recordIndex) {
+        if (window.tableRenderer && window.tableRenderer.currentSearchResults) {
+            const currentRecord = window.tableRenderer.currentSearchResults[recordIndex];
+            if (currentRecord) {
+                const originalValuesMap = new Map();
+                
+                CONFIG.integratedTableConfig.columns.forEach(column => {
+                    if (!column.isChangeFlag) { // 変更フラグ列は除外
+                        originalValuesMap.set(column.key, currentRecord[column.key]);
+                    }
+                });
+                
+                this.originalValues.set(recordIndex, originalValuesMap);
+            }
         }
     }
 
@@ -146,6 +193,95 @@ class VirtualScroll {
     }
 
     /**
+     * セル交換時のフィールド変更状態を更新
+     */
+    updateFieldChangeStatusForSwap(recordIndex, fieldKey, originalValue, newValue) {
+        // セッション全体で一意のキーを生成（レコードIDベース）
+        const recordId = this.getRecordId(recordIndex);
+        const sessionKey = `${recordId}_${fieldKey}`;
+        
+        // セッション全体の元の値を管理するマップ（存在しない場合は作成）
+        if (!window.swapSessionOriginalValues) {
+            window.swapSessionOriginalValues = new Map();
+        }
+        
+        // 初回交換時：元の値を保存（セッション全体で一意）
+        if (!window.swapSessionOriginalValues.has(sessionKey)) {
+            window.swapSessionOriginalValues.set(sessionKey, originalValue);
+        }
+        
+        // 保存された元の値と現在値を比較
+        const savedOriginalValue = window.swapSessionOriginalValues.get(sessionKey);
+        
+        if (savedOriginalValue === newValue) {
+            // 元の値に戻った場合
+            this.removeChangedField(recordIndex, fieldKey);
+            // セッションからも削除（初期状態に戻す）
+            window.swapSessionOriginalValues.delete(sessionKey);
+        } else {
+            // まだ変更状態
+            this.setChangedField(recordIndex, fieldKey);
+        }
+    }
+
+    /**
+     * レコードIDを取得（レコードを一意に識別）
+     */
+    getRecordId(recordIndex) {
+        // レコードインデックスをそのまま使用（シンプルで確実）
+        // セル交換では行の位置は変わらないため、recordIndexが最も安全
+        return recordIndex;
+    }
+
+    /**
+     * フィールドの元の値を保存し、現在の値と比較して変更状態を更新
+     */
+    updateFieldChangeStatus(recordIndex, fieldKey, currentValue) {
+        // 元の値のマップを初期化（必要に応じて）
+        if (!this.originalValues.has(recordIndex)) {
+            this.originalValues.set(recordIndex, new Map());
+        }
+        
+        const originalValuesMap = this.originalValues.get(recordIndex);
+        
+        // 元の値が保存されていない場合はエラー（フォーカス時に保存されるはず）
+        if (!originalValuesMap.has(fieldKey)) {
+            console.warn(`⚠️ 元の値が見つかりません: 行${recordIndex} ${fieldKey} - 変更フラグ追加`);
+            this.setChangedField(recordIndex, fieldKey);
+            return;
+        }
+        
+        const originalValue = originalValuesMap.get(fieldKey);
+        
+        // 現在の値が元の値と同じかどうかを判定
+        if (currentValue === originalValue) {
+            // 元に戻った場合は変更フラグから削除
+            this.removeChangedField(recordIndex, fieldKey);
+            // 背景色もクリア
+            this.clearCellChangedStyle(recordIndex, fieldKey);
+        } else {
+            // 変更されている場合は変更フラグに追加
+            this.setChangedField(recordIndex, fieldKey);
+            // 背景色を設定
+            this.setCellChangedStyle(recordIndex, fieldKey);
+        }
+    }
+
+    /**
+     * 指定レコードから変更されたフィールドを削除
+     */
+    removeChangedField(recordIndex, fieldKey) {
+        if (this.changedFields.has(recordIndex)) {
+            this.changedFields.get(recordIndex).delete(fieldKey);
+            
+            // 変更されたフィールドがなくなった場合は変更フラグもリセット
+            if (this.changedFields.get(recordIndex).size === 0) {
+                this.setChangeFlag(recordIndex, false);
+            }
+        }
+    }
+
+    /**
      * レコードの変更フラグを設定
      */
     setChangeFlag(recordIndex, isChanged) {
@@ -154,10 +290,11 @@ class VirtualScroll {
         
         // フラグがリセットされた場合は変更フィールドもクリア
         if (!isChanged) {
-            console.log(`🏁 変更フラグリセット処理: 行${recordIndex}`);
             this.changedFields.set(recordIndex, new Set());
             // 対応するセルの背景色もクリア
             this.clearCellChangedStyles(recordIndex);
+            // 元の値もリセット（保存後の新しい状態を元の値とする）
+            this.resetOriginalValues(recordIndex);
         }
     }
 
@@ -170,7 +307,7 @@ class VirtualScroll {
         cells.forEach(cell => {
             cell.classList.remove('cell-changed');
         });
-        console.log(`🧹 背景色クリア: 行${recordIndex} (${cells.length}個のセル)`);
+        // 背景色クリアの詳細ログは省略
     }
 
     /**
@@ -180,7 +317,6 @@ class VirtualScroll {
         const checkbox = document.querySelector(`input[data-record-index="${recordIndex}"][data-field="change-flag"]`);
         if (checkbox) {
             checkbox.checked = isChanged;
-            // console.log(`☑️ VirtualScroll: チェックボックス更新 行${recordIndex} = ${isChanged}`);
         } else {
             console.warn(`⚠️ VirtualScroll: チェックボックスが見つかりません 行${recordIndex}`);
             // DOM更新が遅れている可能性があるため、少し遅延して再試行
@@ -188,7 +324,6 @@ class VirtualScroll {
                 const retryCheckbox = document.querySelector(`input[data-record-index="${recordIndex}"][data-field="change-flag"]`);
                 if (retryCheckbox) {
                     retryCheckbox.checked = isChanged;
-                    // console.log(`☑️ VirtualScroll: チェックボックス更新（再試行）行${recordIndex} = ${isChanged}`);
                 }
             }, 100);
         }
@@ -235,6 +370,7 @@ class VirtualScroll {
                 
                 // セルにデータ属性を追加（ドラッグアンドドロップ用）
                 td.setAttribute('data-row', i);
+                td.setAttribute('data-record-index', i);
                 td.setAttribute('data-column', column.key);
                 td.setAttribute('data-field-code', column.fieldCode || '');
                 
@@ -258,11 +394,6 @@ class VirtualScroll {
                     checkbox.setAttribute('data-field', 'change-flag');
                     td.appendChild(checkbox);
                     td.className = 'change-flag-cell';
-                    
-                    // デバッグログ（コメントアウト）
-                    // if (isChanged) {
-                    //     console.log(`☑️ 変更フラグ反映: 行${i} = ${isChanged}`);
-                    // }
                 } else if (this.isEditableField(column)) {
                     // 編集可能フィールドの場合は入力要素を作成
                     const inputElement = await this.createEditableInput(column, value, i, columnIndex);
@@ -283,15 +414,14 @@ class VirtualScroll {
                 const changedFields = this.getChangedFields(i);
                 if (changedFields.has(column.key)) {
                     td.classList.add('cell-changed');
-                    console.log(`🎨 背景色適用: 行${i} フィールド${column.key}`);
                 } else {
                     // 変更フィールドに含まれていない場合は背景色クラスを削除
                     td.classList.remove('cell-changed');
                 }
                 
-                // ドラッグアンドドロップ機能を追加（TableRenderer経由）
-                if (window.tableRenderer && column.fieldCode) {
-                    window.tableRenderer.addDragAndDropToCell(td, i, column.key, column.fieldCode);
+                // ドラッグアンドドロップ機能を追加（CellSwapper経由）
+                if (window.tableRenderer && window.tableRenderer.cellSwapper && column.fieldCode) {
+                    window.tableRenderer.cellSwapper.addDragAndDropToCell(td, i, column.key, column.fieldCode);
                 }
                 
                 row.appendChild(td);
@@ -394,6 +524,11 @@ class VirtualScroll {
             'data-field-key': column.key
         }, 'editable-cell-input');
 
+        // フォーカス時に元の値を保存
+        input.addEventListener('focus', (event) => {
+            this.saveOriginalValueOnEdit(event.target);
+        });
+
         // 値変更時のイベントリスナー
         input.addEventListener('change', (event) => {
             this.handleCellValueChange(event.target);
@@ -433,6 +568,11 @@ class VirtualScroll {
         if (value && !options.includes(value)) {
             select.value = '';
         }
+
+        // フォーカス時に元の値を保存
+        select.addEventListener('focus', (event) => {
+            this.saveOriginalValueOnEdit(event.target);
+        });
 
         // 値変更時のイベントリスナー
         select.addEventListener('change', (event) => {
@@ -484,6 +624,27 @@ class VirtualScroll {
     }
 
     /**
+     * セル編集開始時に元の値を保存
+     */
+    saveOriginalValueOnEdit(inputElement) {
+        const recordIndex = parseInt(inputElement.getAttribute('data-record-index'));
+        const fieldKey = inputElement.getAttribute('data-field-key');
+        const currentValue = inputElement.value;
+
+        // 元の値のマップを初期化（必要に応じて）
+        if (!this.originalValues.has(recordIndex)) {
+            this.originalValues.set(recordIndex, new Map());
+        }
+        
+        const originalValuesMap = this.originalValues.get(recordIndex);
+        
+        // まだ元の値が保存されていない場合のみ保存
+        if (!originalValuesMap.has(fieldKey)) {
+            originalValuesMap.set(fieldKey, currentValue);
+        }
+    }
+
+    /**
      * セルの値変更を処理
      */
     handleCellValueChange(inputElement) {
@@ -491,25 +652,49 @@ class VirtualScroll {
         const fieldKey = inputElement.getAttribute('data-field-key');
         const newValue = inputElement.value;
 
-        console.log(`📝 セル編集: レコード${recordIndex}, フィールド${fieldKey}, 新しい値: ${newValue}`);
-
         // TableRendererの現在のデータを更新
         if (window.tableRenderer && window.tableRenderer.currentSearchResults) {
             const currentData = window.tableRenderer.currentSearchResults;
             if (currentData[recordIndex]) {
                 currentData[recordIndex][fieldKey] = newValue;
-                console.log(`✅ データ更新完了: レコード${recordIndex}[${fieldKey}] = ${newValue}`);
                 
-                // 変更されたフィールドを記録
-                if (!this.changedFields.has(recordIndex)) {
-                    this.changedFields.set(recordIndex, new Set());
-                }
-                this.changedFields.get(recordIndex).add(fieldKey);
-                
-                // 変更フラグを設定
-                this.setChangeFlag(recordIndex, true);
+                // 元の値と比較して変更状態を更新
+                this.updateFieldChangeStatus(recordIndex, fieldKey, newValue);
             }
         }
+    }
+
+    /**
+     * 指定セルにcell-changedクラスを付与（背景色変更）
+     */
+    setCellChangedStyle(recordIndex, fieldKey) {
+        const cell = this.findCellElement(recordIndex, fieldKey);
+        if (cell) {
+            cell.classList.add('cell-changed');
+        } else {
+            console.warn(`⚠️ セル要素が見つかりません: 行${recordIndex} ${fieldKey}`);
+        }
+    }
+
+    /**
+     * 指定セルからcell-changedクラスを削除（背景色クリア）
+     */
+    clearCellChangedStyle(recordIndex, fieldKey) {
+        const cell = this.findCellElement(recordIndex, fieldKey);
+        if (cell) {
+            cell.classList.remove('cell-changed');
+        } else {
+            console.warn(`⚠️ セル要素が見つかりません（クリア時）: 行${recordIndex} ${fieldKey}`);
+        }
+    }
+
+    /**
+     * セル要素を検索
+     */
+    findCellElement(recordIndex, fieldKey) {
+        // データ属性でセルを検索
+        const selector = `td[data-record-index="${recordIndex}"][data-column="${fieldKey}"]`;
+        return document.querySelector(selector);
     }
 }
 
