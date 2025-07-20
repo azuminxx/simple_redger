@@ -36,6 +36,10 @@ class SearchEngine {
                 }
             } else {
                 console.log(CONFIG.system.messages.noResults);
+                // 0件の場合もテーブル表示処理を呼び出し（空の配列を渡す）
+                if (window.tableRenderer) {
+                    window.tableRenderer.displayIntegratedTable(appId, []);
+                }
             }
         } catch (error) {
             console.error('検索エラー:', error);

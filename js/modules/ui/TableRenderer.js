@@ -23,6 +23,12 @@ class TableRenderer {
             existingResults.remove();
         }
 
+        // データが0件の場合は0件メッセージを表示
+        if (integratedData.length === 0) {
+            this.displayNoResultsMessage();
+            return;
+        }
+
         // 動的CSSを生成してテーブル幅を設定
         CSSGenerator.generateTableWidthCSS();
 
@@ -38,6 +44,32 @@ class TableRenderer {
         const tableContainer = this.virtualScroll.createVirtualScrollTable(integratedData);
         
         integratedResultsContainer.appendChild(tableContainer);
+        resultsContainer.appendChild(integratedResultsContainer);
+    }
+
+    /**
+     * 検索結果0件のメッセージを表示
+     */
+    displayNoResultsMessage() {
+        const resultsContainer = document.getElementById(CONFIG.system.resultsContainerId);
+        if (!resultsContainer) {
+            console.error(`結果表示エリア（${CONFIG.system.resultsContainerId}）が見つかりません`);
+            return;
+        }
+
+        // 統合結果コンテナを作成
+        const integratedResultsContainer = DOMHelper.createElement('div', {}, 'integrated-results');
+
+        // タイトルを作成
+        const title = DOMHelper.createElement('h3');
+        title.textContent = '統合検索結果（0件）';
+        integratedResultsContainer.appendChild(title);
+
+        // 0件メッセージを作成
+        const noResultsMessage = DOMHelper.createElement('div', {}, 'no-results-message');
+        noResultsMessage.textContent = CONFIG.system.messages.noResults;
+        integratedResultsContainer.appendChild(noResultsMessage);
+
         resultsContainer.appendChild(integratedResultsContainer);
     }
 
