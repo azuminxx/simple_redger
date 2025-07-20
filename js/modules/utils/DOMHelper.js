@@ -114,6 +114,81 @@ class DOMHelper {
         // スタイル要素を作成して追加
         DOMHelper.createStyleElement('dynamic-table-width', css);
     }
+
+    /**
+     * セルから値を取得（レガシーシステムのCellValueHelper同様）
+     */
+    static getCellValue(cell) {
+        if (!cell) return '';
+
+        // input要素がある場合
+        const input = cell.querySelector('input, select, textarea');
+        if (input) {
+            return input.value || '';
+        }
+
+        // リンク要素がある場合
+        const link = cell.querySelector('a');
+        if (link) {
+            return link.textContent || '';
+        }
+
+        // 主キーセル（分離ボタン付き）の場合、値spanから取得
+        const valueSpan = cell.querySelector('div > span, .primary-key-value');
+        if (valueSpan) {
+            return valueSpan.textContent || '';
+        }
+
+        // 通常のテキストセル
+        return cell.textContent || '';
+    }
+
+    /**
+     * セルに値を設定（レガシーシステムのCellValueHelper同様）
+     */
+    static setCellValue(cell, value) {
+        if (!cell) return false;
+
+        // input要素がある場合
+        const input = cell.querySelector('input, select, textarea');
+        if (input) {
+            input.value = value;
+            return true;
+        }
+
+        // 主キーセル（分離ボタン付き）の場合、値spanに設定
+        const valueSpan = cell.querySelector('div > span, .primary-key-value');
+        if (valueSpan) {
+            valueSpan.textContent = value;
+            return true;
+        }
+
+        // 通常のテキストセル
+        cell.textContent = value;
+        return true;
+    }
+
+    /**
+     * セルが編集可能かどうかを判定
+     */
+    static isCellEditable(cell) {
+        return cell.querySelector('input, select, textarea') !== null;
+    }
+
+    /**
+     * フィールドキーからフィールドコードを抽出
+     * 例: "PC台帳_PC番号" → "PC番号"
+     */
+    static extractFieldCodeFromKey(fieldKey) {
+        if (!fieldKey || typeof fieldKey !== 'string') return '';
+        
+        const parts = fieldKey.split('_');
+        if (parts.length >= 2) {
+            return parts.slice(1).join('_'); // 最初の部分（台帳名）を除いて結合
+        }
+        
+        return fieldKey;
+    }
 }
 
 // グローバルに公開

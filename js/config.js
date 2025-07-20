@@ -35,12 +35,15 @@ const CONFIG = {
     // 台帳アプリ設定
     apps: {
         6: {
+            appId: 6,
             name: 'PC台帳'
         },
         7: {
+            appId: 7,
             name: '内線台帳'
         },
         8: {
+            appId: 8,
             name: '座席台帳'
         }
     },

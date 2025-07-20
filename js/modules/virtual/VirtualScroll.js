@@ -123,6 +123,19 @@ class VirtualScroll {
     }
 
     /**
+     * 指定レコードに変更されたフィールドを設定
+     */
+    setChangedField(recordIndex, fieldKey) {
+        if (!this.changedFields.has(recordIndex)) {
+            this.changedFields.set(recordIndex, new Set());
+        }
+        this.changedFields.get(recordIndex).add(fieldKey);
+        
+        // 変更フラグも設定
+        this.setChangeFlag(recordIndex, true);
+    }
+
+    /**
      * レコードの変更フラグを設定
      */
     setChangeFlag(recordIndex, isChanged) {
@@ -142,6 +155,17 @@ class VirtualScroll {
         const checkbox = document.querySelector(`input[data-record-index="${recordIndex}"][data-field="change-flag"]`);
         if (checkbox) {
             checkbox.checked = isChanged;
+            console.log(`☑️ VirtualScroll: チェックボックス更新 行${recordIndex} = ${isChanged}`);
+        } else {
+            console.warn(`⚠️ VirtualScroll: チェックボックスが見つかりません 行${recordIndex}`);
+            // DOM更新が遅れている可能性があるため、少し遅延して再試行
+            setTimeout(() => {
+                const retryCheckbox = document.querySelector(`input[data-record-index="${recordIndex}"][data-field="change-flag"]`);
+                if (retryCheckbox) {
+                    retryCheckbox.checked = isChanged;
+                    console.log(`☑️ VirtualScroll: チェックボックス更新（再試行）行${recordIndex} = ${isChanged}`);
+                }
+            }, 100);
         }
     }
 
@@ -184,16 +208,36 @@ class VirtualScroll {
                 const td = DOMHelper.createElement('td');
                 const value = record[column.key];
                 
+                // セルにデータ属性を追加（ドラッグアンドドロップ用）
+                td.setAttribute('data-row', i);
+                td.setAttribute('data-column', column.key);
+                td.setAttribute('data-field-code', column.fieldCode || '');
+                
+                // レコードIDを埋め込み（台帳別）
+                if (column.ledger && column.ledger !== '共通' && column.ledger !== '操作') {
+                    const recordIdKey = `${column.ledger}_$id`;
+                    const recordIdValue = record[recordIdKey];
+                    if (recordIdValue) {
+                        td.setAttribute(`data-record-id-${column.ledger}`, recordIdValue);
+                    }
+                }
+                
                 if (column.isChangeFlag) {
                     // 変更フラグ列の場合はチェックボックスを作成
                     const checkbox = DOMHelper.createElement('input');
                     checkbox.type = 'checkbox';
-                    checkbox.checked = this.changeFlags.get(i) || false;
+                    const isChanged = this.changeFlags.get(i) || false;
+                    checkbox.checked = isChanged;
                     checkbox.disabled = true; // 手動変更不可
                     checkbox.setAttribute('data-record-index', i);
                     checkbox.setAttribute('data-field', 'change-flag');
                     td.appendChild(checkbox);
                     td.className = 'change-flag-cell';
+                    
+                    // デバッグログ
+                    if (isChanged) {
+                        console.log(`☑️ 変更フラグ反映: 行${i} = ${isChanged}`);
+                    }
                 } else if (this.isEditableField(column)) {
                     // 編集可能フィールドの場合は入力要素を作成
                     const inputElement = await this.createEditableInput(column, value, i, columnIndex);
@@ -208,6 +252,17 @@ class VirtualScroll {
                         td.textContent = value;
                         td.className = 'readonly-cell';
                     }
+                }
+                
+                // 変更されたフィールドの背景色を適用
+                const changedFields = this.getChangedFields(i);
+                if (changedFields.has(column.key)) {
+                    td.classList.add('cell-changed');
+                }
+                
+                // ドラッグアンドドロップ機能を追加（TableRenderer経由）
+                if (window.tableRenderer && column.fieldCode) {
+                    window.tableRenderer.addDragAndDropToCell(td, i, column.key, column.fieldCode);
                 }
                 
                 row.appendChild(td);

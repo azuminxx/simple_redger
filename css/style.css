@@ -437,4 +437,86 @@
     background-color: #6c757d;
     cursor: not-allowed;
     transform: none;
+}
+
+/* ドラッグアンドドロップ用スタイル */
+.draggable-primary-key {
+    cursor: grab;
+    position: relative;
+}
+
+.draggable-primary-key:active {
+    cursor: grabbing;
+}
+
+.dragging {
+    opacity: 0.5;
+    background-color: #e3f2fd !important;
+    transform: scale(0.95);
+    z-index: 1000;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.drop-target {
+    background-color: #c8e6c9 !important;
+    border: 2px dashed #4caf50 !important;
+    box-shadow: inset 0 0 10px rgba(76, 175, 80, 0.3);
+}
+
+/* 主キーフィールドの視覚的識別 */
+.draggable-primary-key::before {
+    content: "⚡";
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    font-size: 10px;
+    color: #2196f3;
+    opacity: 0.7;
+}
+
+/* ドラッグ中の視覚効果 */
+.draggable-primary-key:hover {
+    background-color: #f5f5f5;
+    border: 1px solid #2196f3;
+}
+
+/* 交換された値の背景色（既存のcell-changedクラスを拡張） */
+.cell-changed {
+    background-color: #fff3e0 !important;
+    border-left: 3px solid #ff9800;
+    transition: background-color 0.3s ease;
+}
+
+/* 無効なドロップターゲット */
+.drop-invalid {
+    background-color: #ffebee !important;
+    border: 2px dashed #f44336 !important;
+    box-shadow: inset 0 0 10px rgba(244, 67, 54, 0.3);
+}
+
+/* ドロップヒント */
+.drop-hint {
+    position: absolute;
+    background-color: #333;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    white-space: nowrap;
+    z-index: 1001;
+    top: -25px;
+    left: 50%;
+    transform: translateX(-50%);
+    pointer-events: none;
+    opacity: 0.9;
+}
+
+.drop-hint::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    margin-left: -4px;
+    border: 4px solid transparent;
+    border-top-color: #333;
 } 
