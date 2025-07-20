@@ -339,51 +339,51 @@ class SearchEngine {
     /**
      * 既存の全カーソルを強制削除（システム起動時用）
      */
-    async cleanupAllCursors() {
-        console.log('🧹 既存カーソルのクリーンアップを開始...');
+    // async cleanupAllCursors() {
+    //     console.log('🧹 既存カーソルのクリーンアップを開始...');
         
-        try {
-            // 無限ループを避けるため、クリーンアップ中は再試行を無効化
-            const originalMaxRetries = this.maxRetries;
-            this.maxRetries = 0;
+    //     try {
+    //         // 無限ループを避けるため、クリーンアップ中は再試行を無効化
+    //         const originalMaxRetries = this.maxRetries;
+    //         this.maxRetries = 0;
             
-            // より実用的なアプローチ: 各アプリで空のカーソルを作成し、その際に古いカーソルが削除されることを期待
-            const appIds = Object.keys(CONFIG.apps);
+    //         // より実用的なアプローチ: 各アプリで空のカーソルを作成し、その際に古いカーソルが削除されることを期待
+    //         const appIds = Object.keys(CONFIG.apps);
             
-            for (const appId of appIds) {
-                try {
-                    // 直接APIを呼び出してカーソル作成（再試行なし）
-                    const body = {
-                        app: appId,
-                        query: '$id > 0',
-                        size: 1 // 最小サイズ
-                    };
+    //         for (const appId of appIds) {
+    //             try {
+    //                 // 直接APIを呼び出してカーソル作成（再試行なし）
+    //                 const body = {
+    //                     app: appId,
+    //                     query: '$id > 0',
+    //                     size: 1 // 最小サイズ
+    //                 };
                     
-                    const response = await kintone.api(kintone.api.url('/k/v1/records/cursor.json', true), 'POST', body);
-                    console.log(`🧹 App ${appId} で一時カーソル作成: ${response.id}`);
+    //                 const response = await kintone.api(kintone.api.url('/k/v1/records/cursor.json', true), 'POST', body);
+    //                 console.log(`🧹 App ${appId} で一時カーソル作成: ${response.id}`);
                     
-                    // すぐに削除
-                    await this.deleteCursor(response.id);
-                    console.log(`🧹 App ${appId} のカーソルクリーンアップ完了`);
+    //                 // すぐに削除
+    //                 await this.deleteCursor(response.id);
+    //                 console.log(`🧹 App ${appId} のカーソルクリーンアップ完了`);
                     
-                } catch (error) {
-                    console.warn(`⚠️ App ${appId} のカーソルクリーンアップでエラー:`, error);
-                    // エラーが発生しても続行
-                }
+    //             } catch (error) {
+    //                 console.warn(`⚠️ App ${appId} のカーソルクリーンアップでエラー:`, error);
+    //                 // エラーが発生しても続行
+    //             }
                 
-                // 各アプリ間で少し待機
-                await new Promise(resolve => setTimeout(resolve, 500));
-            }
+    //             // 各アプリ間で少し待機
+    //             await new Promise(resolve => setTimeout(resolve, 500));
+    //         }
             
-            // 設定を元に戻す
-            this.maxRetries = originalMaxRetries;
+    //         // 設定を元に戻す
+    //         this.maxRetries = originalMaxRetries;
             
-            console.log('✅ カーソルクリーンアップ完了');
+    //         console.log('✅ カーソルクリーンアップ完了');
             
-        } catch (error) {
-            console.warn('⚠️ カーソルクリーンアップでエラーが発生:', error);
-        }
-    }
+    //     } catch (error) {
+    //         console.warn('⚠️ カーソルクリーンアップでエラーが発生:', error);
+    //     }
+    // }
 
     /**
      * 追加検索を実行（既存の結果にマージ）

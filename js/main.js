@@ -2,6 +2,46 @@
     'use strict';
 
     /**
+     * API実行回数監視クラス
+     */
+    class APICounter {
+        constructor() {
+            this.counts = new Map(); // アプリIDごとのAPI実行回数
+        }
+
+        /**
+         * API実行回数をカウント（ログ出力なし）
+         */
+        count(appId, apiType = 'unknown') {
+            if (!this.counts.has(appId)) {
+                this.counts.set(appId, 0);
+            }
+            
+            const currentCount = this.counts.get(appId) + 1;
+            this.counts.set(appId, currentCount);
+            
+            return currentCount;
+        }
+
+        /**
+         * API実行回数サマリーを表示（簡潔版）
+         */
+        showSummary() {
+            console.log('📊 API実行回数:');
+            
+            if (this.counts.size === 0) {
+                console.log('   実行履歴がありません');
+                return;
+            }
+            
+            this.counts.forEach((count, appId) => {
+                const appName = CONFIG.apps[appId] ? CONFIG.apps[appId].name : `App ${appId}`;
+                console.log(`   ${appName}: ${count}回`);
+            });
+        }
+    }
+
+    /**
      * 統合台帳検索システム（モジュール統合版）
      */
     class LedgerSearchSystem {

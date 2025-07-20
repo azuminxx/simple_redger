@@ -120,21 +120,21 @@ class FieldInfoAPI {
     /**
      * ローカルストレージのキャッシュをクリア
      */
-    clearLocalStorageCache() {
-        try {
-            const keys = [];
-            for (let i = 0; i < localStorage.length; i++) {
-                const key = localStorage.key(i);
-                if (key && key.startsWith(this.localStoragePrefix)) {
-                    keys.push(key);
-                }
-            }
-            keys.forEach(key => localStorage.removeItem(key));
-            console.log(`🗑️ ローカルストレージキャッシュクリア完了 (${keys.length}件)`);
-        } catch (error) {
-            console.warn('ローカルストレージキャッシュクリアエラー:', error);
-        }
-    }
+    // clearLocalStorageCache() {
+    //     try {
+    //         const keys = [];
+    //         for (let i = 0; i < localStorage.length; i++) {
+    //             const key = localStorage.key(i);
+    //             if (key && key.startsWith(this.localStoragePrefix)) {
+    //                 keys.push(key);
+    //             }
+    //         }
+    //         keys.forEach(key => localStorage.removeItem(key));
+    //         console.log(`🗑️ ローカルストレージキャッシュクリア完了 (${keys.length}件)`);
+    //     } catch (error) {
+    //         console.warn('ローカルストレージキャッシュクリアエラー:', error);
+    //     }
+    // }
 
     /**
      * APIレスポンスのフィールドデータを処理

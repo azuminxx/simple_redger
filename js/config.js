@@ -94,10 +94,10 @@ const CONFIG = {
      * アプリのフィールド情報を取得
      * @deprecated グローバルのwindow.fieldInfoAPIを直接使用してください
      */
-    async getAppFields(appId) {
-        console.warn('⚠️ CONFIG.getAppFields は非推奨です。window.fieldInfoAPI.getAppFields を直接使用してください。');
-        return await window.fieldInfoAPI.getAppFields(appId);
-    },
+    // async getAppFields(appId) {
+    //     console.warn('⚠️ CONFIG.getAppFields は非推奨です。window.fieldInfoAPI.getAppFields を直接使用してください。');
+    //     return await window.fieldInfoAPI.getAppFields(appId);
+    // },
 
     /**
      * ユーザーリストのフィールド情報を取得

@@ -41,61 +41,61 @@ class FormBuilder {
     /**
      * ドロップダウン要素を作成
      */
-    static createDropdownElement(field, appId) {
-        const inputElement = DOMHelper.createElement('select', {
-            id: `${field.code}-${appId}`,
-            name: field.code
-        });
+    // static createDropdownElement(field, appId) {
+    //     const inputElement = DOMHelper.createElement('select', {
+    //         id: `${field.code}-${appId}`,
+    //         name: field.code
+    //     });
 
-        if (field.options && Array.isArray(field.options)) {
-            field.options.forEach(option => {
-                const optionElement = DOMHelper.createElement('option', {
-                    value: option
-                });
-                optionElement.textContent = option === '' ? '選択してください' : option;
-                inputElement.appendChild(optionElement);
-            });
-        } else {
-            // オプションが無い場合のフォールバック
-            const defaultOption = DOMHelper.createElement('option', { value: '' });
-            defaultOption.textContent = '選択してください';
-            inputElement.appendChild(defaultOption);
-        }
+    //     if (field.options && Array.isArray(field.options)) {
+    //         field.options.forEach(option => {
+    //             const optionElement = DOMHelper.createElement('option', {
+    //                 value: option
+    //             });
+    //             optionElement.textContent = option === '' ? '選択してください' : option;
+    //             inputElement.appendChild(optionElement);
+    //         });
+    //     } else {
+    //         // オプションが無い場合のフォールバック
+    //         const defaultOption = DOMHelper.createElement('option', { value: '' });
+    //         defaultOption.textContent = '選択してください';
+    //         inputElement.appendChild(defaultOption);
+    //     }
 
-        return inputElement;
-    }
+    //     return inputElement;
+    // }
 
     /**
      * チェックボックス要素を作成
      */
-    static createCheckboxElement(field, appId) {
-        const container = DOMHelper.createElement('div', {}, 'checkbox-container');
+    // static createCheckboxElement(field, appId) {
+    //     const container = DOMHelper.createElement('div', {}, 'checkbox-container');
         
-        if (field.options && Array.isArray(field.options)) {
-            field.options.forEach((option, index) => {
-                if (option === '') return; // 空の選択肢はスキップ
+    //     if (field.options && Array.isArray(field.options)) {
+    //         field.options.forEach((option, index) => {
+    //             if (option === '') return; // 空の選択肢はスキップ
                 
-                const checkboxWrapper = DOMHelper.createElement('div', {}, 'checkbox-wrapper');
+    //             const checkboxWrapper = DOMHelper.createElement('div', {}, 'checkbox-wrapper');
                 
-                const checkbox = DOMHelper.createElement('input', {
-                    type: 'checkbox',
-                    id: `${field.code}-${appId}-${index}`,
-                    name: `${field.code}-${appId}`,
-                    value: option
-                });
+    //             const checkbox = DOMHelper.createElement('input', {
+    //                 type: 'checkbox',
+    //                 id: `${field.code}-${appId}-${index}`,
+    //                 name: `${field.code}-${appId}`,
+    //                 value: option
+    //             });
                 
-                const label = DOMHelper.createElement('label');
-                label.setAttribute('for', `${field.code}-${appId}-${index}`);
-                label.textContent = option;
+    //             const label = DOMHelper.createElement('label');
+    //             label.setAttribute('for', `${field.code}-${appId}-${index}`);
+    //             label.textContent = option;
                 
-                checkboxWrapper.appendChild(checkbox);
-                checkboxWrapper.appendChild(label);
-                container.appendChild(checkboxWrapper);
-            });
-        }
+    //             checkboxWrapper.appendChild(checkbox);
+    //             checkboxWrapper.appendChild(label);
+    //             container.appendChild(checkboxWrapper);
+    //         });
+    //     }
         
-        return container;
-    }
+    //     return container;
+    // }
 
     /**
      * 数値入力要素を作成
@@ -136,14 +136,14 @@ class FormBuilder {
     /**
      * テキスト入力要素を作成
      */
-    static createTextInputElement(field, appId) {
-        return DOMHelper.createElement('input', {
-            type: 'text',
-            id: `${field.code}-${appId}`,
-            name: field.code,
-            placeholder: field.placeholder
-        });
-    }
+    // static createTextInputElement(field, appId) {
+    //     return DOMHelper.createElement('input', {
+    //         type: 'text',
+    //         id: `${field.code}-${appId}`,
+    //         name: field.code,
+    //         placeholder: field.placeholder
+    //     });
+    // }
 
     /**
      * フィールド入力要素のHTMLを生成
