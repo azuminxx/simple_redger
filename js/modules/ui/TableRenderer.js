@@ -5,6 +5,9 @@ class TableRenderer {
     constructor() {
         this.virtualScroll = new VirtualScroll();
         this.currentSearchResults = []; // 現在の検索結果を保持
+        
+        // VirtualScrollインスタンスをグローバルに設定
+        window.virtualScroll = this.virtualScroll;
     }
 
     /**
@@ -200,18 +203,35 @@ class TableRenderer {
         try {
             console.log('📤 変更保存開始...');
             
-            // 各台帳ごとにレコードをグループ化
-            const recordsByApp = this.groupRecordsByApp();
+            // 変更されたレコードのインデックスを取得
+            if (!window.virtualScroll) {
+                throw new Error('VirtualScrollインスタンスが見つかりません');
+            }
             
-            // 各台帳のレコードを更新
+            const changedIndices = window.virtualScroll.getChangedRecordIndices();
+            
+            if (changedIndices.length === 0) {
+                alert('変更されたレコードがありません。');
+                return;
+            }
+            
+            console.log(`📝 変更されたレコード: ${changedIndices.length}件`);
+            
+            // 変更されたレコードのみから各台帳ごとにレコードをグループ化
+            const recordsByApp = this.groupRecordsByApp(changedIndices);
+            
+            // 各台帳のレコードを一括更新
             const updatePromises = [];
             for (const [appId, records] of Object.entries(recordsByApp)) {
                 if (records.length > 0) {
-                    updatePromises.push(this.updateAppRecords(appId, records));
+                    updatePromises.push(this.updateAppRecordsBatch(appId, records));
                 }
             }
             
             await Promise.all(updatePromises);
+            
+            // 変更フラグをリセット
+            this.resetChangeFlags(changedIndices);
             
             console.log('✅ 全ての変更が保存されました');
             alert('変更が正常に保存されました。');
@@ -228,9 +248,9 @@ class TableRenderer {
     }
 
     /**
-     * レコードを台帳ごとにグループ化
+     * レコードを台帳ごとにグループ化（更新要件に基づく）
      */
-    groupRecordsByApp() {
+    groupRecordsByApp(changedIndices = null) {
         const recordsByApp = {};
         
         // 各台帳のレコードを初期化
@@ -238,38 +258,121 @@ class TableRenderer {
             recordsByApp[appId] = [];
         });
         
-        this.currentSearchResults.forEach(integratedRecord => {
-            // 各台帳からフィールドを抽出
+        // 処理対象のレコードを決定（変更されたレコードのみまたは全レコード）
+        const targetRecords = changedIndices 
+            ? changedIndices.map(index => this.currentSearchResults[index])
+            : this.currentSearchResults;
+        
+        targetRecords.forEach((integratedRecord, index) => {
+            // 各台帳のレコードを準備
+            const recordsToUpdate = {};
+            
+            // 実際のレコードインデックスを取得（changedIndicesを使用している場合）
+            const actualRecordIndex = changedIndices ? changedIndices[index] : index;
+            
+            // 変更されたフィールドのみを取得
+            const changedFieldKeys = window.virtualScroll.getChangedFields(actualRecordIndex);
+            
+            if (changedFieldKeys.size === 0) {
+                console.warn(`⚠️ レコード${actualRecordIndex}に変更されたフィールドがありません`);
+                return;
+            }
+            
+            console.log(`🔍 レコード${actualRecordIndex}の変更フィールド:`, Array.from(changedFieldKeys));
+            
+            // 全台帳のレコードIDを取得
             Object.entries(CONFIG.apps).forEach(([appId, appConfig]) => {
                 const ledgerName = appConfig.name;
-                const record = { $id: null };
-                let hasData = false;
+                const recordIdValue = integratedRecord[`${ledgerName}_$id`];
                 
-                // 統合キーを取得
-                const integrationKeyValue = integratedRecord[`${ledgerName}_${CONFIG.integrationKey}`];
-                if (integrationKeyValue) {
-                    // 統合キーから実際のレコードIDを取得する必要があります
-                    // ここでは簡略化のため統合キーを使用
-                    record[CONFIG.integrationKey] = { value: integrationKeyValue };
-                    hasData = true;
+                if (recordIdValue) {
+                    recordsToUpdate[appId] = {
+                        $id: { value: recordIdValue },
+                        ledgerName: ledgerName
+                    };
+                    
+                    // 統合キーを設定
+                    const integrationKeyValue = integratedRecord[`${ledgerName}_${CONFIG.integrationKey}`];
+                    if (integrationKeyValue) {
+                        recordsToUpdate[appId][CONFIG.integrationKey] = { value: integrationKeyValue };
+                    }
                 }
+            });
+            
+            // 変更されたフィールドのみを各台帳に振り分け
+            changedFieldKeys.forEach(fieldKey => {
+                const value = integratedRecord[fieldKey];
+                const updateTargets = this.getUpdateTargetsForField(fieldKey);
+                const fieldCode = this.extractFieldCodeFromKey(fieldKey);
                 
-                // 各フィールドの値を設定
-                CONFIG.getDisplayFields(appId).forEach(fieldCode => {
-                    const fieldKey = `${ledgerName}_${fieldCode}`;
-                    if (integratedRecord.hasOwnProperty(fieldKey)) {
-                        record[fieldCode] = { value: integratedRecord[fieldKey] };
-                        hasData = true;
+                console.log(`🔄 フィールド振り分け: ${fieldKey} (${fieldCode}) → ${updateTargets.map(appId => CONFIG.apps[appId].name).join(', ')}`);
+                
+                updateTargets.forEach(appId => {
+                    if (recordsToUpdate[appId]) {
+                        recordsToUpdate[appId][fieldCode] = { value: value };
                     }
                 });
+            });
+            
+            // 各台帳のレコードを追加
+            Object.entries(recordsToUpdate).forEach(([appId, record]) => {
+                // レコードIDと統合キー、ledgerName以外のフィールドがある場合のみ追加
+                const updateFields = Object.keys(record).filter(key => 
+                    key !== '$id' && key !== CONFIG.integrationKey && key !== 'ledgerName'
+                );
+                const hasUpdateFields = updateFields.length > 0;
                 
-                if (hasData) {
+                console.log(`🔍 ${CONFIG.apps[appId].name} レコード構造:`, Object.keys(record));
+                console.log(`📝 ${CONFIG.apps[appId].name} 更新フィールド:`, updateFields);
+                console.log(`✅ ${CONFIG.apps[appId].name} 更新対象: ${hasUpdateFields}`);
+                
+                if (hasUpdateFields) {
                     recordsByApp[appId].push(record);
                 }
             });
         });
         
         return recordsByApp;
+    }
+
+    /**
+     * フィールドの更新対象台帳を取得
+     */
+    getUpdateTargetsForField(fieldKey) {
+        const fieldCode = this.extractFieldCodeFromKey(fieldKey);
+        
+        // PC番号/内線番号/座席番号は全台帳で更新
+        const commonFields = ['PC番号', '内線番号', '座席番号'];
+        if (commonFields.includes(fieldCode)) {
+            return Object.keys(CONFIG.apps);
+        }
+        
+        // ユーザーIDはPC台帳のみ更新
+        if (fieldCode === 'ユーザーID') {
+            return Object.keys(CONFIG.apps).filter(appId => CONFIG.apps[appId].name === 'PC台帳');
+        }
+        
+        // その他のフィールドは元の台帳のみ更新
+        const ledgerName = this.extractLedgerNameFromKey(fieldKey);
+        return Object.keys(CONFIG.apps).filter(appId => CONFIG.apps[appId].name === ledgerName);
+    }
+
+    /**
+     * フィールドキーからフィールドコードを抽出
+     */
+    extractFieldCodeFromKey(fieldKey) {
+        // "台帳名_フィールドコード" の形式からフィールドコードを抽出
+        const parts = fieldKey.split('_');
+        return parts.slice(1).join('_'); // 台帳名を除いた部分
+    }
+
+    /**
+     * フィールドキーから台帳名を抽出
+     */
+    extractLedgerNameFromKey(fieldKey) {
+        // "台帳名_フィールドコード" の形式から台帳名を抽出
+        const parts = fieldKey.split('_');
+        return parts[0]; // 最初の部分が台帳名
     }
 
     /**
@@ -286,26 +389,15 @@ class TableRenderer {
         
         const updatePromises = records.map(async (record) => {
             try {
-                // 統合キーでレコードを検索してIDを取得
-                const integrationKeyValue = record[CONFIG.integrationKey]?.value;
-                if (!integrationKeyValue) {
-                    throw new Error('統合キーが見つかりません');
-                }
-                
-                // レコード検索
-                const query = `${CONFIG.integrationKey} = "${integrationKeyValue}"`;
-                const searchResult = await window.searchEngine.searchRecordsWithQuery(appId, query);
-                
-                if (searchResult.length === 0) {
-                    console.warn(`統合キー ${integrationKeyValue} のレコードが見つかりません`);
+                // レコードIDを取得
+                const recordIdValue = record.$id?.value;
+                if (!recordIdValue) {
+                    console.warn(`${CONFIG.apps[appId].name} レコードIDが見つかりません - スキップします`);
                     return;
                 }
                 
-                const targetRecord = searchResult[0];
-                const recordId = targetRecord.$id.value;
-                
                 // レコード更新用のデータを準備
-                const updateData = { $id: { value: recordId } };
+                const updateData = {};
                 Object.keys(record).forEach(fieldCode => {
                     if (fieldCode !== '$id' && fieldCode !== CONFIG.integrationKey) {
                         updateData[fieldCode] = record[fieldCode];
@@ -315,11 +407,11 @@ class TableRenderer {
                 // レコードを更新
                 await kintone.api(kintone.api.url('/k/v1/record', true), 'PUT', {
                     app: appId,
-                    id: recordId,
+                    id: recordIdValue,
                     record: updateData
                 });
                 
-                console.log(`✅ ${CONFIG.apps[appId].name} レコードID ${recordId} を更新`);
+                console.log(`✅ ${CONFIG.apps[appId].name} レコードID ${recordIdValue} を更新`);
                 
             } catch (error) {
                 console.error(`❌ ${CONFIG.apps[appId].name} レコード更新エラー:`, error);
@@ -328,6 +420,67 @@ class TableRenderer {
         });
         
         await Promise.all(updatePromises);
+    }
+
+    /**
+     * 特定のアプリのレコードを一括更新
+     */
+    async updateAppRecordsBatch(appId, records) {
+        console.log(`📝 ${CONFIG.apps[appId].name}のレコードを一括更新中... (${records.length}件)`);
+        
+        try {
+            // 一括更新用のデータを準備
+            const updateRecords = records.map(record => {
+                const recordIdValue = record.$id?.value;
+                if (!recordIdValue) {
+                    throw new Error(`レコードIDが見つかりません`);
+                }
+                
+                // 更新データを準備（$idと統合キーを除外）
+                const updateData = {};
+                Object.keys(record).forEach(fieldCode => {
+                    if (fieldCode !== '$id' && fieldCode !== CONFIG.integrationKey) {
+                        updateData[fieldCode] = record[fieldCode];
+                    }
+                });
+                
+                return {
+                    id: recordIdValue,
+                    record: updateData
+                };
+            });
+            
+            // API実行回数をカウント
+            window.apiCounter.count(appId, 'レコード一括更新');
+            
+            // kintone REST API の一括更新を実行
+            const response = await kintone.api(kintone.api.url('/k/v1/records', true), 'PUT', {
+                app: appId,
+                records: updateRecords
+            });
+            
+            console.log(`✅ ${CONFIG.apps[appId].name} 一括更新完了 (${records.length}件)`);
+            return response;
+            
+        } catch (error) {
+            console.error(`❌ ${CONFIG.apps[appId].name} 一括更新エラー:`, error);
+            throw error;
+        }
+    }
+
+    /**
+     * 変更フラグをリセット
+     */
+    resetChangeFlags(changedIndices) {
+        if (!window.virtualScroll) {
+            console.warn('VirtualScrollインスタンスが見つかりません - フラグリセットをスキップ');
+            return;
+        }
+        
+        changedIndices.forEach(index => {
+            window.virtualScroll.setChangeFlag(index, false);
+        });
+        console.log(`🔄 変更フラグをリセット (${changedIndices.length}件)`);
     }
 }
 

@@ -15,19 +15,25 @@
         async init() {
             try {
                 // フィールド情報API を初期化
-                const fieldInfoAPI = new FieldInfoAPI();
-                CONFIG.initialize(fieldInfoAPI);
+                this.fieldInfoAPI = new FieldInfoAPI();
+                CONFIG.initialize();
 
                 // モジュールインスタンスを作成
                 this.tabManager = new TabManager();
                 this.searchEngine = new SearchEngine();
                 this.dataIntegrator = new DataIntegrator();
                 this.tableRenderer = new TableRenderer();
+                this.apiCounter = new APICounter();
 
                 // グローバルに公開（他のモジュールから参照できるように）
+                if (window.fieldInfoAPI) {
+                    console.warn('⚠️ window.fieldInfoAPIが既に存在します - 上書きします');
+                }
+                window.fieldInfoAPI = this.fieldInfoAPI;
                 window.tabManager = this.tabManager;
                 window.searchEngine = this.searchEngine;
                 window.dataIntegrator = this.dataIntegrator;
+                window.apiCounter = this.apiCounter;
                 window.tableRenderer = this.tableRenderer;
 
                 // kintoneイベント登録
@@ -68,7 +74,18 @@
                 
                 // 統合テーブルのカラム設定を動的生成
                 const dynamicColumns = await CONFIG.generateIntegratedTableColumns();
-                CONFIG.integratedTableConfig.columns = dynamicColumns;
+                
+                // 変更フラグ列を最初に追加
+                const columnsWithChangeFlag = [{
+                    key: 'change-flag',
+                    label: '変更',
+                    ledger: '操作',
+                    fieldCode: 'change-flag',
+                    appId: null,
+                    isChangeFlag: true
+                }, ...dynamicColumns];
+                
+                CONFIG.integratedTableConfig.columns = columnsWithChangeFlag;
                 
                 console.log(`📋 統合テーブル設定完了 (${dynamicColumns.length}列)`);
                 

@@ -52,6 +52,11 @@ class DOMHelper {
      * キーから台帳名を取得
      */
     static getLedgerNameFromKey(key) {
+        // 変更フラグ列の場合は「共通」を返す
+        if (key === 'change-flag') {
+            return '共通';
+        }
+        
         // 統合キーは表示されなくなったため、この処理は実際には使用されない
         // if (key === CONFIG.integrationKey) {
         //     return '共通';

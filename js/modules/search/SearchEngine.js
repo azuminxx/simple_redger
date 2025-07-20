@@ -5,6 +5,7 @@ class SearchEngine {
     constructor() {
         this.isSearching = false;
         this.activeCursors = new Set(); // アクティブなカーソルIDを管理
+        this.cursorAppMap = new Map(); // カーソルIDとappIdのマッピング
         this.retryCount = 0; // 再試行回数を管理
         this.maxRetries = 1; // 最大再試行回数
     }
@@ -79,7 +80,7 @@ class SearchEngine {
         const conditions = {};
         
         try {
-            const fields = await CONFIG.getAppFields(appId);
+            const fields = await window.fieldInfoAPI.getAppFields(appId);
             
             fields.forEach(field => {
                 if (field.type === 'checkbox') {
@@ -111,7 +112,7 @@ class SearchEngine {
         const queryParts = [];
         
         try {
-            const fields = await CONFIG.getAppFields(appId);
+            const fields = await window.fieldInfoAPI.getAppFields(appId);
 
             for (const [fieldCode, value] of Object.entries(conditions)) {
                 const fieldConfig = fields.find(field => field.code === fieldCode);
@@ -176,9 +177,13 @@ class SearchEngine {
             size: CONFIG.system.cursorSize
         };
 
+        // API実行回数をカウント
+        window.apiCounter.count(appId, 'カーソル作成');
+        
         return kintone.api(kintone.api.url('/k/v1/records/cursor.json', true), 'POST', body)
             .then((response) => {
                 this.activeCursors.add(response.id); // アクティブカーソルに追加
+                this.cursorAppMap.set(response.id, appId); // カーソルとappIdのマッピング
                 this.retryCount = 0; // 成功時は再試行回数をリセット
                 console.log(`📝 カーソル作成: ${response.id} (アクティブ: ${this.activeCursors.size}件)`);
                 return response.id;
@@ -230,6 +235,12 @@ class SearchEngine {
                 id: cursorId
             };
 
+            // API実行回数をカウント
+            const appId = this.cursorAppMap.get(cursorId);
+            if (appId) {
+                window.apiCounter.count(appId, 'レコード取得');
+            }
+
             return kintone.api(kintone.api.url('/k/v1/records/cursor.json', true), 'GET', body)
                 .then((response) => {
                     allRecords.push(...response.records);
@@ -240,6 +251,7 @@ class SearchEngine {
                         // レコード取得完了時はカーソルが自動削除されるため、明示的な削除は不要
                         // ただし、アクティブカーソル管理から削除
                         this.activeCursors.delete(cursorId);
+                        this.cursorAppMap.delete(cursorId);
                         console.log(`✅ レコード取得完了: ${cursorId} (残り: ${this.activeCursors.size}件)`);
                         return allRecords;
                     }
@@ -266,13 +278,21 @@ class SearchEngine {
             id: cursorId
         };
 
+        // API実行回数をカウント
+        const appId = this.cursorAppMap.get(cursorId);
+        if (appId) {
+            window.apiCounter.count(appId, 'カーソル削除');
+        }
+
         return kintone.api(kintone.api.url('/k/v1/records/cursor.json', true), 'DELETE', body)
             .then(() => {
                 this.activeCursors.delete(cursorId); // アクティブカーソルから削除
+                this.cursorAppMap.delete(cursorId); // マッピングからも削除
                 console.log(`🗑️ カーソル削除完了: ${cursorId} (残り: ${this.activeCursors.size}件)`);
             })
             .catch((error) => {
                 this.activeCursors.delete(cursorId); // エラーでも削除扱い
+                this.cursorAppMap.delete(cursorId); // マッピングからも削除
                 
                 // GAIA_CN01エラー（カーソルが存在しない）の場合は詳細ログを抑制
                 if (error.code === 'GAIA_CN01') {

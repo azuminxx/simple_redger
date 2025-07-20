@@ -4,6 +4,8 @@
 class VirtualScroll {
     constructor() {
         this.fieldInfoCache = {};
+        this.changeFlags = new Map(); // レコードの変更フラグを管理
+        this.changedFields = new Map(); // 変更されたフィールドを記録 {recordIndex: Set(fieldKeys)}
     }
     /**
      * 仮想スクロール対応テーブルを作成
@@ -44,6 +46,9 @@ class VirtualScroll {
             headerTable: headerTable,
             bodyTable: bodyTable
         };
+        
+        // 変更フラグを初期化
+        this.initializeChangeFlags(integratedData);
         
         // 初期レンダリング
         this.renderVirtualRows(virtualState);
@@ -86,6 +91,61 @@ class VirtualScroll {
     }
 
     /**
+     * 変更フラグを初期化
+     */
+    initializeChangeFlags(data) {
+        this.changeFlags.clear();
+        this.changedFields.clear();
+        for (let i = 0; i < data.length; i++) {
+            this.changeFlags.set(i, false);
+            this.changedFields.set(i, new Set());
+        }
+    }
+
+    /**
+     * 変更されたレコードのインデックスを取得
+     */
+    getChangedRecordIndices() {
+        const changedIndices = [];
+        this.changeFlags.forEach((isChanged, index) => {
+            if (isChanged) {
+                changedIndices.push(index);
+            }
+        });
+        return changedIndices;
+    }
+
+    /**
+     * 指定レコードの変更されたフィールドを取得
+     */
+    getChangedFields(recordIndex) {
+        return this.changedFields.get(recordIndex) || new Set();
+    }
+
+    /**
+     * レコードの変更フラグを設定
+     */
+    setChangeFlag(recordIndex, isChanged) {
+        this.changeFlags.set(recordIndex, isChanged);
+        this.updateChangeCheckbox(recordIndex, isChanged);
+        
+        // フラグがリセットされた場合は変更フィールドもクリア
+        if (!isChanged) {
+            this.changedFields.set(recordIndex, new Set());
+        }
+    }
+
+    /**
+     * チェックボックスの表示を更新
+     */
+    updateChangeCheckbox(recordIndex, isChanged) {
+        const checkbox = document.querySelector(`input[data-record-index="${recordIndex}"][data-field="change-flag"]`);
+        if (checkbox) {
+            checkbox.checked = isChanged;
+        }
+    }
+
+    /**
      * colgroup要素を作成してカラム幅を定義
      */
     createColgroup() {
@@ -124,7 +184,17 @@ class VirtualScroll {
                 const td = DOMHelper.createElement('td');
                 const value = record[column.key];
                 
-                if (this.isEditableField(column)) {
+                if (column.isChangeFlag) {
+                    // 変更フラグ列の場合はチェックボックスを作成
+                    const checkbox = DOMHelper.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.checked = this.changeFlags.get(i) || false;
+                    checkbox.disabled = true; // 手動変更不可
+                    checkbox.setAttribute('data-record-index', i);
+                    checkbox.setAttribute('data-field', 'change-flag');
+                    td.appendChild(checkbox);
+                    td.className = 'change-flag-cell';
+                } else if (this.isEditableField(column)) {
                     // 編集可能フィールドの場合は入力要素を作成
                     const inputElement = await this.createEditableInput(column, value, i, columnIndex);
                     td.appendChild(inputElement);
@@ -193,6 +263,11 @@ class VirtualScroll {
      * フィールドが編集可能かどうかを判定
      */
     isEditableField(column) {
+        // 変更フラグ列は編集不可
+        if (column.isChangeFlag) {
+            return false;
+        }
+        
         // 編集不可のフィールドを定義
         const readOnlyFields = ['PC番号', '内線番号', '座席番号', 'ユーザー名'];
         
@@ -283,12 +358,12 @@ class VirtualScroll {
         return select;
     }
 
-    /**
-     * フィールド情報を取得（キャッシュ付き）
+        /**
+     * フィールド情報を取得（フィールドレベルキャッシュ付き）
      */
     async getFieldInfo(appId, fieldCode) {
         try {
-            // 静的キャッシュを使用してAPI呼び出しを最小限に抑制
+            // フィールドレベルの静的キャッシュを使用
             if (!this.fieldInfoCache) {
                 this.fieldInfoCache = {};
             }
@@ -297,17 +372,23 @@ class VirtualScroll {
             if (this.fieldInfoCache[cacheKey]) {
                 return this.fieldInfoCache[cacheKey];
             }
+
+            // グローバルのFieldInfoAPIインスタンスを使用
+            if (!window.fieldInfoAPI) {
+                console.error('FieldInfoAPIインスタンスが見つかりません');
+                return { type: 'text' };
+            }
             
-            const fields = await CONFIG.getAppFields(appId);
-            const fieldInfo = fields.find(field => field.code === fieldCode);
+            const fields = await window.fieldInfoAPI.getAppFields(appId);
+            const fieldInfo = fields.find(field => field.code === fieldCode) || { type: 'text' };
             
-            // キャッシュに保存
+            // フィールドレベルキャッシュに保存
             this.fieldInfoCache[cacheKey] = fieldInfo;
             
             return fieldInfo;
         } catch (error) {
             console.error(`フィールド情報取得エラー (App ${appId}, Field ${fieldCode}):`, error);
-            return null;
+            return { type: 'text' };
         }
     }
 
@@ -327,6 +408,15 @@ class VirtualScroll {
             if (currentData[recordIndex]) {
                 currentData[recordIndex][fieldKey] = newValue;
                 console.log(`✅ データ更新完了: レコード${recordIndex}[${fieldKey}] = ${newValue}`);
+                
+                // 変更されたフィールドを記録
+                if (!this.changedFields.has(recordIndex)) {
+                    this.changedFields.set(recordIndex, new Set());
+                }
+                this.changedFields.get(recordIndex).add(fieldKey);
+                
+                // 変更フラグを設定
+                this.setChangeFlag(recordIndex, true);
             }
         }
     }

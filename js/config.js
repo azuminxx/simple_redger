@@ -68,14 +68,11 @@ const CONFIG = {
         ]
     },
 
-    // FieldInfoAPIインスタンス
-    fieldInfoAPI: null,
-
     /**
      * CONFIGを初期化
      */
     initialize: function(fieldInfoAPI) {
-        this.fieldInfoAPI = fieldInfoAPI;
+        // fieldInfoAPIは使用せず、window.fieldInfoAPIを使用
         console.log('⚙️ CONFIG初期化完了');
     },
 
@@ -95,25 +92,18 @@ const CONFIG = {
 
     /**
      * アプリのフィールド情報を取得
+     * @deprecated グローバルのwindow.fieldInfoAPIを直接使用してください
      */
     async getAppFields(appId) {
-        try {
-            if (!this.fieldInfoAPI) {
-                throw new Error('FieldInfoAPIが初期化されていません');
-            }
-
-            return await this.fieldInfoAPI.getAppFields(appId);
-        } catch (error) {
-            console.error(`App ${appId}のフィールド情報取得エラー:`, error);
-            throw error;
-        }
+        console.warn('⚠️ CONFIG.getAppFields は非推奨です。window.fieldInfoAPI.getAppFields を直接使用してください。');
+        return await window.fieldInfoAPI.getAppFields(appId);
     },
 
     /**
      * ユーザーリストのフィールド情報を取得
      */
     async getUserListFields() {
-        return this.getAppFields(this.userList.appId);
+        return await window.fieldInfoAPI.getAppFields(this.userList.appId);
     },
 
     /**
@@ -121,12 +111,12 @@ const CONFIG = {
      */
     async getAllAppFields() {
         try {
-            if (!this.fieldInfoAPI) {
+            if (!window.fieldInfoAPI) {
                 throw new Error('FieldInfoAPIが初期化されていません');
             }
 
             const appIds = Object.keys(this.apps);
-            return await this.fieldInfoAPI.getMultipleAppFields(appIds);
+            return await window.fieldInfoAPI.getMultipleAppFields(appIds);
         } catch (error) {
             console.error('全アプリのフィールド情報取得エラー:', error);
             throw error;

@@ -155,6 +155,13 @@ class DataIntegrator {
                         }
                     });
                     
+                    // レコードIDを追加（保存処理で使用するため）
+                    const recordIdField = matchingRecord['$id'];
+                    const recordIdValue = recordIdField && recordIdField.value !== undefined 
+                        ? recordIdField.value 
+                        : recordIdField;
+                    integratedRecord[`${ledgerName}_$id`] = recordIdValue;
+                    
                     // 統合キーも追加（マージ処理で使用するため）
                     const integrationKeyField = matchingRecord[CONFIG.integrationKey];
                     const integrationKeyValue = integrationKeyField && integrationKeyField.value !== undefined 
@@ -166,6 +173,9 @@ class DataIntegrator {
                     displayFields.forEach(fieldCode => {
                         integratedRecord[`${ledgerName}_${fieldCode}`] = null;
                     });
+                    
+                    // レコードIDもnullで追加
+                    integratedRecord[`${ledgerName}_$id`] = null;
                     
                     // 統合キーもnullで追加
                     integratedRecord[`${ledgerName}_${CONFIG.integrationKey}`] = null;

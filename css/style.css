@@ -343,6 +343,23 @@
     background: #a8a8a8;
 }
 
+/* 変更フラグセルのスタイル */
+.change-flag-cell {
+    text-align: center;
+    width: 60px;
+    min-width: 60px;
+    max-width: 60px;
+    padding: 8px 4px;
+    vertical-align: middle;
+}
+
+.change-flag-cell input[type="checkbox"] {
+    cursor: not-allowed;
+    transform: scale(1.2);
+    margin: 0 auto;
+    display: block;
+}
+
 /* 編集可能セルのスタイル */
 .editable-cell-input,
 .editable-cell-select {
