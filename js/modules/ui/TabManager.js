@@ -236,6 +236,7 @@ class TabManager {
             checkbox.checked = false;
         });
     }
+
 }
 
 // グローバルに公開

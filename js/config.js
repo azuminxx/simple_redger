@@ -52,7 +52,7 @@ const CONFIG = {
             { key: 'PC台帳_PC番号', label: 'PC番号', width: '120px', appId: 6, fieldCode: 'PC番号' },
             { key: 'PC台帳_ユーザーID', label: 'ユーザーID', width: '100px', appId: 6, fieldCode: 'ユーザーID' },
             { key: 'PC台帳_ユーザー名', label: 'ユーザー名', width: '120px', appId: 6, fieldCode: 'ユーザー名', isUserListDerived: true },
-            { key: 'PC台帳_PC用途', label: 'PC用途', width: '110px', appId: 6, fieldCode: 'PC用途' },
+            { key: 'PC台帳_PC用途', label: 'PC用途', width: '130px', appId: 6, fieldCode: 'PC用途' },
             { key: 'PC台帳_test1', label: 'test1', width: '100px', appId: 6, fieldCode: 'test1' },
             { key: 'PC台帳_sample', label: 'sample', width: '100px', appId: 6, fieldCode: 'sample' },
             

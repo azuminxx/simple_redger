@@ -2,6 +2,9 @@
  * 仮想スクロールクラス
  */
 class VirtualScroll {
+    constructor() {
+        this.fieldInfoCache = {};
+    }
     /**
      * 仮想スクロール対応テーブルを作成
      */
@@ -101,7 +104,7 @@ class VirtualScroll {
     /**
      * 仮想スクロールの行をレンダリング
      */
-    renderVirtualRows(virtualState) {
+    async renderVirtualRows(virtualState) {
         const { data, startIndex, endIndex, tbody, headerTable, bodyTable } = virtualState;
         
         // 既存の行をクリア
@@ -113,20 +116,32 @@ class VirtualScroll {
             
             const record = data[i];
             const row = DOMHelper.createElement('tr');
+            row.setAttribute('data-record-index', i);
             
-            CONFIG.integratedTableConfig.columns.forEach(column => {
+            // 各カラムのセルを作成
+            for (let columnIndex = 0; columnIndex < CONFIG.integratedTableConfig.columns.length; columnIndex++) {
+                const column = CONFIG.integratedTableConfig.columns[columnIndex];
                 const td = DOMHelper.createElement('td');
                 const value = record[column.key];
                 
-                if (value === null || value === undefined || value === '') {
-                    td.textContent = '-';
-                    td.className = 'null-value';
+                if (this.isEditableField(column)) {
+                    // 編集可能フィールドの場合は入力要素を作成
+                    const inputElement = await this.createEditableInput(column, value, i, columnIndex);
+                    td.appendChild(inputElement);
+                    td.className = 'editable-cell';
                 } else {
-                    td.textContent = value;
+                    // 読み取り専用フィールドの場合は通常のテキスト表示
+                    if (value === null || value === undefined || value === '') {
+                        td.textContent = '-';
+                        td.className = 'null-value readonly-cell';
+                    } else {
+                        td.textContent = value;
+                        td.className = 'readonly-cell';
+                    }
                 }
                 
                 row.appendChild(td);
-            });
+            }
             
             tbody.appendChild(row);
         }
@@ -160,7 +175,10 @@ class VirtualScroll {
         if (bufferStart !== virtualState.startIndex || bufferEnd !== virtualState.endIndex) {
             virtualState.startIndex = bufferStart;
             virtualState.endIndex = bufferEnd;
-            this.renderVirtualRows(virtualState);
+            // 非同期レンダリングを実行
+            this.renderVirtualRows(virtualState).catch(error => {
+                console.error('仮想スクロール再レンダリングエラー:', error);
+            });
         }
     }
 
@@ -169,6 +187,148 @@ class VirtualScroll {
      */
     syncHeaderScroll(headerTable, scrollContainer) {
         headerTable.style.transform = `translateX(-${scrollContainer.scrollLeft}px)`;
+    }
+
+    /**
+     * フィールドが編集可能かどうかを判定
+     */
+    isEditableField(column) {
+        // 編集不可のフィールドを定義
+        const readOnlyFields = ['PC番号', '内線番号', '座席番号', 'ユーザー名'];
+        
+        return !readOnlyFields.includes(column.fieldCode);
+    }
+
+    /**
+     * 編集可能な入力要素を作成
+     */
+    async createEditableInput(column, value, recordIndex, columnIndex) {
+        const displayValue = value === null || value === undefined ? '' : value;
+        
+        try {
+            // フィールド情報を取得してフィールドタイプを判定
+            const fieldInfo = await this.getFieldInfo(column.appId, column.fieldCode);
+            
+            if (fieldInfo && (fieldInfo.type === 'dropdown' || fieldInfo.type === 'radio')) {
+                // ドロップダウン/ラジオボタンの場合
+                return this.createSelectInput(column, displayValue, recordIndex, columnIndex, fieldInfo.options);
+            } else {
+                // その他の場合はテキストボックス
+                return this.createTextInput(column, displayValue, recordIndex, columnIndex);
+            }
+        } catch (error) {
+            console.warn(`フィールド情報取得エラー (${column.fieldCode}):`, error);
+            // エラー時はテキストボックスにフォールバック
+            return this.createTextInput(column, displayValue, recordIndex, columnIndex);
+        }
+    }
+
+    /**
+     * テキスト入力要素を作成
+     */
+    createTextInput(column, value, recordIndex, columnIndex) {
+        const input = DOMHelper.createElement('input', {
+            type: 'text',
+            value: value,
+            'data-record-index': recordIndex,
+            'data-column-index': columnIndex,
+            'data-field-key': column.key
+        }, 'editable-cell-input');
+
+        // 値変更時のイベントリスナー
+        input.addEventListener('change', (event) => {
+            this.handleCellValueChange(event.target);
+        });
+
+        return input;
+    }
+
+    /**
+     * セレクト入力要素を作成
+     */
+    createSelectInput(column, value, recordIndex, columnIndex, options) {
+        const select = DOMHelper.createElement('select', {
+            'data-record-index': recordIndex,
+            'data-column-index': columnIndex,
+            'data-field-key': column.key
+        }, 'editable-cell-select');
+
+        // 空の選択肢を追加
+        const emptyOption = DOMHelper.createElement('option', { value: '' });
+        emptyOption.textContent = '-';
+        select.appendChild(emptyOption);
+
+        // 選択肢を追加
+        if (options && options.length > 0) {
+            options.forEach(option => {
+                const optionElement = DOMHelper.createElement('option', { value: option });
+                optionElement.textContent = option;
+                if (option === value) {
+                    optionElement.selected = true;
+                }
+                select.appendChild(optionElement);
+            });
+        }
+
+        // 現在の値が選択肢にない場合は選択状態をクリア
+        if (value && !options.includes(value)) {
+            select.value = '';
+        }
+
+        // 値変更時のイベントリスナー
+        select.addEventListener('change', (event) => {
+            this.handleCellValueChange(event.target);
+        });
+
+        return select;
+    }
+
+    /**
+     * フィールド情報を取得（キャッシュ付き）
+     */
+    async getFieldInfo(appId, fieldCode) {
+        try {
+            // 静的キャッシュを使用してAPI呼び出しを最小限に抑制
+            if (!this.fieldInfoCache) {
+                this.fieldInfoCache = {};
+            }
+            
+            const cacheKey = `${appId}_${fieldCode}`;
+            if (this.fieldInfoCache[cacheKey]) {
+                return this.fieldInfoCache[cacheKey];
+            }
+            
+            const fields = await CONFIG.getAppFields(appId);
+            const fieldInfo = fields.find(field => field.code === fieldCode);
+            
+            // キャッシュに保存
+            this.fieldInfoCache[cacheKey] = fieldInfo;
+            
+            return fieldInfo;
+        } catch (error) {
+            console.error(`フィールド情報取得エラー (App ${appId}, Field ${fieldCode}):`, error);
+            return null;
+        }
+    }
+
+    /**
+     * セルの値変更を処理
+     */
+    handleCellValueChange(inputElement) {
+        const recordIndex = parseInt(inputElement.getAttribute('data-record-index'));
+        const fieldKey = inputElement.getAttribute('data-field-key');
+        const newValue = inputElement.value;
+
+        console.log(`📝 セル編集: レコード${recordIndex}, フィールド${fieldKey}, 新しい値: ${newValue}`);
+
+        // TableRendererの現在のデータを更新
+        if (window.tableRenderer && window.tableRenderer.currentSearchResults) {
+            const currentData = window.tableRenderer.currentSearchResults;
+            if (currentData[recordIndex]) {
+                currentData[recordIndex][fieldKey] = newValue;
+                console.log(`✅ データ更新完了: レコード${recordIndex}[${fieldKey}] = ${newValue}`);
+            }
+        }
     }
 }
 
