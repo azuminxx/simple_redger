@@ -48,8 +48,6 @@ class SearchEngine {
                 const integratedData = await window.dataIntegrator.searchAllLedgersWithIntegrationKeys(appId, records);
                 
                 if (integratedData) {
-                    console.log(`📊 統合データ生成完了: ${integratedData.length}件`);
-                    
                     // テーブル表示
                     if (window.tableRenderer) {
                         window.tableRenderer.displayIntegratedTable(appId, integratedData);
@@ -65,6 +63,9 @@ class SearchEngine {
             
             // データ抽出完了後のカーソル状況をログ出力
             this.logCursorStatus('通常検索');
+            
+            // API実行回数サマリーを表示
+            window.apiCounter.showSummary();
         } catch (error) {
             console.error('検索エラー:', error);
             alert(`${CONFIG.system.messages.searchError}\n詳細: ${error.message}`);
@@ -89,6 +90,12 @@ class SearchEngine {
                     const values = Array.from(checkboxes).map(cb => cb.value);
                     if (values.length > 0) {
                         conditions[field.code] = values;
+                    }
+                } else if (field.type === 'dropdown' || field.type === 'radio') {
+                    // ドロップダウン/ラジオボタンの場合は単一選択
+                    const select = document.getElementById(`${field.code}-${appId}`);
+                    if (select && select.value && select.value.trim() !== '') {
+                        conditions[field.code] = select.value.trim();
                     }
                 } else {
                     // その他のフィールドは単一値を取得
@@ -185,7 +192,7 @@ class SearchEngine {
                 this.activeCursors.add(response.id); // アクティブカーソルに追加
                 this.cursorAppMap.set(response.id, appId); // カーソルとappIdのマッピング
                 this.retryCount = 0; // 成功時は再試行回数をリセット
-                console.log(`📝 カーソル作成: ${response.id} (アクティブ: ${this.activeCursors.size}件)`);
+                // カーソル作成ログは削除（サマリーで表示）
                 return response.id;
             })
             .catch(async (error) => {
@@ -252,7 +259,7 @@ class SearchEngine {
                         // ただし、アクティブカーソル管理から削除
                         this.activeCursors.delete(cursorId);
                         this.cursorAppMap.delete(cursorId);
-                        console.log(`✅ レコード取得完了: ${cursorId} (残り: ${this.activeCursors.size}件)`);
+                        // レコード取得完了ログは削除（サマリーで表示）
                         return allRecords;
                     }
                 })
@@ -288,7 +295,7 @@ class SearchEngine {
             .then(() => {
                 this.activeCursors.delete(cursorId); // アクティブカーソルから削除
                 this.cursorAppMap.delete(cursorId); // マッピングからも削除
-                console.log(`🗑️ カーソル削除完了: ${cursorId} (残り: ${this.activeCursors.size}件)`);
+                // カーソル削除完了ログは削除（サマリーで表示）
             })
             .catch((error) => {
                 this.activeCursors.delete(cursorId); // エラーでも削除扱い
@@ -296,7 +303,7 @@ class SearchEngine {
                 
                 // GAIA_CN01エラー（カーソルが存在しない）の場合は詳細ログを抑制
                 if (error.code === 'GAIA_CN01') {
-                    console.log(`🗑️ カーソル既に削除済み: ${cursorId} (残り: ${this.activeCursors.size}件)`);
+                    // カーソル削除済みログは削除（サマリーで表示）
                 } else {
                     console.warn(`⚠️ カーソル削除エラー: ${cursorId}`, error);
                 }
@@ -412,8 +419,6 @@ class SearchEngine {
                 const newIntegratedData = await window.dataIntegrator.searchAllLedgersWithIntegrationKeys(appId, records);
                 
                 if (newIntegratedData) {
-                    console.log(`📊 新規統合データ生成完了: ${newIntegratedData.length}件`);
-                    
                     // 既存の検索結果と新しい結果をマージ
                     const existingData = window.tableRenderer.getCurrentSearchResults();
                     const mergedData = window.dataIntegrator.mergeIntegratedData(existingData, newIntegratedData);
@@ -433,6 +438,9 @@ class SearchEngine {
             
             // データ抽出完了後のカーソル状況をログ出力
             this.logCursorStatus('追加検索');
+            
+            // API実行回数サマリーを表示
+            window.apiCounter.showSummary();
         } catch (error) {
             console.error('追加検索エラー:', error);
             alert(`追加検索中にエラーが発生しました。\n詳細: ${error.message}`);
@@ -442,22 +450,21 @@ class SearchEngine {
     }
 
     /**
-     * カーソル状況をログ出力
+     * カーソル状況をログ出力（簡潔版）
      */
     logCursorStatus(operation) {
         const activeCount = this.activeCursors.size;
         
         if (activeCount === 0) {
-            console.log(`✅ ${operation}完了 - 全てのカーソルが正常に削除されました (アクティブカーソル: 0件)`);
+            console.log(`✅ ${operation}完了 - カーソル管理正常`);
         } else {
-            console.warn(`⚠️ ${operation}完了 - 削除されていないカーソルがあります (アクティブカーソル: ${activeCount}件)`);
-            console.warn('未削除カーソル一覧:', Array.from(this.activeCursors));
+            console.warn(`⚠️ ${operation}完了 - 未削除カーソル: ${activeCount}件`);
             
             // 未削除カーソルがある場合は手動削除を試行
             this.deleteAllActiveCursors().then(() => {
-                console.log(`🧹 未削除カーソルの手動削除完了`);
+                console.log(`🧹 カーソルクリーンアップ完了`);
             }).catch(error => {
-                console.error(`❌ 未削除カーソルの手動削除エラー:`, error);
+                console.error(`❌ カーソルクリーンアップエラー:`, error);
             });
         }
     }

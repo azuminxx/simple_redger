@@ -8,6 +8,15 @@ class TableRenderer {
         
         // VirtualScrollインスタンスをグローバルに設定
         window.virtualScroll = this.virtualScroll;
+        
+        // 更新ルール定義（単純化）
+        this.UPDATE_RULES = {
+            'PC番号': 'all',      // 全台帳
+            '内線番号': 'all',     // 全台帳
+            '座席番号': 'all',     // 全台帳
+            'ユーザーID': 'pc_only', // PC台帳のみ
+            '*': 'origin'         // その他は元台帳のみ
+        };
     }
 
     /**
@@ -305,8 +314,6 @@ class TableRenderer {
                 const updateTargets = this.getUpdateTargetsForField(fieldKey);
                 const fieldCode = this.extractFieldCodeFromKey(fieldKey);
                 
-                console.log(`🔄 フィールド振り分け: ${fieldKey} (${fieldCode}) → ${updateTargets.map(appId => CONFIG.apps[appId].name).join(', ')}`);
-                
                 updateTargets.forEach(appId => {
                     if (recordsToUpdate[appId]) {
                         recordsToUpdate[appId][fieldCode] = { value: value };
@@ -322,10 +329,6 @@ class TableRenderer {
                 );
                 const hasUpdateFields = updateFields.length > 0;
                 
-                console.log(`🔍 ${CONFIG.apps[appId].name} レコード構造:`, Object.keys(record));
-                console.log(`📝 ${CONFIG.apps[appId].name} 更新フィールド:`, updateFields);
-                console.log(`✅ ${CONFIG.apps[appId].name} 更新対象: ${hasUpdateFields}`);
-                
                 if (hasUpdateFields) {
                     recordsByApp[appId].push(record);
                 }
@@ -336,25 +339,29 @@ class TableRenderer {
     }
 
     /**
-     * フィールドの更新対象台帳を取得
+     * フィールドの更新対象台帳を取得（単純化版）
      */
     getUpdateTargetsForField(fieldKey) {
         const fieldCode = this.extractFieldCodeFromKey(fieldKey);
         
-        // PC番号/内線番号/座席番号は全台帳で更新
-        const commonFields = ['PC番号', '内線番号', '座席番号'];
-        if (commonFields.includes(fieldCode)) {
-            return Object.keys(CONFIG.apps);
-        }
+        // 更新ルールに基づいて判定
+        const rule = this.UPDATE_RULES[fieldCode] || this.UPDATE_RULES['*'];
         
-        // ユーザーIDはPC台帳のみ更新
-        if (fieldCode === 'ユーザーID') {
-            return Object.keys(CONFIG.apps).filter(appId => CONFIG.apps[appId].name === 'PC台帳');
+        switch (rule) {
+            case 'all':
+                // 全台帳で更新
+                return Object.keys(CONFIG.apps);
+                
+            case 'pc_only':
+                // PC台帳のみ更新
+                return Object.keys(CONFIG.apps).filter(appId => CONFIG.apps[appId].name === 'PC台帳');
+                
+            case 'origin':
+            default:
+                // 元の台帳のみ更新
+                const ledgerName = this.extractLedgerNameFromKey(fieldKey);
+                return Object.keys(CONFIG.apps).filter(appId => CONFIG.apps[appId].name === ledgerName);
         }
-        
-        // その他のフィールドは元の台帳のみ更新
-        const ledgerName = this.extractLedgerNameFromKey(fieldKey);
-        return Object.keys(CONFIG.apps).filter(appId => CONFIG.apps[appId].name === ledgerName);
     }
 
     /**

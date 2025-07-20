@@ -20,7 +20,6 @@ class FieldInfoAPI {
         // ローカルストレージから取得を試行
         const cachedData = this.getFromLocalStorage(appId);
         if (cachedData) {
-            console.log(`💿 ローカルストレージからフィールド情報取得: App ${appId}`);
             // メモリキャッシュにも保存
             this.fieldCache.set(appId, cachedData);
             return cachedData;

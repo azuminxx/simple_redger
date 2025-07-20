@@ -8,7 +8,7 @@ class APICounter {
     }
 
     /**
-     * API実行回数をカウント
+     * API実行回数をカウント（ログ出力なし）
      */
     count(appId, apiType = 'unknown') {
         if (!this.counts.has(appId)) {
@@ -17,10 +17,6 @@ class APICounter {
         
         const currentCount = this.counts.get(appId) + 1;
         this.counts.set(appId, currentCount);
-        
-        const appName = CONFIG.apps[appId] ? CONFIG.apps[appId].name : `App ${appId}`;
-        
-        console.log(`🔢 API実行回数: ${appName} ${currentCount} - ${apiType}`);
         
         return currentCount;
     }
@@ -50,21 +46,19 @@ class APICounter {
     }
 
     /**
-     * API実行回数サマリーを表示
+     * API実行回数サマリーを表示（簡潔版）
      */
     showSummary() {
-        console.log('📊 API実行回数サマリー:');
-        const allCounts = this.getAllCounts();
+        console.log('📊 API実行回数:');
         
-        if (Object.keys(allCounts).length === 0) {
-            console.log('   API実行履歴がありません');
+        if (this.counts.size === 0) {
+            console.log('   実行履歴がありません');
             return;
         }
         
-        Object.entries(allCounts).forEach(([appName, info]) => {
-            const status = info.percentage >= 90 ? '🔴' : 
-                          info.percentage >= 80 ? '🟡' : '🟢';
-            console.log(`   ${status} ${appName}: ${info.count}/${info.limit} (${info.percentage}%)`);
+        this.counts.forEach((count, appId) => {
+            const appName = CONFIG.apps[appId] ? CONFIG.apps[appId].name : `App ${appId}`;
+            console.log(`   ${appName}: ${count}回`);
         });
     }
 

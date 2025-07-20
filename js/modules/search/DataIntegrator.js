@@ -14,7 +14,7 @@ class DataIntegrator {
             return Promise.resolve([]);
         }
 
-        console.log(`🔗 統合キー抽出: ${integrationKeys.length}件`);
+        // 統合キー抽出ログは削除
 
         // 全台帳のデータを格納するオブジェクト
         const allLedgerData = {};
@@ -28,7 +28,7 @@ class DataIntegrator {
                 const promise = this.searchByIntegrationKeys(appId, integrationKeys)
                     .then(records => {
                         allLedgerData[appId] = records;
-                        console.log(`✓ ${CONFIG.apps[appId].name}: ${records.length}件`);
+                        // 各台帳の検索結果ログは削除
                         return records;
                     });
                 searchPromises.push(promise);
@@ -38,7 +38,7 @@ class DataIntegrator {
         // ユーザーリストをユーザーIDで検索するPromiseを追加
         const userListPromise = this.searchUserListByUserIds(allLedgerData)
             .then(userListData => {
-                console.log(`✓ ユーザーリスト: ${userListData.length}件`);
+                // ユーザーリスト検索結果ログは削除
                 return userListData;
             });
         searchPromises.push(userListPromise);
@@ -96,7 +96,6 @@ class DataIntegrator {
         });
 
         if (userIds.size === 0) {
-            console.log('ユーザーIDが見つかりませんでした。');
             return Promise.resolve([]);
         }
 
@@ -230,7 +229,6 @@ class DataIntegrator {
                 if (!existingKeys.has(integrationKey)) {
                     mergedData.push(record);
                     existingKeys.add(integrationKey);
-                    console.log(`✅ 新規レコード追加: 統合キー=${integrationKey}`);
                 } else {
                     console.log(`❌ 重複レコード除外: 統合キー=${integrationKey}`);
                 }

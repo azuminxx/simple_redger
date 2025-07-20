@@ -124,6 +124,8 @@
     width: 100%;
 }
 
+
+
 .field-group input:focus,
 .field-group select:focus {
     outline: none;
@@ -315,6 +317,11 @@
 
 .integrated-table tbody tr:hover {
     background-color: #ebf3fd;
+}
+
+/* 変更列（1列目）のマウスオーバー効果を無効化 */
+.integrated-table tbody tr:hover td.change-flag-cell {
+    background-color: inherit;
 }
 
 /* null値の表示 */
