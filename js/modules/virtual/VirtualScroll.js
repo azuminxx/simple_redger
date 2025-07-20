@@ -6,6 +6,7 @@ class VirtualScroll {
         this.fieldInfoCache = {};
         this.changeFlags = new Map(); // レコードの変更フラグを管理
         this.changedFields = new Map(); // 変更されたフィールドを記録 {recordIndex: Set(fieldKeys)}
+        this.savedScrollTop = 0; // スクロール位置を保存
     }
     /**
      * 仮想スクロール対応テーブルを作成
@@ -58,11 +59,20 @@ class VirtualScroll {
             this.handleVirtualScroll(scrollContainer, virtualState);
             // ヘッダーの横スクロールを同期
             this.syncHeaderScroll(headerTable, scrollContainer);
+            // スクロール位置を保存
+            this.savedScrollTop = scrollContainer.scrollTop;
         });
         
         scrollContainer.appendChild(spacer);
         scrollContainer.appendChild(content);
         container.appendChild(scrollContainer);
+        
+        // 保存されたスクロール位置を復元
+        if (this.savedScrollTop > 0) {
+            setTimeout(() => {
+                scrollContainer.scrollTop = this.savedScrollTop;
+            }, 0);
+        }
         
         return container;
     }
@@ -144,8 +154,23 @@ class VirtualScroll {
         
         // フラグがリセットされた場合は変更フィールドもクリア
         if (!isChanged) {
+            console.log(`🏁 変更フラグリセット処理: 行${recordIndex}`);
             this.changedFields.set(recordIndex, new Set());
+            // 対応するセルの背景色もクリア
+            this.clearCellChangedStyles(recordIndex);
         }
+    }
+
+    /**
+     * 指定行のセルから変更スタイル（背景色）をクリア
+     */
+    clearCellChangedStyles(recordIndex) {
+        // 該当行の全てのセルから.cell-changedクラスを削除
+        const cells = document.querySelectorAll(`td[data-row="${recordIndex}"]`);
+        cells.forEach(cell => {
+            cell.classList.remove('cell-changed');
+        });
+        console.log(`🧹 背景色クリア: 行${recordIndex} (${cells.length}個のセル)`);
     }
 
     /**
@@ -155,7 +180,7 @@ class VirtualScroll {
         const checkbox = document.querySelector(`input[data-record-index="${recordIndex}"][data-field="change-flag"]`);
         if (checkbox) {
             checkbox.checked = isChanged;
-            console.log(`☑️ VirtualScroll: チェックボックス更新 行${recordIndex} = ${isChanged}`);
+            // console.log(`☑️ VirtualScroll: チェックボックス更新 行${recordIndex} = ${isChanged}`);
         } else {
             console.warn(`⚠️ VirtualScroll: チェックボックスが見つかりません 行${recordIndex}`);
             // DOM更新が遅れている可能性があるため、少し遅延して再試行
@@ -163,7 +188,7 @@ class VirtualScroll {
                 const retryCheckbox = document.querySelector(`input[data-record-index="${recordIndex}"][data-field="change-flag"]`);
                 if (retryCheckbox) {
                     retryCheckbox.checked = isChanged;
-                    console.log(`☑️ VirtualScroll: チェックボックス更新（再試行）行${recordIndex} = ${isChanged}`);
+                    // console.log(`☑️ VirtualScroll: チェックボックス更新（再試行）行${recordIndex} = ${isChanged}`);
                 }
             }, 100);
         }
@@ -234,10 +259,10 @@ class VirtualScroll {
                     td.appendChild(checkbox);
                     td.className = 'change-flag-cell';
                     
-                    // デバッグログ
-                    if (isChanged) {
-                        console.log(`☑️ 変更フラグ反映: 行${i} = ${isChanged}`);
-                    }
+                    // デバッグログ（コメントアウト）
+                    // if (isChanged) {
+                    //     console.log(`☑️ 変更フラグ反映: 行${i} = ${isChanged}`);
+                    // }
                 } else if (this.isEditableField(column)) {
                     // 編集可能フィールドの場合は入力要素を作成
                     const inputElement = await this.createEditableInput(column, value, i, columnIndex);
@@ -258,6 +283,10 @@ class VirtualScroll {
                 const changedFields = this.getChangedFields(i);
                 if (changedFields.has(column.key)) {
                     td.classList.add('cell-changed');
+                    console.log(`🎨 背景色適用: 行${i} フィールド${column.key}`);
+                } else {
+                    // 変更フィールドに含まれていない場合は背景色クラスを削除
+                    td.classList.remove('cell-changed');
                 }
                 
                 // ドラッグアンドドロップ機能を追加（TableRenderer経由）

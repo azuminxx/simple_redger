@@ -282,142 +282,13 @@ class TableRenderer {
      * DOMから変更されたレコードを台帳ごとにグループ化（全台帳対応版）
      */
     groupRecordsByApp(changedIndices = null) {
-        const recordsByApp = {};
+
         
-        // 各台帳のレコードを初期化
-        Object.keys(CONFIG.apps).forEach(appId => {
-            recordsByApp[appId] = [];
-        });
+
         
-        // 変更された行の全台帳のフィールド値を出力
-        changedIndices.forEach(rowIndex => {
-            console.log(`\n🔍 =================== 行${rowIndex}の全台帳フィールド値 ===================`);
-            
-            // 各台帳のフィールド値を出力
-            Object.values(CONFIG.apps).forEach(appConfig => {
-                const ledgerName = appConfig.name;
-                const recordIdKey = `${ledgerName}_$id`;
-                const recordId = this.currentSearchResults[rowIndex][recordIdKey];
-                
-                console.log(`\n📋 ${ledgerName} (RecordID: ${recordId || 'なし'})`);
-                
-                if (recordId) {
-                    // この台帳の全フィールドを出力（主キーフィールドは除外）
-                    if (ledgerName === 'PC台帳') {
-                        // PC台帳の全フィールド（PC番号は除外、ユーザーIDのみ表示）
-                        const userId = this.currentSearchResults[rowIndex]['PC台帳_ユーザーID'];
-                        const pcUsage = this.currentSearchResults[rowIndex]['PC台帳_PC用途'];
-                        const test1 = this.currentSearchResults[rowIndex]['PC台帳_test1'];
-                        const sample = this.currentSearchResults[rowIndex]['PC台帳_sample'];
-                        const extensionNumber = this.currentSearchResults[rowIndex]['内線台帳_内線番号'];
-                        const seatNumber = this.currentSearchResults[rowIndex]['座席台帳_座席番号'];
-                        
-                        console.log(`  📝 ユーザーID: ${userId}`);
-                        console.log(`  📝 PC用途: ${pcUsage}`);
-                        console.log(`  📝 test1: ${test1}`);
-                        console.log(`  📝 sample: ${sample}`);
-                        console.log(`  📝 内線番号: ${extensionNumber}`);
-                        console.log(`  📝 座席番号: ${seatNumber}`);
-                        
-                    } else if (ledgerName === '内線台帳') {
-                        // 内線台帳の全フィールド（内線番号は除外）
-                        const phoneType = this.currentSearchResults[rowIndex]['内線台帳_電話機種別'];
-                        const pcNumber = this.currentSearchResults[rowIndex]['PC台帳_PC番号'];
-                        const seatNumber = this.currentSearchResults[rowIndex]['座席台帳_座席番号'];
-                        
-                        console.log(`  📝 電話機種別: ${phoneType}`);
-                        console.log(`  📝 PC番号: ${pcNumber}`);
-                        console.log(`  📝 座席番号: ${seatNumber}`);
-                        
-                    } else if (ledgerName === '座席台帳') {
-                        // 座席台帳の全フィールド（座席番号は除外）
-                        const seatLocation = this.currentSearchResults[rowIndex]['座席台帳_座席拠点'];
-                        const floor = this.currentSearchResults[rowIndex]['座席台帳_階数'];
-                        const seatDepartment = this.currentSearchResults[rowIndex]['座席台帳_座席部署'];
-                        const pcNumber = this.currentSearchResults[rowIndex]['PC台帳_PC番号'];
-                        const extensionNumber = this.currentSearchResults[rowIndex]['内線台帳_内線番号'];
-                        
-                        console.log(`  📝 座席拠点: ${seatLocation}`);
-                        console.log(`  📝 階数: ${floor}`);
-                        console.log(`  📝 座席部署: ${seatDepartment}`);
-                        console.log(`  📝 PC番号: ${pcNumber}`);
-                        console.log(`  📝 内線番号: ${extensionNumber}`);
-                    }
-                } else {
-                    console.log(`  ⚠️ この台帳のレコードは存在しません`);
-                }
-            });
-            
-            // 更新対象レコードオブジェクトを作成してログ表示
-            console.log(`\n📦 =================== 行${rowIndex}の更新レコードオブジェクト ===================`);
-            
-            ['PC台帳', '内線台帳', '座席台帳'].forEach(ledgerName => {
-                const recordIdKey = `${ledgerName}_$id`;
-                const recordId = this.currentSearchResults[rowIndex][recordIdKey];
-                
-                if (recordId) {
-                    let updateRecord = {
-                        id: parseInt(recordId),
-                        record: {}
-                    };
-                    
-                    if (ledgerName === 'PC台帳') {
-                        // PC台帳の更新フィールド
-                        const userId = this.currentSearchResults[rowIndex]['PC台帳_ユーザーID'];
-                        const pcUsage = this.currentSearchResults[rowIndex]['PC台帳_PC用途'];
-                        const test1 = this.currentSearchResults[rowIndex]['PC台帳_test1'];
-                        const sample = this.currentSearchResults[rowIndex]['PC台帳_sample'];
-                        const extensionNumber = this.currentSearchResults[rowIndex]['内線台帳_内線番号'];
-                        const seatNumber = this.currentSearchResults[rowIndex]['座席台帳_座席番号'];
-                        
-                        updateRecord.record = {
-                            "ユーザーID": { value: userId },
-                            "PC用途": { value: pcUsage },
-                            "test1": { value: test1 },
-                            "sample": { value: sample },
-                            "内線番号": { value: extensionNumber },
-                            "座席番号": { value: seatNumber }
-                        };
-                        
-                    } else if (ledgerName === '内線台帳') {
-                        // 内線台帳の更新フィールド
-                        const phoneType = this.currentSearchResults[rowIndex]['内線台帳_電話機種別'];
-                        const pcNumber = this.currentSearchResults[rowIndex]['PC台帳_PC番号'];
-                        const seatNumber = this.currentSearchResults[rowIndex]['座席台帳_座席番号'];
-                        
-                        updateRecord.record = {
-                            "電話機種別": { value: phoneType },
-                            "PC番号": { value: pcNumber },
-                            "座席番号": { value: seatNumber }
-                        };
-                        
-                    } else if (ledgerName === '座席台帳') {
-                        // 座席台帳の更新フィールド
-                        const seatLocation = this.currentSearchResults[rowIndex]['座席台帳_座席拠点'];
-                        const floor = this.currentSearchResults[rowIndex]['座席台帳_階数'];
-                        const seatDepartment = this.currentSearchResults[rowIndex]['座席台帳_座席部署'];
-                        const pcNumber = this.currentSearchResults[rowIndex]['PC台帳_PC番号'];
-                        const extensionNumber = this.currentSearchResults[rowIndex]['内線台帳_内線番号'];
-                        
-                        updateRecord.record = {
-                            "座席拠点": { value: seatLocation },
-                            "階数": { value: floor },
-                            "座席部署": { value: seatDepartment },
-                            "PC番号": { value: pcNumber },
-                            "内線番号": { value: extensionNumber }
-                        };
-                    }
-                    
-                    console.log(`📋 ${ledgerName} 更新レコード:`, JSON.stringify(updateRecord, null, 2));
-                } else {
-                    console.log(`📋 ${ledgerName}: レコードが存在しないため更新対象外`);
-                }
-            });
-            
-            console.log(`=================== 行${rowIndex}の出力終了 ===================\n`);
-        });
-        
-        // 実際の更新処理用のupdateRecordsByAppオブジェクトを作成
+        // 【重要】kintone更新用レコードオブジェクト作成
+        // ■ 各台帳の交換されたデータを、kintone REST API形式に変換
+        // ■ 形式：{id: レコードID, record: {フィールド名: {value: 値}}}
         const updateRecordsByApp = {};
         
         changedIndices.forEach(rowIndex => {
@@ -441,7 +312,7 @@ class TableRenderer {
                     };
                     
                     if (ledgerName === 'PC台帳') {
-                        // PC台帳の更新フィールド
+                        // 【重要】PC台帳の更新フィールド構成
                         const userId = this.currentSearchResults[rowIndex]['PC台帳_ユーザーID'];
                         const pcUsage = this.currentSearchResults[rowIndex]['PC台帳_PC用途'];
                         const test1 = this.currentSearchResults[rowIndex]['PC台帳_test1'];
@@ -492,8 +363,8 @@ class TableRenderer {
             });
         });
         
-        console.log(`🔚 フィールド値の出力が完了しました。実際の更新処理を開始します。`);
-        console.log(`📦 更新対象アプリ:`, Object.keys(updateRecordsByApp));
+        // console.log(`🔚 フィールド値の出力が完了しました。実際の更新処理を開始します。`);
+        // console.log(`📦 更新対象アプリ:`, Object.keys(updateRecordsByApp));
         
         return updateRecordsByApp;
     }
@@ -543,70 +414,9 @@ class TableRenderer {
         }
     }
 
-    /**
-     * フィールドキーからフィールドコードを抽出
-     */
-    extractFieldCodeFromKey(fieldKey) {
-        // "台帳名_フィールドコード" の形式からフィールドコードを抽出
-        const parts = fieldKey.split('_');
-        return parts.slice(1).join('_'); // 台帳名を除いた部分
-    }
 
-    /**
-     * フィールドキーから台帳名を抽出
-     */
-    extractLedgerNameFromKey(fieldKey) {
-        // "台帳名_フィールドコード" の形式から台帳名を抽出
-        const parts = fieldKey.split('_');
-        return parts[0]; // 最初の部分が台帳名
-    }
 
-    /**
-     * 特定のアプリのレコードを更新
-     */
-    async updateAppRecords(appId, records) {
-        console.log(`📝 ${CONFIG.apps[appId].name}のレコードを更新中... (${records.length}件)`);
-        
-        // レコードの更新処理
-        // 注意: この実装は簡略化されています。実際の実装では以下が必要です：
-        // 1. 統合キーから実際のレコードIDを取得
-        // 2. 既存レコードの検索と更新
-        // 3. エラーハンドリング
-        
-        const updatePromises = records.map(async (record) => {
-            try {
-                // レコードIDを取得
-                const recordIdValue = record.$id?.value;
-                if (!recordIdValue) {
-                    console.warn(`${CONFIG.apps[appId].name} レコードIDが見つかりません - スキップします`);
-                    return;
-                }
-                
-                // レコード更新用のデータを準備
-                const updateData = {};
-                Object.keys(record).forEach(fieldCode => {
-                    if (fieldCode !== '$id' && fieldCode !== CONFIG.integrationKey) {
-                        updateData[fieldCode] = record[fieldCode];
-                    }
-                });
-                
-                // レコードを更新
-                await kintone.api(kintone.api.url('/k/v1/record', true), 'PUT', {
-                    app: appId,
-                    id: recordIdValue,
-                    record: updateData
-                });
-                
-                console.log(`✅ ${CONFIG.apps[appId].name} レコードID ${recordIdValue} を更新`);
-                
-            } catch (error) {
-                this.logError(`${CONFIG.apps[appId].name} レコード更新`, error);
-                throw error;
-            }
-        });
-        
-        await Promise.all(updatePromises);
-    }
+
 
     /**
      * 特定のアプリのレコードを一括更新
@@ -614,8 +424,8 @@ class TableRenderer {
     async updateAppRecordsBatch(appId, records) {
         console.log(`📝 ${CONFIG.apps[appId].name}のレコードを一括更新中... (${records.length}件)`);
         
-        // リクエストボディをログ出力
-        console.log(`🔍 ${CONFIG.apps[appId].name} リクエストボディ:`, JSON.stringify(records, null, 2));
+        // リクエストボディをログ出力（デバッグ用）
+        // console.log(`🔍 ${CONFIG.apps[appId].name} リクエストボディ:`, JSON.stringify(records, null, 2));
         
         try {
             // 一括更新用のデータを準備
@@ -626,7 +436,7 @@ class TableRenderer {
                     throw new Error(`レコードIDが見つかりません`);
                 }
                 
-                console.log(`📋 レコード${index + 1}の更新データ準備開始 (ID: ${recordIdValue})`);
+                // console.log(`📋 レコード${index + 1}の更新データ準備開始 (ID: ${recordIdValue})`);
                 
                 // 新しい形式の場合は直接recordオブジェクトを使用、旧形式の場合は従来の処理
                 if (record.id && record.record) {
@@ -637,34 +447,14 @@ class TableRenderer {
                     };
                 }
                 
-                // 旧形式: 更新データを準備（$idと統合キーのみ除外、主キーフィールドは含める）
-                const updateData = {};
-                
-                Object.keys(record).forEach(fieldCode => {
-                    const isSystemField = fieldCode === '$id' || fieldCode === CONFIG.integrationKey;
-                    
-                    if (!isSystemField) {
-                        updateData[fieldCode] = record[fieldCode];
-                        console.log(`  🔄 更新対象フィールド: ${fieldCode} = ${record[fieldCode]?.value || record[fieldCode]}`);
-                    } else {
-                        console.log(`  🔧 システムフィールドのため更新除外: ${fieldCode}`);
-                    }
-                });
-                
-                const updateRecord = {
-                    id: recordIdValue,
-                    record: updateData
-                };
-                
-                console.log(`📋 レコード${index + 1}の最終更新データ:`, JSON.stringify(updateRecord, null, 2));
-                
-                return updateRecord;
+                // 旧形式は現在サポートしていません
+                throw new Error(`旧形式のレコードはサポートされていません: ${JSON.stringify(record)}`);
             });
             
-            console.log(`📤 kintone API更新リクエスト全体:`, JSON.stringify({
-                app: appId,
-                records: updateRecords
-            }, null, 2));
+            // console.log(`📤 kintone API更新リクエスト全体:`, JSON.stringify({
+            //     app: appId,
+            //     records: updateRecords
+            // }, null, 2));
             
             // API実行回数をカウント
             window.apiCounter.count(appId, 'レコード一括更新');
@@ -676,17 +466,9 @@ class TableRenderer {
             });
             
             console.log(`✅ ${CONFIG.apps[appId].name} 一括更新完了 (${records.length}件)`);
-            console.log(`📥 kintone API更新レスポンス:`, JSON.stringify(response, null, 2));
+            // console.log(`📥 kintone API更新レスポンス:`, JSON.stringify(response, null, 2));
             
-            // 各レコードの更新結果を詳細表示
-            if (response.records) {
-                response.records.forEach((updatedRecord, index) => {
-                    console.log(`📝 更新済みレコード${index + 1}:`, {
-                        id: updatedRecord.id,
-                        revision: updatedRecord.revision
-                    });
-                });
-            }
+
             
             return response;
             
@@ -781,7 +563,7 @@ class TableRenderer {
         
         e.dataTransfer.effectAllowed = 'move';
         
-        console.log(`🔄 ドラッグ開始: ${fieldCode} (行${rowIndex}, キー: ${columnKey})`);
+        // console.log(`🔄 ドラッグ開始: ${fieldCode} (行${rowIndex}, キー: ${columnKey})`);
     }
 
     /**
@@ -831,7 +613,7 @@ class TableRenderer {
             const sourceColumnKey = this.dragState.sourceColumnKey;
             const sourceFieldCode = this.dragState.sourceFieldCode;
             
-            console.log(`🎯 ドロップ処理: ${sourceFieldCode} (行${sourceRowIndex}) → ${targetFieldCode} (行${targetRowIndex})`);
+            // console.log(`🎯 ドロップ処理: ${sourceFieldCode} (行${sourceRowIndex}) → ${targetFieldCode} (行${targetRowIndex})`);
             
             // 同じセルの場合は何もしない
             if (sourceRowIndex === targetRowIndex && sourceColumnKey === targetColumnKey) {
@@ -915,9 +697,24 @@ class TableRenderer {
 
     /**
      * ドラッグアンドドロップによる主キー交換を実行
+     * 
+     * 【重要】セル交換の核となるロジック
+     * ■ 交換対象フィールドの決定ルール：
+     *   - PC番号交換時：PC台帳の全フィールド + 他台帳のPC番号フィールド
+     *   - 内線番号交換時：内線台帳の全フィールド + 他台帳の内線番号フィールド  
+     *   - 座席番号交換時：座席台帳の全フィールド + 他台帳の座席番号フィールド
+     * 
+     * ■ レコードID交換ルール：
+     *   - 起点台帳のレコードIDのみ交換（PC番号交換時はPC台帳のレコードIDのみ）
+     *   - 他台帳のレコードIDは交換しない（データの整合性を保つため）
+     * 
+     * ■ 例：PC番号交換時の動作
+     *   - PC台帳：PC番号、ユーザーID、ユーザー名、PC用途等の全フィールドを交換
+     *   - 内線台帳：PC番号フィールドのみ交換（内線番号、電話機種別は交換しない）
+     *   - 座席台帳：PC番号フィールドのみ交換（座席番号、座席拠点等は交換しない）
      */
     swapPrimaryKeyValues(sourceRowIndex, targetRowIndex, primaryKeyField) {
-        console.log(`🔄 主キー交換開始: ${primaryKeyField} (行${sourceRowIndex} ⇄ 行${targetRowIndex})`);
+        // console.log(`🔄 主キー交換開始: ${primaryKeyField} (行${sourceRowIndex} ⇄ 行${targetRowIndex})`);
 
         const sourceRecord = this.currentSearchResults[sourceRowIndex];
         const targetRecord = this.currentSearchResults[targetRowIndex];
@@ -927,18 +724,19 @@ class TableRenderer {
             return;
         }
 
-        // 主キーフィールドに対応する台帳（sourceApp）を特定
+        // 【重要】主キーフィールドに対応する起点台帳を特定
+        // PC番号 → PC台帳、内線番号 → 内線台帳、座席番号 → 座席台帳
         const sourceApp = this.getPrimaryKeySourceApp(primaryKeyField);
         if (!sourceApp) {
             console.error(`❌ 主キー ${primaryKeyField} に対応する台帳が見つかりません`);
             return;
         }
 
-        console.log(`🎯 主キー交換: ${primaryKeyField} (起点台帳: ${sourceApp})`);
+        // console.log(`🎯 主キー交換: ${primaryKeyField} (起点台帳: ${sourceApp})`);
         
         const swappedFields = new Set();
         
-        // 全台帳を対象に、該当主キーフィールドを交換
+        // 【核心ロジック】全台帳を対象に、交換対象フィールドを決定して交換実行
         CONFIG.integratedTableConfig.columns.forEach(column => {
             if (column.isChangeFlag) return; // 変更フラグは除外
             
@@ -946,22 +744,30 @@ class TableRenderer {
             const ledgerName = DOMHelper.getLedgerNameFromKey(fieldKey);
             const fieldCode = DOMHelper.extractFieldCodeFromKey(fieldKey);
             
-            // 各台帳での処理判定
+            // 【重要】各台帳での交換対象フィールド判定
             if (ledgerName === sourceApp) {
-                // 起点台帳: 全フィールドを交換（主キーも含む）
+                // ■ 起点台帳（例：PC番号交換時のPC台帳）
+                // → 全フィールドを交換（PC番号、ユーザーID、ユーザー名、PC用途等すべて）
                 this.swapFieldValues(sourceRecord, targetRecord, sourceRowIndex, targetRowIndex, fieldKey, swappedFields);
             } else {
-                // 他台帳: 該当主キーフィールドのみ交換
+                // ■ 他台帳（例：PC番号交換時の内線台帳・座席台帳）
+                // → 該当主キーフィールドのみ交換（PC番号フィールドのみ）
+                // → 内線番号、電話機種別、座席拠点等は交換しない
                 if (fieldCode === primaryKeyField) {
                     this.swapFieldValues(sourceRecord, targetRecord, sourceRowIndex, targetRowIndex, fieldKey, swappedFields);
                 }
             }
         });
         
-        console.log(`🔍 デバッグ: 交換されたフィールド数 = ${swappedFields.size}`);
-        console.log(`🔍 デバッグ: 交換されたフィールド一覧 =`, Array.from(swappedFields));
+        // console.log(`🔍 デバッグ: 交換されたフィールド数 = ${swappedFields.size}`);
+        // console.log(`🔍 デバッグ: 交換されたフィールド一覧 =`, Array.from(swappedFields));
         
-        // 主キーの起点台帳のレコードIDのみを交換
+        // 【重要】レコードIDは起点台帳のもののみ交換
+        // ■ 理由：データの整合性を保つため
+        // ■ 例：PC番号交換時
+        //   - PC台帳のレコードIDは交換（6163 ⇄ 6164）
+        //   - 内線台帳のレコードIDは交換しない（6158, 6159のまま）
+        //   - 座席台帳のレコードIDは交換しない（7713, 7714のまま）
         const recordIdKey = `${sourceApp}_$id`;
         
         if (sourceRecord[recordIdKey] && targetRecord[recordIdKey]) {
@@ -972,12 +778,12 @@ class TableRenderer {
             sourceRecord[recordIdKey] = targetRecordId;
             targetRecord[recordIdKey] = sourceRecordId;
             
-            console.log(`🆔 レコードID交換: ${sourceApp} (${sourceRecordId} ⇄ ${targetRecordId})`);
+            // console.log(`🆔 レコードID交換: ${sourceApp} (${sourceRecordId} ⇄ ${targetRecordId})`);
         } else {
             console.log(`⚠️ ${sourceApp}のレコードIDが見つからないため、レコードID交換をスキップ`);
         }
         
-        console.log(`🔄 全台帳フィールド交換完了: ${primaryKeyField}による行交換 (${swappedFields.size}フィールド + レコードID)`);
+        // console.log(`🔄 全台帳フィールド交換完了: ${primaryKeyField}による行交換 (${swappedFields.size}フィールド + レコードID)`);
         
         // VirtualScrollでテーブルを再描画
         this.refreshVirtualScrollTable();
@@ -1007,7 +813,7 @@ class TableRenderer {
         window.virtualScroll.setChangedField(sourceRowIndex, fieldKey);
         window.virtualScroll.setChangedField(targetRowIndex, fieldKey);
         
-        console.log(`🏷️ フィールド交換: 行${sourceRowIndex}⇄${targetRowIndex}, ${fieldKey} (${sourceValue} ⇄ ${targetValue})`);
+                            // console.log(`🏷️ フィールド交換: 行${sourceRowIndex}⇄${targetRowIndex}, ${fieldKey} (${sourceValue} ⇄ ${targetValue})`);
     }
 
     /**
@@ -1049,11 +855,17 @@ class TableRenderer {
             const tableContainer = integratedResults?.querySelector('.integrated-table-container');
             
             if (tableContainer && this.currentSearchResults) {
+                // 現在のスクロール位置を保存
+                const scrollContainer = tableContainer.querySelector('.virtual-scroll-container');
+                if (scrollContainer) {
+                    this.virtualScroll.savedScrollTop = scrollContainer.scrollTop;
+                }
+                
                 // 変更フラグを保持（再描画前に現在の状態を保存）
                 const currentChangeFlags = new Map(this.virtualScroll.changeFlags);
                 const currentChangedFields = new Map(this.virtualScroll.changedFields);
                 
-                console.log(`🔄 変更フラグ保持: ${currentChangeFlags.size}件のフラグ, ${currentChangedFields.size}件のフィールド`);
+                // console.log(`🔄 変更フラグ保持: ${currentChangeFlags.size}件のフラグ, ${currentChangedFields.size}件のフィールド`);
                 
                 // 新しいVirtualScrollテーブルを作成
                 const newTableContainer = this.virtualScroll.createVirtualScrollTable(this.currentSearchResults);
@@ -1065,7 +877,7 @@ class TableRenderer {
                 // 既存のテーブルコンテナを新しいものと置き換え
                 tableContainer.parentNode.replaceChild(newTableContainer, tableContainer);
                 
-                console.log('✅ VirtualScrollテーブル再描画完了（変更フラグ復元済み）');
+                // console.log('✅ VirtualScrollテーブル再描画完了（変更フラグ復元済み）');
             } else {
                 console.warn('⚠️ テーブルコンテナまたは検索結果が見つかりません');
             }
@@ -1138,6 +950,7 @@ class TableRenderer {
         }
         
         changedIndices.forEach(index => {
+            console.log(`🔄 変更フラグリセット: 行${index}`);
             window.virtualScroll.setChangeFlag(index, false);
         });
         console.log(`🔄 変更フラグをリセット (${changedIndices.length}件)`);
