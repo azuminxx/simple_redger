@@ -35,9 +35,13 @@
             }
             
             this.counts.forEach((count, appId) => {
-                const appName = CONFIG.apps[appId] ? CONFIG.apps[appId].name : `App ${appId}`;
+                const appName = this.getAppName(appId);
                 console.log(`   ${appName}: ${count}回`);
             });
+        }
+
+        getAppName(appId) {
+            return CONFIG.apps[appId]?.name || `App ${appId}`;
         }
     }
 

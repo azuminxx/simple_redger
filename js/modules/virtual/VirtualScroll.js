@@ -387,9 +387,16 @@ class VirtualScroll {
             
             return fieldInfo;
         } catch (error) {
-            console.error(`フィールド情報取得エラー (App ${appId}, Field ${fieldCode}):`, error);
+            this.logError(`フィールド情報取得 (App ${appId}, Field ${fieldCode})`, error);
             return { type: 'text' };
         }
+    }
+
+    /**
+     * エラーログを統一フォーマットで出力
+     */
+    logError(operation, error) {
+        console.error(`❌ ${operation}エラー:`, error);
     }
 
     /**

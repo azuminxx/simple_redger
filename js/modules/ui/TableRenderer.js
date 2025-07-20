@@ -421,7 +421,7 @@ class TableRenderer {
                 console.log(`✅ ${CONFIG.apps[appId].name} レコードID ${recordIdValue} を更新`);
                 
             } catch (error) {
-                console.error(`❌ ${CONFIG.apps[appId].name} レコード更新エラー:`, error);
+                this.logError(`${CONFIG.apps[appId].name} レコード更新`, error);
                 throw error;
             }
         });
@@ -470,9 +470,16 @@ class TableRenderer {
             return response;
             
         } catch (error) {
-            console.error(`❌ ${CONFIG.apps[appId].name} 一括更新エラー:`, error);
+            this.logError(`${CONFIG.apps[appId].name} 一括更新`, error);
             throw error;
         }
+    }
+
+    /**
+     * エラーログを統一フォーマットで出力
+     */
+    logError(operation, error) {
+        console.error(`❌ ${operation}エラー:`, error);
     }
 
     /**

@@ -112,29 +112,12 @@ class FieldInfoAPI {
             
             return processedFields;
         } catch (error) {
-            console.error(`✗ App ${appId}のフィールド情報取得エラー:`, error);
+            this.logError(`App ${appId}のフィールド情報取得`, error);
             throw new Error(`フィールド情報の取得に失敗しました (App ${appId}): ${error.message}`);
         }
     }
 
-    /**
-     * ローカルストレージのキャッシュをクリア
-     */
-    // clearLocalStorageCache() {
-    //     try {
-    //         const keys = [];
-    //         for (let i = 0; i < localStorage.length; i++) {
-    //             const key = localStorage.key(i);
-    //             if (key && key.startsWith(this.localStoragePrefix)) {
-    //                 keys.push(key);
-    //             }
-    //         }
-    //         keys.forEach(key => localStorage.removeItem(key));
-    //         console.log(`🗑️ ローカルストレージキャッシュクリア完了 (${keys.length}件)`);
-    //     } catch (error) {
-    //         console.warn('ローカルストレージキャッシュクリアエラー:', error);
-    //     }
-    // }
+
 
     /**
      * APIレスポンスのフィールドデータを処理
@@ -282,9 +265,16 @@ class FieldInfoAPI {
             
             return fieldsMap;
         } catch (error) {
-            console.error('複数アプリのフィールド情報取得エラー:', error);
+            this.logError('複数アプリのフィールド情報取得', error);
             throw error;
         }
+    }
+
+    /**
+     * エラーログを統一フォーマットで出力
+     */
+    logError(operation, error) {
+        console.error(`❌ ${operation}エラー:`, error);
     }
 }
 
