@@ -303,7 +303,7 @@ class VirtualScroll {
      */
     clearCellChangedStyles(recordIndex) {
         // 該当行の全てのセルから.cell-changedクラスを削除
-        const cells = document.querySelectorAll(`td[data-row="${recordIndex}"]`);
+        const cells = document.querySelectorAll(`td[data-record-index="${recordIndex}"]`);
         cells.forEach(cell => {
             cell.classList.remove('cell-changed');
         });
@@ -318,14 +318,10 @@ class VirtualScroll {
         if (checkbox) {
             checkbox.checked = isChanged;
         } else {
-            console.warn(`⚠️ VirtualScroll: チェックボックスが見つかりません 行${recordIndex}`);
-            // DOM更新が遅れている可能性があるため、少し遅延して再試行
-            setTimeout(() => {
-                const retryCheckbox = document.querySelector(`input[data-record-index="${recordIndex}"][data-field="change-flag"]`);
-                if (retryCheckbox) {
-                    retryCheckbox.checked = isChanged;
-                }
-            }, 100);
+            // VirtualScrollでは画面外の行はDOM要素が存在しないため、
+            // チェックボックスが見つからない場合は内部状態のみ更新
+            // （次回その行が表示される際に正しい状態が反映される）
+            // console.warn(`⚠️ VirtualScroll: チェックボックスが見つかりません 行${recordIndex} (画面外のため正常)`);
         }
     }
 
@@ -369,7 +365,6 @@ class VirtualScroll {
                 const value = record[column.key];
                 
                 // セルにデータ属性を追加（ドラッグアンドドロップ用）
-                td.setAttribute('data-row', i);
                 td.setAttribute('data-record-index', i);
                 td.setAttribute('data-column', column.key);
                 td.setAttribute('data-field-code', column.fieldCode || '');
@@ -520,7 +515,6 @@ class VirtualScroll {
             type: 'text',
             value: value,
             'data-record-index': recordIndex,
-            'data-column-index': columnIndex,
             'data-field-key': column.key
         }, 'editable-cell-input');
 
@@ -543,7 +537,6 @@ class VirtualScroll {
     createSelectInput(column, value, recordIndex, columnIndex, options) {
         const select = DOMHelper.createElement('select', {
             'data-record-index': recordIndex,
-            'data-column-index': columnIndex,
             'data-field-key': column.key
         }, 'editable-cell-select');
 

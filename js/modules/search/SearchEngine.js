@@ -10,6 +10,24 @@ class SearchEngine {
         this.maxRetries = 1; // 最大再試行回数
     }
     /**
+     * 検索処理中の表示を更新
+     */
+    updateSearchButtonState(appId, isSearching) {
+        const searchButton = document.querySelector(`button.search-button[data-app-id="${appId}"]`);
+        const addSearchButton = document.querySelector(`button.add-search-button[data-app-id="${appId}"]`);
+        
+        if (searchButton) {
+            searchButton.disabled = isSearching;
+            searchButton.textContent = isSearching ? '検索中...' : '検索';
+        }
+        
+        if (addSearchButton) {
+            addSearchButton.disabled = isSearching;
+            addSearchButton.textContent = isSearching ? '検索中...' : '追加検索';
+        }
+    }
+
+    /**
      * レコードを検索
      */
     async searchRecords(appId) {
@@ -21,6 +39,7 @@ class SearchEngine {
 
         try {
             this.isSearching = true;
+            this.updateSearchButtonState(appId, true);
             this.retryCount = 0; // 検索開始時に再試行回数をリセット
             
             const searchConditions = await this.getSearchConditions(appId);
@@ -71,6 +90,7 @@ class SearchEngine {
             alert(`${CONFIG.system.messages.searchError}\n詳細: ${error.message}`);
         } finally {
             this.isSearching = false;
+            this.updateSearchButtonState(appId, false);
         }
     }
 
@@ -144,24 +164,51 @@ class SearchEngine {
                     // 日付フィールドは範囲検索も可能だが、ここでは完全一致
                     queryParts.push(`${fieldCode} = "${value}"`);
                 } else {
-                    // テキストフィールドは部分一致
-                    queryParts.push(`${fieldCode} like "${value}"`);
+                    // テキストフィールドは部分一致（複数検索対応）
+                    const multipleQuery = this.buildMultipleSearchQuery(fieldCode, value);
+                    queryParts.push(multipleQuery);
                 }
             }
         } catch (error) {
             this.logError(`App ${appId}の検索クエリ構築`, error);
-            // エラー時は基本的な like 検索にフォールバック
+            // エラー時は基本的な like 検索にフォールバック（複数検索対応）
             for (const [fieldCode, value] of Object.entries(conditions)) {
                 if (Array.isArray(value)) {
                     const queries = value.map(v => `${fieldCode} like "${v}"`);
                     queryParts.push(`(${queries.join(' or ')})`);
                 } else {
-                    queryParts.push(`${fieldCode} like "${value}"`);
+                    const multipleQuery = this.buildMultipleSearchQuery(fieldCode, value);
+                    queryParts.push(multipleQuery);
                 }
             }
         }
 
         return queryParts.join(' and ');
+    }
+
+    /**
+     * 複数検索クエリを構築
+     * スペース、カンマ、改行で区切られた値を OR 条件で結合
+     */
+    buildMultipleSearchQuery(fieldCode, value) {
+        if (!value || typeof value !== 'string') {
+            return `${fieldCode} like "${value}"`;
+        }
+
+        // スペース、カンマ、改行コードで分割（連続する区切り文字も考慮）
+        const values = value
+            .split(/[\s,\r\n]+/)       // スペース、カンマ、改行コード（1つ以上）で分割
+            .map(v => v.trim())        // 前後の空白を除去
+            .filter(v => v.length > 0); // 空文字を除外
+
+        if (values.length <= 1) {
+            // 単一値の場合は従来通り
+            return `${fieldCode} like "${value}"`;
+        } else {
+            // 複数値の場合は OR 条件で結合
+            const queries = values.map(v => `${fieldCode} like "${v}"`);
+            return `(${queries.join(' or ')})`;
+        }
     }
 
     /**
@@ -350,6 +397,7 @@ class SearchEngine {
 
         try {
             this.isSearching = true;
+            this.updateSearchButtonState(appId, true);
             this.retryCount = 0; // 追加検索開始時に再試行回数をリセット
             
             const searchConditions = await this.getSearchConditions(appId);
@@ -399,6 +447,7 @@ class SearchEngine {
             alert(`追加検索中にエラーが発生しました。\n詳細: ${error.message}`);
         } finally {
             this.isSearching = false;
+            this.updateSearchButtonState(appId, false);
         }
     }
 

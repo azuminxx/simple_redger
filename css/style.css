@@ -184,6 +184,21 @@
     transform: translateY(-1px);
 }
 
+/* 検索処理中のボタンスタイル */
+.search-button:disabled,
+.add-search-button:disabled {
+    background-color: #6c757d;
+    cursor: not-allowed;
+    transform: none;
+    opacity: 0.7;
+}
+
+.search-button:disabled:hover,
+.add-search-button:disabled:hover {
+    background-color: #6c757d;
+    transform: none;
+}
+
 
 
 /* 統合結果テーブル */

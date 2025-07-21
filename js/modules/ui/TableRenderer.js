@@ -428,10 +428,10 @@ class TableRenderer {
                 throw new Error(`旧形式のレコードはサポートされていません: ${JSON.stringify(record)}`);
             });
             
-            // console.log(`📤 kintone API更新リクエスト全体:`, JSON.stringify({
-            //     app: appId,
-            //     records: updateRecords
-            // }, null, 2));
+            console.log(`📤 kintone API更新リクエスト全体:`, JSON.stringify({
+                app: appId,
+                records: updateRecords
+            }, null, 2));
             
             // API実行回数をカウント
             window.apiCounter.count(appId, 'レコード一括更新');

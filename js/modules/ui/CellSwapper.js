@@ -294,15 +294,17 @@ class CellSwapper {
         //   - 座席台帳のレコードIDは交換しない（7713, 7714のまま）
         const recordIdKey = `${sourceApp}_$id`;
         
-        if (sourceRecord[recordIdKey] && targetRecord[recordIdKey]) {
+        if (sourceRecord[recordIdKey] || targetRecord[recordIdKey]) {
             const sourceRecordId = sourceRecord[recordIdKey];
             const targetRecordId = targetRecord[recordIdKey];
             
-            // 起点台帳のレコードIDのみを交換
+            // 起点台帳のレコードIDを交換（どちらか一方がnullでも交換）
             sourceRecord[recordIdKey] = targetRecordId;
             targetRecord[recordIdKey] = sourceRecordId;
+            
+            console.log(`🔄 ${sourceApp}レコードID交換: ${sourceRecordId} ⇄ ${targetRecordId}`);
         } else {
-            console.log(`⚠️ ${sourceApp}のレコードIDが見つからないため、レコードID交換をスキップ`);
+            console.log(`⚠️ ${sourceApp}のレコードIDが両方の行で見つからないため、レコードID交換をスキップ`);
         }
         
         // VirtualScrollでテーブルを再描画
@@ -395,8 +397,8 @@ class CellSwapper {
     findRowByIndex(tbody, rowIndex) {
         const rows = tbody.querySelectorAll('tr');
         for (const row of rows) {
-            const dataRowIndex = parseInt(row.getAttribute('data-record-index'));
-            if (dataRowIndex === rowIndex) {
+            const recordIndex = parseInt(row.getAttribute('data-record-index'));
+            if (recordIndex === rowIndex) {
                 return row;
             }
         }

@@ -186,6 +186,7 @@ class TabManager {
 
         const searchButton = DOMHelper.createElement('button', {}, 'search-button');
         searchButton.textContent = '検索';
+        searchButton.setAttribute('data-app-id', appId);
         searchButton.addEventListener('click', () => {
             if (window.searchEngine) {
                 window.searchEngine.searchRecords(appId);
@@ -194,6 +195,7 @@ class TabManager {
 
         const addSearchButton = DOMHelper.createElement('button', {}, 'add-search-button');
         addSearchButton.textContent = '追加検索';
+        addSearchButton.setAttribute('data-app-id', appId);
         addSearchButton.addEventListener('click', () => {
             if (window.searchEngine) {
                 window.searchEngine.addSearchRecords(appId);
