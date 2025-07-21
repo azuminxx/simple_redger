@@ -395,6 +395,21 @@
     vertical-align: middle;
 }
 
+/* 詳細リンクセルのスタイル */
+.detail-link-cell {
+    text-align: center;
+    width: 50px;
+    min-width: 50px;
+    max-width: 50px;
+    padding: 8px 4px;
+    vertical-align: middle;
+}
+
+.detail-link-cell a {
+    display: inline-block;
+    transition: transform 0.2s ease;
+}
+
 .change-flag-cell input[type="checkbox"] {
     cursor: not-allowed;
     transform: scale(1.2);

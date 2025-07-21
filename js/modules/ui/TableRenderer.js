@@ -12,14 +12,28 @@ class TableRenderer {
         // セル交換機能を初期化
         this.cellSwapper = new CellSwapper(this);
         
-        // 更新ルール定義（主キー交換対応）
-        this.UPDATE_RULES = {
-            'PC番号': 'exclude_origin',    // PC番号は他の台帳のみ（PC台帳は除外）
-            '内線番号': 'exclude_origin',   // 内線番号は他の台帳のみ（内線台帳は除外）
-            '座席番号': 'exclude_origin',   // 座席番号は他の台帳のみ（座席台帳は除外）
-            'ユーザーID': 'pc_only',       // PC台帳のみ
-            '*': 'origin'                 // その他は元台帳のみ
-        };
+        // 更新ルール定義（主キー交換対応）- CONFIG.jsから動的に生成
+        this.UPDATE_RULES = this.generateUpdateRules();
+    }
+
+    /**
+     * 更新ルールを動的に生成
+     */
+    generateUpdateRules() {
+        const rules = {};
+        
+        // 主キーフィールドは全て exclude_origin ルール
+        CONFIG.primaryKeyFields.forEach(fieldCode => {
+            rules[fieldCode] = 'exclude_origin';
+        });
+        
+        // ユーザーIDは PC台帳のみ
+        rules[CONFIG.fieldMappings.userId] = 'pc_only';
+        
+        // その他のフィールドは元台帳のみ
+        rules['*'] = 'origin';
+        
+        return rules;
     }
 
     /**
@@ -264,16 +278,13 @@ class TableRenderer {
      */
     groupRecordsByApp(changedIndices = null) {
 
-        
-
-        
         // 【重要】kintone更新用レコードオブジェクト作成
         // ■ 各台帳の交換されたデータを、kintone REST API形式に変換
         // ■ 形式：{id: レコードID, record: {フィールド名: {value: 値}}}
         const updateRecordsByApp = {};
         
         changedIndices.forEach(rowIndex => {
-            ['PC台帳', '内線台帳', '座席台帳'].forEach(ledgerName => {
+            CONFIG.ledgerNames.forEach(ledgerName => {
                 const recordIdKey = `${ledgerName}_$id`;
                 const recordId = this.currentSearchResults[rowIndex][recordIdKey];
                 
@@ -292,52 +303,14 @@ class TableRenderer {
                         record: {}
                     };
                     
-                    if (ledgerName === 'PC台帳') {
-                        // 【重要】PC台帳の更新フィールド構成
-                        const userId = this.currentSearchResults[rowIndex]['PC台帳_ユーザーID'];
-                        const pcUsage = this.currentSearchResults[rowIndex]['PC台帳_PC用途'];
-                        const test1 = this.currentSearchResults[rowIndex]['PC台帳_test1'];
-                        const sample = this.currentSearchResults[rowIndex]['PC台帳_sample'];
-                        const extensionNumber = this.currentSearchResults[rowIndex]['内線台帳_内線番号'];
-                        const seatNumber = this.currentSearchResults[rowIndex]['座席台帳_座席番号'];
-                        
-                        updateRecord.record = {
-                            "ユーザーID": { value: userId },
-                            "PC用途": { value: pcUsage },
-                            "test1": { value: test1 },
-                            "sample": { value: sample },
-                            "内線番号": { value: extensionNumber },
-                            "座席番号": { value: seatNumber }
-                        };
-                        
-                    } else if (ledgerName === '内線台帳') {
-                        // 内線台帳の更新フィールド
-                        const phoneType = this.currentSearchResults[rowIndex]['内線台帳_電話機種別'];
-                        const pcNumber = this.currentSearchResults[rowIndex]['PC台帳_PC番号'];
-                        const seatNumber = this.currentSearchResults[rowIndex]['座席台帳_座席番号'];
-                        
-                        updateRecord.record = {
-                            "電話機種別": { value: phoneType },
-                            "PC番号": { value: pcNumber },
-                            "座席番号": { value: seatNumber }
-                        };
-                        
-                    } else if (ledgerName === '座席台帳') {
-                        // 座席台帳の更新フィールド
-                        const seatLocation = this.currentSearchResults[rowIndex]['座席台帳_座席拠点'];
-                        const floor = this.currentSearchResults[rowIndex]['座席台帳_階数'];
-                        const seatDepartment = this.currentSearchResults[rowIndex]['座席台帳_座席部署'];
-                        const pcNumber = this.currentSearchResults[rowIndex]['PC台帳_PC番号'];
-                        const extensionNumber = this.currentSearchResults[rowIndex]['内線台帳_内線番号'];
-                        
-                        updateRecord.record = {
-                            "座席拠点": { value: seatLocation },
-                            "階数": { value: floor },
-                            "座席部署": { value: seatDepartment },
-                            "PC番号": { value: pcNumber },
-                            "内線番号": { value: extensionNumber }
-                        };
-                    }
+                    // 【重要】CONFIG.jsから台帳の更新フィールド構成を動的取得
+                    const updateFields = CONFIG.getLedgerUpdateFields(ledgerName);
+                    
+                    // 各フィールドの値を設定
+                    Object.entries(updateFields).forEach(([fieldCode, fieldConfig]) => {
+                        const value = this.currentSearchResults[rowIndex][fieldConfig.sourceKey];
+                        updateRecord.record[fieldCode] = { value: value };
+                    });
                     
                     updateRecordsByApp[appId].push(updateRecord);
                 }
@@ -384,8 +357,9 @@ class TableRenderer {
                 return targetApps;
                 
             case 'pc_only':
-                // PC台帳のみ更新
-                return Object.keys(CONFIG.apps).filter(appId => CONFIG.apps[appId].name === 'PC台帳');
+                // PC台帳のみ更新（CONFIG.jsから動的取得）
+                const pcLedgerName = CONFIG.fieldMappings.primaryKeyToLedger['PC番号']; // 'PC台帳'
+                return Object.keys(CONFIG.apps).filter(appId => CONFIG.apps[appId].name === pcLedgerName);
                 
             case 'origin':
             default:
@@ -477,6 +451,8 @@ class TableRenderer {
             console.log(`   ${index + 1}. ${ledgerName} レコード${recordId}: ${recordUrl}`);
         });
     }
+
+
 
     /**
      * VirtualScrollテーブルを再描画

@@ -119,17 +119,25 @@
                 // 統合テーブルのカラム設定を動的生成
                 const dynamicColumns = await CONFIG.generateIntegratedTableColumns();
                 
-                // 変更フラグ列を最初に追加
-                const columnsWithChangeFlag = [{
+                // 変更フラグ列とリンク列を最初に追加
+                const columnsWithSpecialColumns = [{
                     key: 'change-flag',
                     label: '変更',
                     ledger: '操作',
                     fieldCode: 'change-flag',
                     appId: null,
                     isChangeFlag: true
+                }, {
+                    key: 'detail-link',
+                    label: '📁',
+                    ledger: '操作',
+                    fieldCode: 'detail-link',
+                    appId: null,
+                    isDetailLink: true,
+                    width: '50px'
                 }, ...dynamicColumns];
                 
-                CONFIG.integratedTableConfig.columns = columnsWithChangeFlag;
+                CONFIG.integratedTableConfig.columns = columnsWithSpecialColumns;
                 
                 console.log(`📋 統合テーブル設定完了 (${dynamicColumns.length}列)`);
                 

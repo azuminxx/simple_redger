@@ -256,10 +256,12 @@ class VirtualScroll {
                     return record[CONFIG.integrationKey];
                 }
                 
-                // PC台帳の統合キーを試行
-                const pcIntegrationKey = record['PC台帳_統合キー'];
-                if (pcIntegrationKey) {
-                    return pcIntegrationKey;
+                // 各台帳の統合キーを試行（CONFIG.jsから動的取得）
+                const pcLedgerName = CONFIG.fieldMappings.primaryKeyToLedger['PC番号']; // 'PC台帳'
+                const integrationKeyField = `${pcLedgerName}_${CONFIG.fieldMappings.integrationKey}`;
+                const integrationKeyValue = record[integrationKeyField];
+                if (integrationKeyValue) {
+                    return integrationKeyValue;
                 }
             }
         }
@@ -445,6 +447,9 @@ class VirtualScroll {
                     checkbox.setAttribute('data-field', 'change-flag');
                     td.appendChild(checkbox);
                     td.className = 'change-flag-cell';
+                } else if (column.isDetailLink) {
+                    // 詳細リンク列の場合はファイル絵文字リンクを作成
+                    this.createDetailLinkCell(td, i, record);
                 } else if (this.isEditableField(column)) {
                     // 編集可能フィールドの場合は入力要素を作成
                     const inputElement = await this.createEditableInput(column, value, i, columnIndex);
@@ -538,8 +543,8 @@ class VirtualScroll {
             return false;
         }
         
-        // 編集不可のフィールドを定義
-        const readOnlyFields = ['PC番号', '内線番号', '座席番号', 'ユーザー名'];
+        // 編集不可のフィールドを定義（CONFIG.jsから取得）
+        const readOnlyFields = CONFIG.fieldPermissions.readOnlyFields;
         
         return !readOnlyFields.includes(column.fieldCode);
     }
@@ -761,9 +766,237 @@ class VirtualScroll {
      * 主キーフィールドかどうかを判定
      */
     isPrimaryKeyField(fieldCode) {
-        // 主キーとして扱うフィールドコードを定義（ユーザー名は除外）
-        const primaryKeyFields = ['$id', 'PC番号', '内線番号', '座席番号'];
+        // 主キーとして扱うフィールドコードを定義（CONFIG.jsから取得、$idも含む）
+        const primaryKeyFields = ['$id', ...CONFIG.primaryKeyFields];
         return primaryKeyFields.includes(fieldCode);
+    }
+
+    /**
+     * 詳細リンクセルを作成（ファイル絵文字）
+     */
+    createDetailLinkCell(td, recordIndex, record) {
+        const link = DOMHelper.createElement('a', {
+            href: '#',
+            'data-record-index': recordIndex
+        });
+        link.textContent = '📁';
+        link.style.cssText = `
+            color: #007bff;
+            text-decoration: none;
+            font-size: 18px;
+            cursor: pointer;
+            display: block;
+            text-align: center;
+            padding: 4px;
+        `;
+        
+        // ホバーエフェクト
+        link.addEventListener('mouseenter', () => {
+            link.style.transform = 'scale(1.2)';
+            link.style.transition = 'transform 0.2s ease';
+        });
+        link.addEventListener('mouseleave', () => {
+            link.style.transform = 'scale(1)';
+        });
+
+        // クリックイベント
+        link.addEventListener('click', (event) => {
+            event.preventDefault();
+            // 統合キーを取得
+            const integrationKey = this.getIntegrationKeyFromRecord(record);
+            this.showLedgerDetailsModal(integrationKey, record);
+        });
+
+        td.appendChild(link);
+        td.className = 'detail-link-cell';
+        td.style.cssText = 'text-align: center; vertical-align: middle;';
+    }
+
+    /**
+     * レコードから統合キーを取得
+     */
+    getIntegrationKeyFromRecord(record) {
+        // 各台帳の統合キーフィールドから値を取得
+        const pcLedgerName = CONFIG.fieldMappings.primaryKeyToLedger['PC番号']; // 'PC台帳'
+        const integrationKeyField = `${pcLedgerName}_${CONFIG.fieldMappings.integrationKey}`;
+        return record[integrationKeyField] || 'Unknown';
+    }
+
+    /**
+     * 3つの台帳詳細をモーダルで表示
+     */
+    showLedgerDetailsModal(integrationKey, record) {
+        // 既存のモーダルを削除
+        const existingModal = document.querySelector('.ledger-details-modal');
+        if (existingModal) {
+            existingModal.remove();
+        }
+
+        // モーダル要素を作成
+        const modal = DOMHelper.createElement('div', {}, 'ledger-details-modal');
+        modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 10000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        `;
+
+        const content = DOMHelper.createElement('div');
+        content.style.cssText = `
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            max-width: 1200px;
+            max-height: 95vh;
+            width: 95%;
+            overflow-y: auto;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        `;
+
+        // ヘッダー
+        const header = DOMHelper.createElement('div');
+        header.style.cssText = `
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #dee2e6;
+        `;
+
+        const title = DOMHelper.createElement('h3');
+        title.textContent = `統合キー: ${integrationKey} の詳細`;
+        title.style.cssText = 'font-size: 18px; font-weight: bold; color: #495057; margin: 0;';
+
+        const closeButton = DOMHelper.createElement('button');
+        closeButton.textContent = '閉じる';
+        closeButton.style.cssText = `
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-weight: bold;
+        `;
+        closeButton.addEventListener('click', () => modal.remove());
+
+        header.appendChild(title);
+        header.appendChild(closeButton);
+
+        // 各台帳のセクション
+        const body = DOMHelper.createElement('div');
+        body.style.cssText = 'display: flex; flex-direction: column; gap: 20px;';
+
+        // 3つの台帳をiframeで上中下に表示
+        CONFIG.ledgerNames.forEach(ledgerName => {
+            const iframeSection = this.createLedgerIframeSection(ledgerName, record);
+            body.appendChild(iframeSection);
+        });
+
+        content.appendChild(header);
+        content.appendChild(body);
+        modal.appendChild(content);
+
+        // クリックで閉じる
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.remove();
+            }
+        });
+
+        document.body.appendChild(modal);
+    }
+
+    /**
+     * 台帳iframeセクションを作成
+     */
+    createLedgerIframeSection(ledgerName, record) {
+        const baseUrl = 'https://fps62oxtrbhh.cybozu.com/k';
+        const appId = CONFIG.getAppIdByLedgerName(ledgerName);
+        
+        const section = DOMHelper.createElement('div');
+        section.style.cssText = `
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            overflow: hidden;
+            height: 250px;
+        `;
+
+        // レコードIDを取得
+        const recordIdKey = `${ledgerName}_$id`;
+        const recordId = record[recordIdKey];
+        
+        if (recordId) {
+            const recordUrl = `${baseUrl}/${appId}/show#record=${recordId}`;
+            
+            // iframeコンテナを作成（縮小表示用）
+            const iframeContainer = DOMHelper.createElement('div');
+            iframeContainer.style.cssText = `
+                width: 100%;
+                height: 250px;
+                overflow: hidden;
+                position: relative;
+            `;
+
+            // iframeを作成（縮小表示）
+            const iframe = DOMHelper.createElement('iframe');
+            iframe.src = recordUrl;
+            iframe.style.cssText = `
+                width: 166.67%;
+                height: 416px;
+                border: none;
+                background: white;
+                transform: scale(0.6);
+                transform-origin: top left;
+                position: absolute;
+                top: 0;
+                left: 0;
+            `;
+            
+            // iframe読み込みエラー対応
+            iframe.addEventListener('error', () => {
+                const errorMsg = DOMHelper.createElement('div');
+                errorMsg.textContent = 'レコードの読み込みに失敗しました';
+                errorMsg.style.cssText = `
+                    padding: 20px;
+                    text-align: center;
+                    color: #dc3545;
+                    height: 250px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                `;
+                section.appendChild(errorMsg);
+                return;
+            });
+            
+            iframeContainer.appendChild(iframe);
+            section.appendChild(iframeContainer);
+        } else {
+            const noDataMessage = DOMHelper.createElement('div');
+            noDataMessage.textContent = 'この台帳にはデータがありません';
+            noDataMessage.style.cssText = `
+                color: #6c757d;
+                font-style: italic;
+                text-align: center;
+                padding: 20px;
+                height: 250px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            `;
+            
+            section.appendChild(noDataMessage);
+        }
+        
+        return section;
     }
 
     /**

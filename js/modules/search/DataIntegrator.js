@@ -85,10 +85,11 @@ class DataIntegrator {
     searchUserListByUserIds(allLedgerData) {
         const userIds = new Set();
         
-        // 全台帳からユーザーIDを抽出
+        // 全台帳からユーザーIDを抽出（CONFIG.jsから取得）
+        const userIdFieldName = CONFIG.fieldMappings.userId;
         Object.values(allLedgerData).forEach(records => {
             records.forEach(record => {
-                const userIdField = record['ユーザーID'];
+                const userIdField = record[userIdFieldName];
                 if (userIdField && userIdField.value) {
                     userIds.add(userIdField.value);
                 }
@@ -99,9 +100,9 @@ class DataIntegrator {
             return Promise.resolve([]);
         }
 
-        // ユーザーIDでユーザーリストを検索
+        // ユーザーIDでユーザーリストを検索（CONFIG.jsから取得）
         const userIdList = Array.from(userIds).map(id => `"${id}"`).join(',');
-        const query = `ユーザーID in (${userIdList})`;
+        const query = `${userIdFieldName} in (${userIdList})`;
         
         return window.searchEngine.searchRecordsWithQuery(CONFIG.userList.appId, query);
     }
@@ -112,11 +113,13 @@ class DataIntegrator {
     async integrateAllLedgerDataWithUserList(allLedgerData, integrationKeys, userListData) {
         const integratedData = [];
 
-        // ユーザーリストをユーザーIDでマップ化
+        // ユーザーリストをユーザーIDでマップ化（CONFIG.jsから取得）
+        const userIdFieldName = CONFIG.fieldMappings.userId;
+        const userNameFieldName = CONFIG.fieldMappings.userName;
         const userMap = new Map();
         userListData.forEach(user => {
-            const userId = user['ユーザーID'] && user['ユーザーID'].value;
-            const userName = user['ユーザー名'] && user['ユーザー名'].value;
+            const userId = user[userIdFieldName] && user[userIdFieldName].value;
+            const userName = user[userNameFieldName] && user[userNameFieldName].value;
             if (userId) {
                 userMap.set(userId, userName || '');
             }
@@ -148,8 +151,8 @@ class DataIntegrator {
                         
                         integratedRecord[`${ledgerName}_${fieldCode}`] = displayValue;
                         
-                        // ユーザーIDを記録
-                        if (fieldCode === 'ユーザーID' && displayValue) {
+                        // ユーザーIDを記録（CONFIG.jsから取得）
+                        if (fieldCode === userIdFieldName && displayValue) {
                             recordUserId = displayValue;
                         }
                     });
@@ -182,10 +185,11 @@ class DataIntegrator {
             }
 
             // ユーザーリストからユーザー名を取得してPC台帳のデータとして設定
+            const pcLedgerName = CONFIG.fieldMappings.primaryKeyToLedger['PC番号']; // 'PC台帳'
             if (recordUserId && userMap.has(recordUserId)) {
-                integratedRecord['PC台帳_ユーザー名'] = userMap.get(recordUserId);
+                integratedRecord[`${pcLedgerName}_${userNameFieldName}`] = userMap.get(recordUserId);
             } else {
-                integratedRecord['PC台帳_ユーザー名'] = null;
+                integratedRecord[`${pcLedgerName}_${userNameFieldName}`] = null;
             }
 
             integratedData.push(integratedRecord);

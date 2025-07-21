@@ -34,18 +34,9 @@ const CONFIG = {
 
     // 台帳アプリ設定
     apps: {
-        6: {
-            appId: 6,
-            name: 'PC台帳'
-        },
-        7: {
-            appId: 7,
-            name: '内線台帳'
-        },
-        8: {
-            appId: 8,
-            name: '座席台帳'
-        }
+        6: { name: 'PC台帳' },
+        7: { name: '内線台帳' },
+        8: { name: '座席台帳' }
     },
 
     // 統合テーブル表示設定
@@ -69,6 +60,127 @@ const CONFIG = {
             { key: '座席台帳_座席番号', label: '座席番号', width: '120px', appId: 8, fieldCode: '座席番号' },
             { key: '座席台帳_座席部署', label: '座席部署', width: '80px', appId: 8, fieldCode: '座席部署' }
         ]
+    },
+
+    // 主キーフィールド設定
+    primaryKeyFields: ['PC番号', '内線番号', '座席番号'],
+    
+    // フィールドマッピング設定
+    fieldMappings: {
+        integrationKey: '統合キー',
+        userId: 'ユーザーID',
+        userName: 'ユーザー名',
+        primaryKeyToLedger: {
+            'PC番号': 'PC台帳',
+            '内線番号': '内線台帳',
+            '座席番号': '座席台帳'
+        }
+    },
+    
+    // 編集可能/読み取り専用フィールドの設定
+    fieldPermissions: {
+        readOnlyFields: ['PC番号', '内線番号', '座席番号', 'ユーザー名']
+    },
+
+    // フィールドフィルタリング設定
+    fieldFiltering: {
+        // スキップするシステムフィールド
+        systemFields: ['$id', '$revision', 'レコード番号', '作成者', '作成日時', '更新者', '更新日時'],
+        
+        // サポートしないフィールドタイプ
+        unsupportedTypes: [
+            'SUBTABLE', 'FILE', 'REFERENCE_TABLE', 'GROUP', 'SPACER',
+            'HR', 'CATEGORY', 'STATUS', 'STATUS_ASSIGNEE', 'CREATED_TIME',
+            'UPDATED_TIME', 'CREATOR', 'MODIFIER'
+        ]
+    },
+
+    // フィールドタイプマッピング設定
+    fieldTypeMapping: {
+        'SINGLE_LINE_TEXT': 'text',
+        'MULTI_LINE_TEXT': 'text',
+        'RICH_TEXT': 'text',
+        'NUMBER': 'number',
+        'CALC': 'text', // 計算フィールドは読み取り専用だが検索では文字列として扱う
+        'DROP_DOWN': 'dropdown',
+        'RADIO_BUTTON': 'radio',
+        'CHECK_BOX': 'checkbox',
+        'DATE': 'date',
+        'DATETIME': 'datetime-local',
+        'TIME': 'time',
+        'LINK': 'text',
+        'USER_SELECT': 'text' // ユーザー選択フィールドは文字列として扱う
+    },
+
+    // デフォルトフィールドタイプ
+    defaultFieldType: 'text',
+
+    // 台帳更新設定（保存時のフィールドマッピング）
+    ledgerUpdateConfig: {
+        'PC台帳': {
+            ownFields: ['ユーザーID', 'PC用途', 'test1', 'sample'],
+            crossReferenceFields: {
+                '内線番号': '内線台帳',
+                '座席番号': '座席台帳'
+            }
+        },
+        '内線台帳': {
+            ownFields: ['電話機種別'],
+            crossReferenceFields: {
+                'PC番号': 'PC台帳',
+                '座席番号': '座席台帳'
+            }
+        },
+        '座席台帳': {
+            ownFields: ['座席拠点', '階数', '座席部署'],
+            crossReferenceFields: {
+                'PC番号': 'PC台帳',
+                '内線番号': '内線台帳'
+            }
+        }
+    },
+
+    // 台帳名の配列（処理順序用）
+    get ledgerNames() {
+        return Object.values(this.apps).map(app => app.name);
+    },
+
+    /**
+     * 台帳名からappIdを取得
+     */
+    getAppIdByLedgerName(ledgerName) {
+        const entry = Object.entries(this.apps).find(([appId, config]) => 
+            config.name === ledgerName
+        );
+        return entry ? entry[0] : null;
+    },
+
+    /**
+     * 指定台帳の更新フィールド構成を取得
+     */
+    getLedgerUpdateFields(ledgerName) {
+        const config = this.ledgerUpdateConfig[ledgerName];
+        if (!config) return {};
+        
+        const updateFields = {};
+        
+        // 自台帳のフィールド
+        config.ownFields.forEach(fieldCode => {
+            updateFields[fieldCode] = {
+                sourceKey: `${ledgerName}_${fieldCode}`,
+                fieldCode: fieldCode
+            };
+        });
+        
+        // 他台帳からの参照フィールド
+        Object.entries(config.crossReferenceFields).forEach(([fieldCode, sourceLedger]) => {
+            updateFields[fieldCode] = {
+                sourceKey: `${sourceLedger}_${fieldCode}`,
+                fieldCode: fieldCode
+            };
+        });
+        
+        return updateFields;
     },
 
     /**

@@ -141,23 +141,16 @@ class FieldInfoAPI {
     }
 
     /**
-     * スキップすべきフィールドかどうかを判定
+     * スキップすべきフィールドかどうかを判定（CONFIG.jsから設定を取得）
      */
     shouldSkipField(fieldCode, fieldInfo) {
-        // システムフィールド
-        const systemFields = ['$id', '$revision', 'レコード番号', '作成者', '作成日時', '更新者', '更新日時'];
-        if (systemFields.includes(fieldCode)) {
+        // システムフィールドの判定（CONFIG.jsから取得）
+        if (CONFIG.fieldFiltering.systemFields.includes(fieldCode)) {
             return true;
         }
 
-        // サポートしないフィールドタイプ
-        const unsupportedTypes = [
-            'SUBTABLE', 'FILE', 'REFERENCE_TABLE', 'GROUP', 'SPACER',
-            'HR', 'CATEGORY', 'STATUS', 'STATUS_ASSIGNEE', 'CREATED_TIME',
-            'UPDATED_TIME', 'CREATOR', 'MODIFIER'
-        ];
-        
-        if (unsupportedTypes.includes(fieldInfo.type)) {
+        // サポートしないフィールドタイプの判定（CONFIG.jsから取得）
+        if (CONFIG.fieldFiltering.unsupportedTypes.includes(fieldInfo.type)) {
             return true;
         }
 
@@ -198,26 +191,10 @@ class FieldInfoAPI {
     }
 
     /**
-     * kintoneのフィールドタイプを検索フォーム用タイプにマッピング
+     * kintoneのフィールドタイプを検索フォーム用タイプにマッピング（CONFIG.jsから設定を取得）
      */
     mapFieldType(kintoneType) {
-        const typeMapping = {
-            'SINGLE_LINE_TEXT': 'text',
-            'MULTI_LINE_TEXT': 'text',
-            'RICH_TEXT': 'text',
-            'NUMBER': 'number',
-            'CALC': 'text', // 計算フィールドは読み取り専用だが検索では文字列として扱う
-            'DROP_DOWN': 'dropdown',
-            'RADIO_BUTTON': 'radio',
-            'CHECK_BOX': 'checkbox',
-            'DATE': 'date',
-            'DATETIME': 'datetime-local',
-            'TIME': 'time',
-            'LINK': 'text',
-            'USER_SELECT': 'text' // ユーザー選択フィールドは文字列として扱う
-        };
-
-        return typeMapping[kintoneType] || 'text';
+        return CONFIG.fieldTypeMapping[kintoneType] || CONFIG.defaultFieldType;
     }
 
     /**

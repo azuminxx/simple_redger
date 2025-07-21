@@ -6,8 +6,8 @@ class CellSwapper {
     constructor(tableRenderer) {
         this.tableRenderer = tableRenderer;
         
-        // ドラッグアンドドロップ用の主キーフィールド定義
-        this.PRIMARY_KEY_FIELDS = ['PC番号', '内線番号', '座席番号'];
+        // ドラッグアンドドロップ用の主キーフィールド定義（CONFIG.jsから取得）
+        this.PRIMARY_KEY_FIELDS = CONFIG.primaryKeyFields;
         
         // ドラッグアンドドロップの状態管理
         this.dragState = {
@@ -330,14 +330,8 @@ class CellSwapper {
      * 主キーフィールドに対応するsourceAppを取得
      */
     getPrimaryKeySourceApp(primaryKeyField) {
-        // フィールドマッピング（レガシーシステムのconfig.jsを参考）
-        const primaryKeyMappings = {
-            'PC番号': 'PC台帳',
-            '内線番号': '内線台帳', 
-            '座席番号': '座席台帳'
-        };
-        
-        return primaryKeyMappings[primaryKeyField] || null;
+        // CONFIG.jsのフィールドマッピングから取得
+        return CONFIG.fieldMappings.primaryKeyToLedger[primaryKeyField] || null;
     }
 
     /**
