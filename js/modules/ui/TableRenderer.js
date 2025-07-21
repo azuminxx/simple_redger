@@ -522,18 +522,18 @@ class TableRenderer {
     }
 
     /**
-     * スクロール位置を保持してVirtualScrollテーブルを再描画
-     * 明示的にスクロール位置を保存・復元
+     * スクロール位置を保持してテーブルを再描画
      */
     refreshVirtualScrollTableWithScrollPreservation(forcedScrollTop = null) {
         try {
-            // 現在のスクロール位置を明示的に保存
+            // スクロールコンテナを取得
             const resultsContainer = document.getElementById(CONFIG.system.resultsContainerId);
             const integratedResults = resultsContainer?.querySelector('.integrated-results');
             const tableContainer = integratedResults?.querySelector('.integrated-table-container');
             const scrollContainer = tableContainer?.querySelector('.virtual-scroll-container');
             
-            let savedScrollTop = forcedScrollTop;
+            // スクロール位置を保存
+            let savedScrollTop = forcedScrollTop; // 強制指定を優先
             if (savedScrollTop === null && scrollContainer) {
                 savedScrollTop = scrollContainer.scrollTop;
             }
@@ -541,7 +541,6 @@ class TableRenderer {
             if (savedScrollTop > 0) {
                 // VirtualScrollのプロパティにも保存
                 this.virtualScroll.savedScrollTop = savedScrollTop;
-                console.log(`📍 スクロール位置保存: ${savedScrollTop}px`);
             }
             
             // 通常の再描画を実行
@@ -553,7 +552,6 @@ class TableRenderer {
                     const newScrollContainer = document.querySelector('.virtual-scroll-container');
                     if (newScrollContainer) {
                         newScrollContainer.scrollTop = savedScrollTop;
-                        console.log(`📍 スクロール位置復元: ${savedScrollTop}px → 実際: ${newScrollContainer.scrollTop}px`);
                     }
                 }, 150); // 十分な時間を確保
             }

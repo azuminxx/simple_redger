@@ -291,7 +291,6 @@ class CellSwapper {
         const recordIdKey = `${sourceApp}_$id`;
         if (sourceRecord[recordIdKey] !== undefined || targetRecord[recordIdKey] !== undefined) {
             this.swapFieldValues(sourceRecord, targetRecord, sourceRowIndex, targetRowIndex, recordIdKey, swappedFields);
-            console.log(`🔄 $idフィールド明示的処理: ${recordIdKey}`);
         }
         
         // スクロール位置を事前に保存（空行削除前）
@@ -300,8 +299,6 @@ class CellSwapper {
         
         // セル交換後に空行をチェックして削除（スクロール位置を渡す）
         this.removeEmptyRowsAfterSwap(savedScrollTop);
-        
-        console.log(`✅ セル交換完了: ${primaryKeyField} 行${sourceRowIndex}⇄${targetRowIndex} (${swappedFields.size}フィールド)`);
         
         return true;
     }
@@ -327,8 +324,6 @@ class CellSwapper {
         // セル交換時の元の値保存と変更状態管理
         window.virtualScroll.updateFieldChangeStatusForSwap(sourceRowIndex, fieldKey, sourceValue, targetValue);
         window.virtualScroll.updateFieldChangeStatusForSwap(targetRowIndex, fieldKey, targetValue, sourceValue);
-        
-        console.log(`🔄 フィールド交換: ${fieldKey} "${sourceValue}" ⇄ "${targetValue}"`);
     }
 
     /**
@@ -451,12 +446,10 @@ class CellSwapper {
             const insertIndex = insertAfterIndex + 1;
             this.tableRenderer.currentSearchResults.splice(insertIndex, 0, emptyRow);
             newRowIndex = insertIndex;
-            console.log(`✅ 空行作成: 行${insertAfterIndex}の直下（インデックス${insertIndex}）に挿入`);
         } else {
             // 最終行に追加（従来の動作）
             this.tableRenderer.currentSearchResults.push(emptyRow);
             newRowIndex = this.tableRenderer.currentSearchResults.length - 1;
-            console.log(`✅ 空行作成: 最終行（インデックス${newRowIndex}）に追加`);
         }
         
         return newRowIndex;
@@ -479,8 +472,6 @@ class CellSwapper {
         };
         fields.push(recordIdField);
         
-        console.log(`📋 ${ledgerName}の分離対象フィールド: ${fields.map(f => f.key).join(', ')}`);
-        
         return fields;
     }
 
@@ -502,15 +493,11 @@ class CellSwapper {
             return false;
         }
 
-
-
         // 空行を分離元の行の直下に作成
         const emptyRowIndex = this.createEmptyRow(recordIndex);
         
         // 台帳の全フィールドを取得
         const ledgerFields = this.getLedgerFields(ledgerName);
-        
-        console.log(`🔄 台帳分離開始: ${ledgerName} (${ledgerFields.length}フィールド)`);
         
         // 各フィールドをセル交換で移動
         // 注意: 空行挿入により元のレコードのインデックスは変わらないが、
@@ -544,8 +531,6 @@ class CellSwapper {
                     sourceValue
                 );
             }
-            
-            console.log(`📦 フィールド移動: ${field.key} "${sourceValue}" → 空行`);
         });
         
         // 変更フラグを設定
@@ -554,8 +539,6 @@ class CellSwapper {
         
         // 分離処理後はテーブル再描画が必要（データが変更されたため）
         this.tableRenderer.refreshVirtualScrollTable();
-        
-        console.log(`✅ 台帳分離完了: ${ledgerName} → 空行${emptyRowIndex}`);
         
         return true;
     }
@@ -617,8 +600,6 @@ class CellSwapper {
 
         // セル交換処理完了後は必ず再描画（空行削除の有無に関係なく）
         if (rowsToRemove.length > 0) {
-            console.log(`🧹 空行を削除: ${rowsToRemove.length}件`);
-            
             // インデックスの大きい順に削除（配列のインデックスずれを防ぐため）
             rowsToRemove.reverse().forEach(({ row, index }) => {
                 this.tableRenderer.currentSearchResults.splice(index, 1);
@@ -628,8 +609,6 @@ class CellSwapper {
                     window.virtualScroll.changeFlags.delete(index);
                     window.virtualScroll.changedFields.delete(index);
                 }
-                
-                console.log(`✅ 空行削除: インデックス${index}の空行（統合キー: ${row[CONFIG.integrationKey]}）`);
             });
         }
         

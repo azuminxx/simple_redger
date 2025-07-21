@@ -228,23 +228,18 @@ class VirtualScroll {
         // 保存された元の値と現在値を比較
         const savedOriginalValue = window.swapSessionOriginalValues.get(sessionKey);
         
-
-        
         // $idフィールドの場合、undefinedと"undefined"を同一視
         const normalizedSavedValue = (savedOriginalValue === undefined || savedOriginalValue === 'undefined' || savedOriginalValue === null) ? null : savedOriginalValue;
         const normalizedNewValue = (newValue === undefined || newValue === 'undefined' || newValue === null) ? null : newValue;
         
         if (normalizedSavedValue === normalizedNewValue) {
             // 元の値に戻った場合
-            console.log(`🔄 元の値に復元: ${fieldKey} "${newValue}" (${recordId})`);
             this.removeChangedField(recordIndex, fieldKey);
             // セッションからも削除（初期状態に戻す）
             window.swapSessionOriginalValues.delete(sessionKey);
-            console.log(`✅ 変更フラグクリア実行: 行${recordIndex} ${fieldKey}`);
         } else {
             // まだ変更状態
             this.setChangedField(recordIndex, fieldKey);
-            console.log(`⚠️ まだ変更状態: ${fieldKey} "${normalizedNewValue}" ≠ "${normalizedSavedValue}" (${recordId})`);
         }
     }
 
@@ -258,24 +253,17 @@ class VirtualScroll {
             if (record) {
                 // 統合キーを直接取得を試行
                 if (record[CONFIG.integrationKey]) {
-                    console.log(`🔑 統合キー取得成功: ${record[CONFIG.integrationKey]} (行${recordIndex})`);
                     return record[CONFIG.integrationKey];
                 }
                 
                 // PC台帳の統合キーを試行
                 const pcIntegrationKey = record['PC台帳_統合キー'];
                 if (pcIntegrationKey) {
-                    console.log(`🔑 PC台帳統合キー取得成功: ${pcIntegrationKey} (行${recordIndex})`);
                     return pcIntegrationKey;
                 }
-                
-                // デバッグ：レコードのキー一覧を出力
-                const recordKeys = Object.keys(record);
-                console.log(`🔍 行${recordIndex}のフィールド一覧:`, recordKeys.filter(key => key.includes('統合')));
             }
         }
         // フォールバック：レコードインデックス
-        console.log(`⚠️ 統合キー取得失敗、フォールバック使用: idx_${recordIndex}`);
         return `idx_${recordIndex}`;
     }
 
@@ -319,27 +307,17 @@ class VirtualScroll {
      * 指定レコードから変更されたフィールドを削除
      */
     removeChangedField(recordIndex, fieldKey) {
-        console.log(`🔄 変更フィールド削除開始: 行${recordIndex} ${fieldKey}`);
-        
         if (this.changedFields.has(recordIndex)) {
             const fieldSet = this.changedFields.get(recordIndex);
-            const hadField = fieldSet.has(fieldKey);
             fieldSet.delete(fieldKey);
-            
-            console.log(`📝 フィールド削除: ${hadField ? '成功' : '対象なし'} - 残り${fieldSet.size}個`);
             
             // セルの背景色もクリア
             this.clearCellChangedStyle(recordIndex, fieldKey);
             
             // 変更されたフィールドがなくなった場合は変更フラグもリセット
             if (fieldSet.size === 0) {
-                console.log(`🔄 全フィールド復元完了 - 変更フラグをリセット: 行${recordIndex}`);
                 this.setChangeFlag(recordIndex, false);
-            } else {
-                console.log(`⚠️ まだ他のフィールドが変更状態: 行${recordIndex} (残り${fieldSet.size}個)`);
             }
-        } else {
-            console.log(`⚠️ 変更フィールドマップに行${recordIndex}が存在しません`);
         }
     }
 
@@ -398,8 +376,6 @@ class VirtualScroll {
                     this.setCellChangedStyle(recordIndex, fieldKey);
                 });
             });
-            
-            console.log(`🔄 変更フラグUI復元完了: ${this.changeFlags.size}件`);
         }, 100);
     }
 
@@ -815,13 +791,7 @@ class VirtualScroll {
             
             // CellSwapperの分離処理を呼び出し
             if (window.tableRenderer && window.tableRenderer.cellSwapper) {
-                const success = window.tableRenderer.cellSwapper.separateLedger(recordIndex, fieldCode);
-                
-                if (success) {
-                    console.log(`✅ 分離処理成功: 行${recordIndex} ${fieldCode}`);
-                } else {
-                    console.log(`❌ 分離処理キャンセルまたは失敗: 行${recordIndex} ${fieldCode}`);
-                }
+                window.tableRenderer.cellSwapper.separateLedger(recordIndex, fieldCode);
             } else {
                 console.error('❌ CellSwapperが見つかりません');
             }
