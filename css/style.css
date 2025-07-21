@@ -62,13 +62,14 @@
 }
 
 .tab-button {
-    padding: 12px 20px;
+    padding: 8px 14px;
     border: none;
     background-color: #e9ecef;
     color: #495057;
     cursor: pointer;
-    border-radius: 8px 8px 0 0;
+    border-radius: 6px 6px 0 0;
     font-weight: 500;
+    font-size: 12px;
     transition: all 0.2s ease;
 }
 
@@ -110,15 +111,15 @@
 .field-group label {
     font-weight: 600;
     color: #495057;
-    font-size: 14px;
+    font-size: 12px;
 }
 
 .field-group input,
 .field-group select {
-    padding: 8px 12px;
+    padding: 6px 10px;
     border: 1px solid #ced4da;
-    border-radius: 4px;
-    font-size: 14px;
+    border-radius: 3px;
+    font-size: 12px;
     transition: border-color 0.2s ease;
     max-width: 150px;
     width: 100%;
@@ -127,7 +128,25 @@
     vertical-align: top;
     line-height: normal;
     height: auto;
-    min-height: 38px;
+    min-height: 32px;
+}
+
+/* テーブル内のselect要素とinput要素のスタイル */
+.integrated-table select,
+.integrated-table input,
+table select,
+table input {
+    font-size: 11px;
+    padding: 4px 6px;
+    height: auto;
+    min-height: 28px;
+}
+
+/* 検索フォーム内の要素をより具体的に指定 */
+.search-form select,
+.search-form input[type="text"] {
+    font-size: 11px;
+    padding: 6px 10px;
 }
 
 
@@ -163,13 +182,13 @@
 .search-button,
 .add-search-button,
 .clear-button {
-    padding: 10px 30px;
+    padding: 8px 24px;
     border: none;
-    border-radius: 4px;
+    border-radius: 3px;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s ease;
-    font-size: 14px;
+    font-size: 12px;
 }
 
 .search-button {
@@ -300,7 +319,7 @@
 
 .integrated-table th,
 .integrated-table td {
-    padding: 12px 8px;
+    padding: 6px 5px;
     text-align: left;
     border-right: 1px solid #dee2e6;
     border-bottom: 1px solid #dee2e6;
@@ -308,6 +327,8 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     box-sizing: border-box;
+    font-size: 12px;
+    line-height: 1.2;
 }
 
 .integrated-table th:first-child,
@@ -324,7 +345,7 @@
     background-color: #f8f9fa;
     font-weight: 600;
     color: #495057;
-    font-size: 13px;
+    font-size: 11px;
 }
 
 .header-ledger-cell {
@@ -337,12 +358,12 @@
 
 .header-field-cell {
     background-color: #f8f9fa;
-    font-size: 12px;
+    font-size: 10px;
 }
 
 /* ボディスタイル */
 .integrated-table td {
-    font-size: 13px;
+    font-size: 11px;
     color: #495057;
 }
 
@@ -391,8 +412,9 @@
     width: 60px;
     min-width: 60px;
     max-width: 60px;
-    padding: 8px 4px;
+    padding: 4px 2px;
     vertical-align: middle;
+    font-size: 12px;
 }
 
 /* 詳細リンクセルのスタイル */
@@ -401,7 +423,7 @@
     width: 50px;
     min-width: 50px;
     max-width: 50px;
-    padding: 8px 4px;
+    padding: 4px 2px;
     vertical-align: middle;
 }
 
@@ -467,15 +489,15 @@
 
 /* 保存ボタン */
 .save-changes-button {
-    padding: 8px 16px;
+    padding: 6px 14px;
     background-color: #28a745;
     color: white;
     border: none;
-    border-radius: 4px;
+    border-radius: 3px;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s ease;
-    font-size: 14px;
+    font-size: 12px;
 }
 
 .save-changes-button:hover {
@@ -596,4 +618,88 @@
     margin-left: -4px;
     border: 4px solid transparent;
     border-top-color: #333;
+} 
+
+/* kintoneカスタマイズページ専用のスタイル上書き */
+.gaia-customize-page select,
+.gaia-customize-page input[type="text"] {
+    font-size: 12px;
+    padding: 6px 10px;
+}
+
+/* より具体的なセレクタでkintoneの標準を上書き */
+div.integrated-table-container table select,
+div.integrated-table-container table input {
+    font-size: 12px;
+    padding: 4px 6px;
+}
+
+/* 検索フォーム領域の要素 */
+div.search-form .field-group select,
+div.search-form .field-group input {
+    font-size: 12px;
+    padding: 6px 10px;
+} 
+
+/* タブボタンのフォントサイズを確実に適用 */
+.tab-menu .tab-button,
+div.tab-menu .tab-button,
+button.tab-button {
+    font-size: 12px;
+    padding: 8px 14px;
+} 
+
+/* モーダルドラッグ機能のスタイル */
+.ledger-details-modal [data-drag-handle="true"] {
+    cursor: move;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    position: relative;
+}
+
+.ledger-details-modal [data-drag-handle="true"]:hover {
+    background-color: rgba(0, 0, 0, 0.03);
+    border-radius: 4px 4px 0 0;
+}
+
+.ledger-details-modal [data-drag-handle="true"]:active {
+    cursor: grabbing;
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+/* ドラッグ中のスタイルは通常と同じにする */ 
+
+/* ドラッグハンドルの視覚的改善 */
+.ledger-details-modal [data-drag-handle="true"]::after {
+    content: '';
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 20px;
+    height: 2px;
+    background: repeating-linear-gradient(
+        to right,
+        #ccc 0px,
+        #ccc 3px,
+        transparent 3px,
+        transparent 6px
+    );
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.ledger-details-modal [data-drag-handle="true"]:hover::after {
+    opacity: 0.8;
+} 
+
+/* テーブル内のセレクトボックスのフォントサイズを確実に11pxに統一 */
+.integrated-table tbody td select,
+.virtual-body tbody td select,
+td.editable-cell select,
+.integrated-table-container table tbody td select {
+    font-size: 11px;
+    line-height: 1.2;
 } 

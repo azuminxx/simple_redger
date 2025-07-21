@@ -21,8 +21,8 @@ const CONFIG = {
 
     // 仮想スクロール設定
     virtualScroll: {
-        rowHeight: 40,
-        visibleRows: 15,
+        rowHeight: 32,
+        visibleRows: 20,
         bufferRows: 5
     },
 

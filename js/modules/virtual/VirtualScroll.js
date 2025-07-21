@@ -8,6 +8,7 @@ class VirtualScroll {
         this.changedFields = new Map(); // 変更されたフィールドを記録 {recordIndex: Set(fieldKeys)}
         this.originalValues = new Map(); // 元の値を保存 {recordIndex: Map(fieldKey: originalValue)}
         this.savedScrollTop = 0; // スクロール位置を保存
+        this.ledgerModal = new LedgerDetailsModal(); // モーダルインスタンス
     }
     /**
      * 仮想スクロール対応テーブルを作成
@@ -803,8 +804,8 @@ class VirtualScroll {
         link.addEventListener('click', (event) => {
             event.preventDefault();
             // 統合キーを取得
-            const integrationKey = this.getIntegrationKeyFromRecord(record);
-            this.showLedgerDetailsModal(integrationKey, record);
+            const integrationKey = LedgerDetailsModal.getIntegrationKeyFromRecord(record);
+            this.ledgerModal.show(integrationKey, record);
         });
 
         td.appendChild(link);
@@ -812,192 +813,7 @@ class VirtualScroll {
         td.style.cssText = 'text-align: center; vertical-align: middle;';
     }
 
-    /**
-     * レコードから統合キーを取得
-     */
-    getIntegrationKeyFromRecord(record) {
-        // 各台帳の統合キーフィールドから値を取得
-        const pcLedgerName = CONFIG.fieldMappings.primaryKeyToLedger['PC番号']; // 'PC台帳'
-        const integrationKeyField = `${pcLedgerName}_${CONFIG.fieldMappings.integrationKey}`;
-        return record[integrationKeyField] || 'Unknown';
-    }
 
-    /**
-     * 3つの台帳詳細をモーダルで表示
-     */
-    showLedgerDetailsModal(integrationKey, record) {
-        // 既存のモーダルを削除
-        const existingModal = document.querySelector('.ledger-details-modal');
-        if (existingModal) {
-            existingModal.remove();
-        }
-
-        // モーダル要素を作成
-        const modal = DOMHelper.createElement('div', {}, 'ledger-details-modal');
-        modal.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
-            z-index: 10000;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        `;
-
-        const content = DOMHelper.createElement('div');
-        content.style.cssText = `
-            background: white;
-            border-radius: 8px;
-            padding: 20px;
-            max-width: 1200px;
-            max-height: 95vh;
-            width: 95%;
-            overflow-y: auto;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-        `;
-
-        // ヘッダー
-        const header = DOMHelper.createElement('div');
-        header.style.cssText = `
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #dee2e6;
-        `;
-
-        const title = DOMHelper.createElement('h3');
-        title.textContent = `統合キー: ${integrationKey} の詳細`;
-        title.style.cssText = 'font-size: 18px; font-weight: bold; color: #495057; margin: 0;';
-
-        const closeButton = DOMHelper.createElement('button');
-        closeButton.textContent = '閉じる';
-        closeButton.style.cssText = `
-            background: #dc3545;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            padding: 8px 16px;
-            cursor: pointer;
-            font-weight: bold;
-        `;
-        closeButton.addEventListener('click', () => modal.remove());
-
-        header.appendChild(title);
-        header.appendChild(closeButton);
-
-        // 各台帳のセクション
-        const body = DOMHelper.createElement('div');
-        body.style.cssText = 'display: flex; flex-direction: column; gap: 20px;';
-
-        // 3つの台帳をiframeで上中下に表示
-        CONFIG.ledgerNames.forEach(ledgerName => {
-            const iframeSection = this.createLedgerIframeSection(ledgerName, record);
-            body.appendChild(iframeSection);
-        });
-
-        content.appendChild(header);
-        content.appendChild(body);
-        modal.appendChild(content);
-
-        // クリックで閉じる
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                modal.remove();
-            }
-        });
-
-        document.body.appendChild(modal);
-    }
-
-    /**
-     * 台帳iframeセクションを作成
-     */
-    createLedgerIframeSection(ledgerName, record) {
-        const baseUrl = 'https://fps62oxtrbhh.cybozu.com/k';
-        const appId = CONFIG.getAppIdByLedgerName(ledgerName);
-        
-        const section = DOMHelper.createElement('div');
-        section.style.cssText = `
-            border: 1px solid #dee2e6;
-            border-radius: 8px;
-            overflow: hidden;
-            height: 250px;
-        `;
-
-        // レコードIDを取得
-        const recordIdKey = `${ledgerName}_$id`;
-        const recordId = record[recordIdKey];
-        
-        if (recordId) {
-            const recordUrl = `${baseUrl}/${appId}/show#record=${recordId}`;
-            
-            // iframeコンテナを作成（縮小表示用）
-            const iframeContainer = DOMHelper.createElement('div');
-            iframeContainer.style.cssText = `
-                width: 100%;
-                height: 250px;
-                overflow: hidden;
-                position: relative;
-            `;
-
-            // iframeを作成（縮小表示）
-            const iframe = DOMHelper.createElement('iframe');
-            iframe.src = recordUrl;
-            iframe.style.cssText = `
-                width: 166.67%;
-                height: 416px;
-                border: none;
-                background: white;
-                transform: scale(0.6);
-                transform-origin: top left;
-                position: absolute;
-                top: 0;
-                left: 0;
-            `;
-            
-            // iframe読み込みエラー対応
-            iframe.addEventListener('error', () => {
-                const errorMsg = DOMHelper.createElement('div');
-                errorMsg.textContent = 'レコードの読み込みに失敗しました';
-                errorMsg.style.cssText = `
-                    padding: 20px;
-                    text-align: center;
-                    color: #dc3545;
-                    height: 250px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                `;
-                section.appendChild(errorMsg);
-                return;
-            });
-            
-            iframeContainer.appendChild(iframe);
-            section.appendChild(iframeContainer);
-        } else {
-            const noDataMessage = DOMHelper.createElement('div');
-            noDataMessage.textContent = 'この台帳にはデータがありません';
-            noDataMessage.style.cssText = `
-                color: #6c757d;
-                font-style: italic;
-                text-align: center;
-                padding: 20px;
-                height: 250px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-            `;
-            
-            section.appendChild(noDataMessage);
-        }
-        
-        return section;
-    }
 
     /**
      * 主キーフィールドのセルに分離ボタンを追加
