@@ -233,6 +233,8 @@ class VirtualScroll {
         return recordIndex;
     }
 
+
+
     /**
      * フィールドの元の値を保存し、現在の値と比較して変更状態を更新
      */
@@ -357,6 +359,8 @@ class VirtualScroll {
             const record = data[i];
             const row = DOMHelper.createElement('tr');
             row.setAttribute('data-record-index', i);
+            
+
             
             // 各カラムのセルを作成
             for (let columnIndex = 0; columnIndex < CONFIG.integratedTableConfig.columns.length; columnIndex++) {

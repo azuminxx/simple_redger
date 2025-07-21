@@ -418,6 +418,8 @@ class CellSwapper {
         return null;
     }
 
+
+
     /**
      * エラーログを統一フォーマットで出力
      */
