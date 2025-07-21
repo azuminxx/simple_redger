@@ -196,7 +196,7 @@ class VirtualScroll {
      * セル交換時のフィールド変更状態を更新
      */
     updateFieldChangeStatusForSwap(recordIndex, fieldKey, originalValue, newValue) {
-        // セッション全体で一意のキーを生成（レコードIDベース）
+        // レコードの統合キーを取得
         const recordId = this.getRecordId(recordIndex);
         const sessionKey = `${recordId}_${fieldKey}`;
         
@@ -205,7 +205,22 @@ class VirtualScroll {
             window.swapSessionOriginalValues = new Map();
         }
         
-        // 初回交換時：元の値を保存（セッション全体で一意）
+        // 空行（EMPTY_で始まる統合キー）の場合は特別処理
+        if (recordId.startsWith('EMPTY_')) {
+            // 空行の場合、値が空でない場合は変更とみなす
+            // $idフィールドの場合はundefinedも空とみなす
+            const isEmpty = !newValue || newValue === '' || newValue === '-' || 
+                           newValue === null || newValue === undefined || newValue === 'undefined';
+            
+            if (!isEmpty) {
+                this.setChangedField(recordIndex, fieldKey);
+            } else {
+                this.removeChangedField(recordIndex, fieldKey);
+            }
+            return;
+        }
+        
+        // 通常レコードの場合：初回交換時に元の値を保存（セッション全体で一意）
         if (!window.swapSessionOriginalValues.has(sessionKey)) {
             window.swapSessionOriginalValues.set(sessionKey, originalValue);
         }
@@ -213,14 +228,23 @@ class VirtualScroll {
         // 保存された元の値と現在値を比較
         const savedOriginalValue = window.swapSessionOriginalValues.get(sessionKey);
         
-        if (savedOriginalValue === newValue) {
+
+        
+        // $idフィールドの場合、undefinedと"undefined"を同一視
+        const normalizedSavedValue = (savedOriginalValue === undefined || savedOriginalValue === 'undefined' || savedOriginalValue === null) ? null : savedOriginalValue;
+        const normalizedNewValue = (newValue === undefined || newValue === 'undefined' || newValue === null) ? null : newValue;
+        
+        if (normalizedSavedValue === normalizedNewValue) {
             // 元の値に戻った場合
+            console.log(`🔄 元の値に復元: ${fieldKey} "${newValue}" (${recordId})`);
             this.removeChangedField(recordIndex, fieldKey);
             // セッションからも削除（初期状態に戻す）
             window.swapSessionOriginalValues.delete(sessionKey);
+            console.log(`✅ 変更フラグクリア実行: 行${recordIndex} ${fieldKey}`);
         } else {
             // まだ変更状態
             this.setChangedField(recordIndex, fieldKey);
+            console.log(`⚠️ まだ変更状態: ${fieldKey} "${normalizedNewValue}" ≠ "${normalizedSavedValue}" (${recordId})`);
         }
     }
 
@@ -228,9 +252,31 @@ class VirtualScroll {
      * レコードIDを取得（レコードを一意に識別）
      */
     getRecordId(recordIndex) {
-        // レコードインデックスをそのまま使用（シンプルで確実）
-        // セル交換では行の位置は変わらないため、recordIndexが最も安全
-        return recordIndex;
+        // 統合キーを使用してレコードを一意に識別
+        if (window.tableRenderer && window.tableRenderer.currentSearchResults) {
+            const record = window.tableRenderer.currentSearchResults[recordIndex];
+            if (record) {
+                // 統合キーを直接取得を試行
+                if (record[CONFIG.integrationKey]) {
+                    console.log(`🔑 統合キー取得成功: ${record[CONFIG.integrationKey]} (行${recordIndex})`);
+                    return record[CONFIG.integrationKey];
+                }
+                
+                // PC台帳の統合キーを試行
+                const pcIntegrationKey = record['PC台帳_統合キー'];
+                if (pcIntegrationKey) {
+                    console.log(`🔑 PC台帳統合キー取得成功: ${pcIntegrationKey} (行${recordIndex})`);
+                    return pcIntegrationKey;
+                }
+                
+                // デバッグ：レコードのキー一覧を出力
+                const recordKeys = Object.keys(record);
+                console.log(`🔍 行${recordIndex}のフィールド一覧:`, recordKeys.filter(key => key.includes('統合')));
+            }
+        }
+        // フォールバック：レコードインデックス
+        console.log(`⚠️ 統合キー取得失敗、フォールバック使用: idx_${recordIndex}`);
+        return `idx_${recordIndex}`;
     }
 
 
@@ -273,13 +319,27 @@ class VirtualScroll {
      * 指定レコードから変更されたフィールドを削除
      */
     removeChangedField(recordIndex, fieldKey) {
+        console.log(`🔄 変更フィールド削除開始: 行${recordIndex} ${fieldKey}`);
+        
         if (this.changedFields.has(recordIndex)) {
-            this.changedFields.get(recordIndex).delete(fieldKey);
+            const fieldSet = this.changedFields.get(recordIndex);
+            const hadField = fieldSet.has(fieldKey);
+            fieldSet.delete(fieldKey);
+            
+            console.log(`📝 フィールド削除: ${hadField ? '成功' : '対象なし'} - 残り${fieldSet.size}個`);
+            
+            // セルの背景色もクリア
+            this.clearCellChangedStyle(recordIndex, fieldKey);
             
             // 変更されたフィールドがなくなった場合は変更フラグもリセット
-            if (this.changedFields.get(recordIndex).size === 0) {
+            if (fieldSet.size === 0) {
+                console.log(`🔄 全フィールド復元完了 - 変更フラグをリセット: 行${recordIndex}`);
                 this.setChangeFlag(recordIndex, false);
+            } else {
+                console.log(`⚠️ まだ他のフィールドが変更状態: 行${recordIndex} (残り${fieldSet.size}個)`);
             }
+        } else {
+            console.log(`⚠️ 変更フィールドマップに行${recordIndex}が存在しません`);
         }
     }
 
@@ -313,18 +373,34 @@ class VirtualScroll {
     }
 
     /**
-     * チェックボックスの表示を更新
+     * 変更フラグのチェックボックスUIを更新
      */
     updateChangeCheckbox(recordIndex, isChanged) {
         const checkbox = document.querySelector(`input[data-record-index="${recordIndex}"][data-field="change-flag"]`);
         if (checkbox) {
             checkbox.checked = isChanged;
-        } else {
-            // VirtualScrollでは画面外の行はDOM要素が存在しないため、
-            // チェックボックスが見つからない場合は内部状態のみ更新
-            // （次回その行が表示される際に正しい状態が反映される）
-            // console.warn(`⚠️ VirtualScroll: チェックボックスが見つかりません 行${recordIndex} (画面外のため正常)`);
         }
+    }
+
+    /**
+     * 変更フラグUIを復元（再描画後に実行）
+     */
+    restoreChangeFlagsUI() {
+        // 少し遅延を入れてDOM更新完了後に実行
+        setTimeout(() => {
+            this.changeFlags.forEach((isChanged, recordIndex) => {
+                this.updateChangeCheckbox(recordIndex, isChanged);
+            });
+            
+            // 変更されたセルの背景色も復元
+            this.changedFields.forEach((fieldSet, recordIndex) => {
+                fieldSet.forEach(fieldKey => {
+                    this.setCellChangedStyle(recordIndex, fieldKey);
+                });
+            });
+            
+            console.log(`🔄 変更フラグUI復元完了: ${this.changeFlags.size}件`);
+        }, 100);
     }
 
     /**
@@ -404,7 +480,12 @@ class VirtualScroll {
                         td.textContent = '-';
                         td.className = 'null-value readonly-cell';
                     } else {
-                        td.textContent = value;
+                        // 主キーフィールドの場合は分離ボタンも追加
+                        if (this.isPrimaryKeyField(column.fieldCode) && value && value.trim() !== '') {
+                            this.createCellWithSeparateButton(td, value, i, column);
+                        } else {
+                            td.textContent = value;
+                        }
                         td.className = 'readonly-cell';
                     }
                 }
@@ -669,7 +750,10 @@ class VirtualScroll {
         if (cell) {
             cell.classList.add('cell-changed');
         } else {
-            console.warn(`⚠️ セル要素が見つかりません: 行${recordIndex} ${fieldKey}`);
+            // $idフィールドは表示されていないため、警告を抑制
+            if (!fieldKey.includes('_$id')) {
+                console.warn(`⚠️ セル要素が見つかりません: 行${recordIndex} ${fieldKey}`);
+            }
         }
     }
 
@@ -681,7 +765,10 @@ class VirtualScroll {
         if (cell) {
             cell.classList.remove('cell-changed');
         } else {
-            console.warn(`⚠️ セル要素が見つかりません（クリア時）: 行${recordIndex} ${fieldKey}`);
+            // $idフィールドは表示されていないため、警告を抑制
+            if (!fieldKey.includes('_$id')) {
+                console.warn(`⚠️ セル要素が見つかりません（クリア時）: 行${recordIndex} ${fieldKey}`);
+            }
         }
     }
 
@@ -692,6 +779,56 @@ class VirtualScroll {
         // データ属性でセルを検索
         const selector = `td[data-record-index="${recordIndex}"][data-column="${fieldKey}"]`;
         return document.querySelector(selector);
+    }
+
+    /**
+     * 主キーフィールドかどうかを判定
+     */
+    isPrimaryKeyField(fieldCode) {
+        // 主キーとして扱うフィールドコードを定義（ユーザー名は除外）
+        const primaryKeyFields = ['$id', 'PC番号', '内線番号', '座席番号'];
+        return primaryKeyFields.includes(fieldCode);
+    }
+
+    /**
+     * 主キーフィールドのセルに分離ボタンを追加
+     */
+    createCellWithSeparateButton(td, value, recordIndex, column) {
+        // テキストを表示
+        td.textContent = value;
+
+        // 分離ボタンを作成
+        const separateButton = DOMHelper.createElement('button', {
+            type: 'button',
+            'data-record-index': recordIndex,
+            'data-field-key': column.key,
+            'data-field-code': column.fieldCode
+        }, 'separate-button');
+        separateButton.textContent = '分離';
+
+        // ボタンのイベントリスナー
+        separateButton.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            
+            const fieldCode = event.target.getAttribute('data-field-code');
+            
+            // CellSwapperの分離処理を呼び出し
+            if (window.tableRenderer && window.tableRenderer.cellSwapper) {
+                const success = window.tableRenderer.cellSwapper.separateLedger(recordIndex, fieldCode);
+                
+                if (success) {
+                    console.log(`✅ 分離処理成功: 行${recordIndex} ${fieldCode}`);
+                } else {
+                    console.log(`❌ 分離処理キャンセルまたは失敗: 行${recordIndex} ${fieldCode}`);
+                }
+            } else {
+                console.error('❌ CellSwapperが見つかりません');
+            }
+        });
+
+        // ボタンをセルに追加
+        td.appendChild(separateButton);
     }
 }
 

@@ -286,29 +286,20 @@ class CellSwapper {
             }
         });
         
-        // 【重要】レコードIDは起点台帳のもののみ交換
-        // ■ 理由：データの整合性を保つため
-        // ■ 例：PC番号交換時
-        //   - PC台帳のレコードIDは交換（6163 ⇄ 6164）
-        //   - 内線台帳のレコードIDは交換しない（6158, 6159のまま）
-        //   - 座席台帳のレコードIDは交換しない（7713, 7714のまま）
+        // $idフィールドは CONFIG.integratedTableConfig.columns に含まれていないため、
+        // 明示的に処理する必要がある
         const recordIdKey = `${sourceApp}_$id`;
-        
-        if (sourceRecord[recordIdKey] || targetRecord[recordIdKey]) {
-            const sourceRecordId = sourceRecord[recordIdKey];
-            const targetRecordId = targetRecord[recordIdKey];
-            
-            // 起点台帳のレコードIDを交換（どちらか一方がnullでも交換）
-            sourceRecord[recordIdKey] = targetRecordId;
-            targetRecord[recordIdKey] = sourceRecordId;
-            
-            console.log(`🔄 ${sourceApp}レコードID交換: ${sourceRecordId} ⇄ ${targetRecordId}`);
-        } else {
-            console.log(`⚠️ ${sourceApp}のレコードIDが両方の行で見つからないため、レコードID交換をスキップ`);
+        if (sourceRecord[recordIdKey] !== undefined || targetRecord[recordIdKey] !== undefined) {
+            this.swapFieldValues(sourceRecord, targetRecord, sourceRowIndex, targetRowIndex, recordIdKey, swappedFields);
+            console.log(`🔄 $idフィールド明示的処理: ${recordIdKey}`);
         }
         
-        // VirtualScrollでテーブルを再描画
-        this.tableRenderer.refreshVirtualScrollTable();
+        // スクロール位置を事前に保存（空行削除前）
+        const scrollContainer = document.querySelector('.virtual-scroll-container');
+        const savedScrollTop = scrollContainer ? scrollContainer.scrollTop : 0;
+        
+        // セル交換後に空行をチェックして削除（スクロール位置を渡す）
+        this.removeEmptyRowsAfterSwap(savedScrollTop);
         
         console.log(`✅ セル交換完了: ${primaryKeyField} 行${sourceRowIndex}⇄${targetRowIndex} (${swappedFields.size}フィールド)`);
         
@@ -326,14 +317,18 @@ class CellSwapper {
         sourceRecord[fieldKey] = targetValue;
         targetRecord[fieldKey] = sourceValue;
         
-        // DOM要素も直接交換
-        this.exchangeFieldCellsInDOM(sourceRowIndex, targetRowIndex, fieldKey);
+        // DOM要素交換（$idフィールドは表示されていないためスキップ）
+        if (!fieldKey.includes('_$id')) {
+            this.exchangeFieldCellsInDOM(sourceRowIndex, targetRowIndex, fieldKey);
+        }
         
         swappedFields.add(fieldKey);
         
         // セル交換時の元の値保存と変更状態管理
         window.virtualScroll.updateFieldChangeStatusForSwap(sourceRowIndex, fieldKey, sourceValue, targetValue);
         window.virtualScroll.updateFieldChangeStatusForSwap(targetRowIndex, fieldKey, targetValue, sourceValue);
+        
+        console.log(`🔄 フィールド交換: ${fieldKey} "${sourceValue}" ⇄ "${targetValue}"`);
     }
 
     /**
@@ -426,6 +421,222 @@ class CellSwapper {
     logError(operation, error) {
         console.error(`❌ ${operation}エラー:`, error);
     }
+
+    /**
+     * 空行を作成して指定位置に挿入
+     */
+    createEmptyRow(insertAfterIndex = null) {
+        const emptyRow = {};
+        
+        // 統合キーは空の一意な値を設定
+        emptyRow[CONFIG.integrationKey] = `EMPTY_${Date.now()}`;
+        
+        // 各台帳のフィールドを空に設定
+        CONFIG.integratedTableConfig.columns.forEach(column => {
+            if (!column.isChangeFlag && column.key !== CONFIG.integrationKey) {
+                emptyRow[column.key] = '';
+            }
+        });
+        
+        // 変更フラグは false に設定
+        emptyRow['change-flag'] = false;
+        
+        // 空行識別フラグを設定
+        emptyRow.isVirtualEmptyRow = true;
+        
+        let newRowIndex;
+        
+        if (insertAfterIndex !== null) {
+            // 指定した行の直下に挿入
+            const insertIndex = insertAfterIndex + 1;
+            this.tableRenderer.currentSearchResults.splice(insertIndex, 0, emptyRow);
+            newRowIndex = insertIndex;
+            console.log(`✅ 空行作成: 行${insertAfterIndex}の直下（インデックス${insertIndex}）に挿入`);
+        } else {
+            // 最終行に追加（従来の動作）
+            this.tableRenderer.currentSearchResults.push(emptyRow);
+            newRowIndex = this.tableRenderer.currentSearchResults.length - 1;
+            console.log(`✅ 空行作成: 最終行（インデックス${newRowIndex}）に追加`);
+        }
+        
+        return newRowIndex;
+    }
+
+    /**
+     * 指定台帳の全フィールドを取得（$idフィールドも含む）
+     */
+    getLedgerFields(ledgerName) {
+        const fields = CONFIG.integratedTableConfig.columns.filter(column => 
+            !column.isChangeFlag && 
+            DOMHelper.getLedgerNameFromKey(column.key) === ledgerName
+        );
+        
+        // $idフィールドも追加（統一処理のため）
+        const recordIdField = {
+            key: `${ledgerName}_$id`,
+            fieldCode: '$id',
+            ledger: ledgerName
+        };
+        fields.push(recordIdField);
+        
+        console.log(`📋 ${ledgerName}の分離対象フィールド: ${fields.map(f => f.key).join(', ')}`);
+        
+        return fields;
+    }
+
+    /**
+     * 台帳分離処理
+     */
+    separateLedger(recordIndex, fieldCode) {
+        const sourceRecord = this.tableRenderer.currentSearchResults[recordIndex];
+        
+        if (!sourceRecord) {
+            console.error('❌ 分離対象のレコードが見つかりません');
+            return false;
+        }
+
+        // フィールドコードから台帳名を特定
+        const ledgerName = this.getLedgerNameFromFieldCode(fieldCode);
+        if (!ledgerName) {
+            console.error(`❌ フィールドコード ${fieldCode} に対応する台帳が見つかりません`);
+            return false;
+        }
+
+
+
+        // 空行を分離元の行の直下に作成
+        const emptyRowIndex = this.createEmptyRow(recordIndex);
+        
+        // 台帳の全フィールドを取得
+        const ledgerFields = this.getLedgerFields(ledgerName);
+        
+        console.log(`🔄 台帳分離開始: ${ledgerName} (${ledgerFields.length}フィールド)`);
+        
+        // 各フィールドをセル交換で移動
+        // 注意: 空行挿入により元のレコードのインデックスは変わらないが、
+        // 空行が挿入されたことで配列の参照を再取得する
+        const updatedSourceRecord = this.tableRenderer.currentSearchResults[recordIndex];
+        const emptyRecord = this.tableRenderer.currentSearchResults[emptyRowIndex];
+        
+        ledgerFields.forEach(field => {
+            const sourceValue = updatedSourceRecord[field.key];
+            const targetValue = emptyRecord[field.key];
+            
+            // セル交換を実行
+            updatedSourceRecord[field.key] = targetValue;
+            emptyRecord[field.key] = sourceValue;
+            
+            // VirtualScrollで変更状態を管理（セル交換と同様の処理）
+            if (window.virtualScroll) {
+                // 元レコードの変更状態を記録
+                window.virtualScroll.updateFieldChangeStatusForSwap(
+                    recordIndex, 
+                    field.key, 
+                    sourceValue, 
+                    targetValue
+                );
+                
+                // 空行の変更状態を記録
+                window.virtualScroll.updateFieldChangeStatusForSwap(
+                    emptyRowIndex, 
+                    field.key, 
+                    targetValue, 
+                    sourceValue
+                );
+            }
+            
+            console.log(`📦 フィールド移動: ${field.key} "${sourceValue}" → 空行`);
+        });
+        
+        // 変更フラグを設定
+        window.virtualScroll.setChangeFlag(recordIndex, true);
+        window.virtualScroll.setChangeFlag(emptyRowIndex, true);
+        
+        // 分離処理後はテーブル再描画が必要（データが変更されたため）
+        this.tableRenderer.refreshVirtualScrollTable();
+        
+        console.log(`✅ 台帳分離完了: ${ledgerName} → 空行${emptyRowIndex}`);
+        
+        return true;
+    }
+
+    /**
+     * フィールドコードから台帳名を取得
+     */
+    getLedgerNameFromFieldCode(fieldCode) {
+        // CONFIG.integratedTableConfig.columns から該当するフィールドを検索
+        const column = CONFIG.integratedTableConfig.columns.find(col => 
+            col.fieldCode === fieldCode
+        );
+        
+        if (column) {
+            return DOMHelper.getLedgerNameFromKey(column.key);
+        }
+        
+        return null;
+    }
+
+    /**
+     * 台帳名とフィールドコードからフィールドキーを取得
+     */
+    getFieldKeyFromCode(fieldCode, ledgerName) {
+        const column = CONFIG.integratedTableConfig.columns.find(col => 
+            col.fieldCode === fieldCode && 
+            DOMHelper.getLedgerNameFromKey(col.key) === ledgerName
+        );
+        
+        return column ? column.key : null;
+    }
+
+    /**
+     * セル交換後に完全に空の行を自動削除する機能
+     */
+    removeEmptyRowsAfterSwap(preservedScrollTop = 0) {
+        const rowsToRemove = [];
+        
+        this.tableRenderer.currentSearchResults.forEach((row, index) => {
+            // 統合キー以外の全フィールドが空かチェック
+            let hasAnyData = false;
+            
+            CONFIG.integratedTableConfig.columns.forEach(column => {
+                if (column.isChangeFlag) return; // 変更フラグは除外
+                if (column.key === CONFIG.integrationKey) return; // 統合キーは除外
+                
+                const value = row[column.key];
+                // 空文字、null、undefined、'-'以外の値があれば hasAnyData = true
+                if (value && value !== '' && value !== null && value !== undefined && value !== '-') {
+                    hasAnyData = true;
+                }
+            });
+            
+            // 統合キー以外に何もデータがない行を削除対象とする
+            if (!hasAnyData) {
+                rowsToRemove.push({ row, index });
+            }
+        });
+
+        // セル交換処理完了後は必ず再描画（空行削除の有無に関係なく）
+        if (rowsToRemove.length > 0) {
+            console.log(`🧹 空行を削除: ${rowsToRemove.length}件`);
+            
+            // インデックスの大きい順に削除（配列のインデックスずれを防ぐため）
+            rowsToRemove.reverse().forEach(({ row, index }) => {
+                this.tableRenderer.currentSearchResults.splice(index, 1);
+                
+                // VirtualScrollの変更フラグもクリア
+                if (window.virtualScroll) {
+                    window.virtualScroll.changeFlags.delete(index);
+                    window.virtualScroll.changedFields.delete(index);
+                }
+                
+                console.log(`✅ 空行削除: インデックス${index}の空行（統合キー: ${row[CONFIG.integrationKey]}）`);
+            });
+        }
+        
+        // 保存されたスクロール位置でテーブルを再描画（空行削除の有無に関係なく）
+        this.tableRenderer.refreshVirtualScrollTableWithScrollPreservation(preservedScrollTop);
+    }
+
 }
 
 // グローバルに公開

@@ -444,7 +444,8 @@ class TableRenderer {
             
             console.log(`✅ ${CONFIG.apps[appId].name} 更新完了 (${records.length}件)`);
             
-
+            // 更新されたレコードのURLリンクをログ出力
+            this.logUpdatedRecordLinks(appId, records);
             
             return response;
             
@@ -459,6 +460,22 @@ class TableRenderer {
      */
     logError(operation, error) {
         console.error(`❌ ${operation}エラー:`, error);
+    }
+
+    /**
+     * 更新されたレコードのURLリンクをログ出力
+     */
+    logUpdatedRecordLinks(appId, records) {
+        const ledgerName = CONFIG.apps[appId]?.name || `App${appId}`;
+        const baseUrl = 'https://fps62oxtrbhh.cybozu.com/k';
+        
+        console.log(`🔗 ${ledgerName} 更新レコードのリンク:`);
+        
+        records.forEach((record, index) => {
+            const recordId = record.id;
+            const recordUrl = `${baseUrl}/${appId}/show#record=${recordId}`;
+            console.log(`   ${index + 1}. ${ledgerName} レコード${recordId}: ${recordUrl}`);
+        });
     }
 
     /**
@@ -494,15 +511,57 @@ class TableRenderer {
                 // 既存のテーブルコンテナを新しいものと置き換え
                 tableContainer.parentNode.replaceChild(newTableContainer, tableContainer);
                 
-                // console.log('✅ VirtualScrollテーブル再描画完了（変更フラグ復元済み）');
-            } else {
-                console.warn('⚠️ テーブルコンテナまたは検索結果が見つかりません');
+                // 変更フラグUIを復元
+                this.virtualScroll.restoreChangeFlagsUI();
+                
+                console.log(`✅ VirtualScrollテーブル再描画完了 (${this.currentSearchResults.length}件)`);
             }
         } catch (error) {
             this.logError('VirtualScrollテーブル再描画', error);
         }
     }
 
+    /**
+     * スクロール位置を保持してVirtualScrollテーブルを再描画
+     * 明示的にスクロール位置を保存・復元
+     */
+    refreshVirtualScrollTableWithScrollPreservation(forcedScrollTop = null) {
+        try {
+            // 現在のスクロール位置を明示的に保存
+            const resultsContainer = document.getElementById(CONFIG.system.resultsContainerId);
+            const integratedResults = resultsContainer?.querySelector('.integrated-results');
+            const tableContainer = integratedResults?.querySelector('.integrated-table-container');
+            const scrollContainer = tableContainer?.querySelector('.virtual-scroll-container');
+            
+            let savedScrollTop = forcedScrollTop;
+            if (savedScrollTop === null && scrollContainer) {
+                savedScrollTop = scrollContainer.scrollTop;
+            }
+            
+            if (savedScrollTop > 0) {
+                // VirtualScrollのプロパティにも保存
+                this.virtualScroll.savedScrollTop = savedScrollTop;
+                console.log(`📍 スクロール位置保存: ${savedScrollTop}px`);
+            }
+            
+            // 通常の再描画を実行
+            this.refreshVirtualScrollTable();
+            
+            // 再描画後に強制的にスクロール位置を復元
+            if (savedScrollTop > 0) {
+                setTimeout(() => {
+                    const newScrollContainer = document.querySelector('.virtual-scroll-container');
+                    if (newScrollContainer) {
+                        newScrollContainer.scrollTop = savedScrollTop;
+                        console.log(`📍 スクロール位置復元: ${savedScrollTop}px → 実際: ${newScrollContainer.scrollTop}px`);
+                    }
+                }, 150); // 十分な時間を確保
+            }
+            
+        } catch (error) {
+            this.logError('スクロール位置保持テーブル再描画', error);
+        }
+    }
 
 
     /**
