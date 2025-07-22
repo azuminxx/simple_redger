@@ -567,44 +567,7 @@ class CellSwapper {
      * セル交換後に完全に空の行を自動削除する機能
      */
     removeEmptyRowsAfterSwap(preservedScrollTop = 0) {
-        const rowsToRemove = [];
-        
-        this.tableRenderer.currentSearchResults.forEach((row, index) => {
-            // 統合キー以外の全フィールドが空かチェック
-            let hasAnyData = false;
-            
-            CONFIG.integratedTableConfig.columns.forEach(column => {
-                if (column.isChangeFlag) return; // 変更フラグは除外
-                if (column.key === CONFIG.integrationKey) return; // 統合キーは除外
-                
-                const value = row[column.key];
-                // 空文字、null、undefined、'-'以外の値があれば hasAnyData = true
-                if (value && value !== '' && value !== null && value !== undefined && value !== '-') {
-                    hasAnyData = true;
-                }
-            });
-            
-            // 統合キー以外に何もデータがない行を削除対象とする
-            if (!hasAnyData) {
-                rowsToRemove.push({ row, index });
-            }
-        });
-
-        // セル交換処理完了後は必ず再描画（空行削除の有無に関係なく）
-        if (rowsToRemove.length > 0) {
-            // インデックスの大きい順に削除（配列のインデックスずれを防ぐため）
-            rowsToRemove.reverse().forEach(({ row, index }) => {
-                this.tableRenderer.currentSearchResults.splice(index, 1);
-                
-                // VirtualScrollの変更フラグもクリア
-                if (window.virtualScroll) {
-                    window.virtualScroll.changeFlags.delete(index);
-                    window.virtualScroll.changedFields.delete(index);
-                }
-            });
-        }
-        
-        // 保存されたスクロール位置でテーブルを再描画（空行削除の有無に関係なく）
+        // 空行削除は行わず、テーブル再描画とスクロール復元のみ実行
         this.tableRenderer.refreshVirtualScrollTableWithScrollPreservation(preservedScrollTop);
     }
 

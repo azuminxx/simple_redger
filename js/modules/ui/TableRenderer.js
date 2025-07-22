@@ -236,9 +236,7 @@ class TableRenderer {
             if (!window.virtualScroll) {
                 throw new Error('VirtualScrollインスタンスが見つかりません');
             }
-            
             const changedIndices = window.virtualScroll.getChangedRecordIndices();
-            
             if (changedIndices.length === 0) {
                 alert('変更されたレコードがありません。');
                 return;
@@ -259,6 +257,10 @@ class TableRenderer {
             
             // 変更フラグをリセット
             this.resetChangeFlags(changedIndices);
+            // 空行のフラグ・クラスもクリア
+            if (window.virtualScroll) {
+                window.virtualScroll.clearFlagsAndClassesForEmptyRows();
+            }
             
         } catch (error) {
             console.error('❌ 保存エラー:', error);

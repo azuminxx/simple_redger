@@ -4,9 +4,9 @@
 class VirtualScroll {
     constructor() {
         this.fieldInfoCache = {};
-        this.changeFlags = new Map(); // レコードの変更フラグを管理
-        this.changedFields = new Map(); // 変更されたフィールドを記録 {recordIndex: Set(fieldKeys)}
-        this.originalValues = new Map(); // 元の値を保存 {recordIndex: Map(fieldKey: originalValue)}
+        this.changeFlags = new Map(); // 統合キーで管理
+        this.changedFields = new Map(); // 統合キーで管理
+        this.originalValues = new Map(); // 統合キーで管理
         this.savedScrollTop = 0; // スクロール位置を保存
         this.ledgerModal = new LedgerDetailsModal(); // モーダルインスタンス
     }
@@ -132,9 +132,10 @@ class VirtualScroll {
         this.changedFields.clear();
         this.originalValues.clear();
         for (let i = 0; i < data.length; i++) {
-            this.changeFlags.set(i, false);
-            this.changedFields.set(i, new Set());
-            this.originalValues.set(i, new Map());
+            const recordId = this.getRecordId(i);
+            this.changeFlags.set(recordId, false);
+            this.changedFields.set(recordId, new Set());
+            this.originalValues.set(recordId, new Map());
         }
     }
 
@@ -153,7 +154,8 @@ class VirtualScroll {
                 }
             });
             
-            this.originalValues.set(i, originalValuesMap);
+            const recordId = this.getRecordId(i);
+            this.originalValues.set(recordId, originalValuesMap);
         }
     }
 
@@ -161,6 +163,7 @@ class VirtualScroll {
      * 指定レコードの元の値を現在の値でリセット（保存後に使用）
      */
     resetOriginalValues(recordIndex) {
+        const recordId = this.getRecordId(recordIndex);
         if (window.tableRenderer && window.tableRenderer.currentSearchResults) {
             const currentRecord = window.tableRenderer.currentSearchResults[recordIndex];
             if (currentRecord) {
@@ -172,7 +175,7 @@ class VirtualScroll {
                     }
                 });
                 
-                this.originalValues.set(recordIndex, originalValuesMap);
+                this.originalValues.set(recordId, originalValuesMap);
             }
         }
     }
@@ -182,9 +185,25 @@ class VirtualScroll {
      */
     getChangedRecordIndices() {
         const changedIndices = [];
-        this.changeFlags.forEach((isChanged, index) => {
+        // 編集フラグ（changeFlags）は統合キーで管理しているが、
+        // 保存処理（saveChanges/groupRecordsByApp等）はcurrentSearchResults配列のインデックスで行を参照する設計のため、
+        // ここで「統合キー→インデックス」変換を行い、インデックス配列（changedIndices）を返す。
+        // これにより、統合キー管理と配列ベースの保存処理の両立を実現している。
+        this.changeFlags.forEach((isChanged, recordId) => {
             if (isChanged) {
-                changedIndices.push(index);
+                // recordIdからcurrentSearchResults内のindexを逆引き（getRecordIdFromRowで統一）
+                const index = window.tableRenderer.currentSearchResults.findIndex(r => this.getRecordIdFromRow(r) === recordId);
+                if (index !== -1) {
+                    const row = window.tableRenderer.currentSearchResults[index];
+                    const isAllEmpty = CONFIG.integratedTableConfig.columns.every(col => {
+                        if (col.isChangeFlag) return true;
+                        const v = row[col.key];
+                        return v === '' || v === null || v === undefined || v === '-';
+                    });
+                    if (!isAllEmpty) {
+                        changedIndices.push(index);
+                    }
+                }
             }
         });
         return changedIndices;
@@ -194,17 +213,19 @@ class VirtualScroll {
      * 指定レコードの変更されたフィールドを取得
      */
     getChangedFields(recordIndex) {
-        return this.changedFields.get(recordIndex) || new Set();
+        const recordId = this.getRecordId(recordIndex);
+        return this.changedFields.get(recordId) || new Set();
     }
 
     /**
      * 指定レコードに変更されたフィールドを設定
      */
     setChangedField(recordIndex, fieldKey) {
-        if (!this.changedFields.has(recordIndex)) {
-            this.changedFields.set(recordIndex, new Set());
+        const recordId = this.getRecordId(recordIndex);
+        if (!this.changedFields.has(recordId)) {
+            this.changedFields.set(recordId, new Set());
         }
-        this.changedFields.get(recordIndex).add(fieldKey);
+        this.changedFields.get(recordId).add(fieldKey);
         
         // 変更フラグも設定
         this.setChangeFlag(recordIndex, true);
@@ -265,40 +286,54 @@ class VirtualScroll {
      * レコードIDを取得（レコードを一意に識別）
      */
     getRecordId(recordIndex) {
-        // 統合キーを使用してレコードを一意に識別
         if (window.tableRenderer && window.tableRenderer.currentSearchResults) {
             const record = window.tableRenderer.currentSearchResults[recordIndex];
             if (record) {
-                // 統合キーを直接取得を試行
+                // 1. 起点台帳の統合キー
                 if (record[CONFIG.integrationKey]) {
                     return record[CONFIG.integrationKey];
                 }
-                
-                // 各台帳の統合キーを試行（CONFIG.jsから動的取得）
-                const pcLedgerName = CONFIG.fieldMappings.primaryKeyToLedger['PC番号']; // 'PC台帳'
-                const integrationKeyField = `${pcLedgerName}_${CONFIG.fieldMappings.integrationKey}`;
-                const integrationKeyValue = record[integrationKeyField];
-                if (integrationKeyValue) {
-                    return integrationKeyValue;
+                // 2. 他の台帳の統合キーを順に探索（CONFIG.appsの順で）
+                for (const appId in CONFIG.apps) {
+                    const ledgerName = CONFIG.apps[appId].name;
+                    const key = `${ledgerName}_${CONFIG.integrationKey}`;
+                    if (record[key]) {
+                        return record[key];
+                    }
                 }
             }
         }
-        // フォールバック：レコードインデックス
+        // 3. どれも無ければインデックス
         return `idx_${recordIndex}`;
     }
 
+    // 統合キー取得の共通関数（row単体版）
+    getRecordIdFromRow(row) {
+        if (row[CONFIG.integrationKey]) {
+            return row[CONFIG.integrationKey];
+        }
+        for (const appId in CONFIG.apps) {
+            const ledgerName = CONFIG.apps[appId].name;
+            const key = `${ledgerName}_${CONFIG.integrationKey}`;
+            if (row[key]) {
+                return row[key];
+            }
+        }
+        return null;
+    }
 
 
     /**
      * フィールドの元の値を保存し、現在の値と比較して変更状態を更新
      */
     updateFieldChangeStatus(recordIndex, fieldKey, currentValue) {
+        const recordId = this.getRecordId(recordIndex);
         // 元の値のマップを初期化（必要に応じて）
-        if (!this.originalValues.has(recordIndex)) {
-            this.originalValues.set(recordIndex, new Map());
+        if (!this.originalValues.has(recordId)) {
+            this.originalValues.set(recordId, new Map());
         }
         
-        const originalValuesMap = this.originalValues.get(recordIndex);
+        const originalValuesMap = this.originalValues.get(recordId);
         
         // 元の値が保存されていない場合はエラー（フォーカス時に保存されるはず）
         if (!originalValuesMap.has(fieldKey)) {
@@ -327,8 +362,9 @@ class VirtualScroll {
      * 指定レコードから変更されたフィールドを削除
      */
     removeChangedField(recordIndex, fieldKey) {
-        if (this.changedFields.has(recordIndex)) {
-            const fieldSet = this.changedFields.get(recordIndex);
+        const recordId = this.getRecordId(recordIndex);
+        if (this.changedFields.has(recordId)) {
+            const fieldSet = this.changedFields.get(recordId);
             fieldSet.delete(fieldKey);
             
             // セルの背景色もクリア
@@ -345,12 +381,13 @@ class VirtualScroll {
      * レコードの変更フラグを設定
      */
     setChangeFlag(recordIndex, isChanged) {
-        this.changeFlags.set(recordIndex, isChanged);
+        const recordId = this.getRecordId(recordIndex);
+        this.changeFlags.set(recordId, isChanged);
         this.updateChangeCheckbox(recordIndex, isChanged);
         
         // フラグがリセットされた場合は変更フィールドもクリア
         if (!isChanged) {
-            this.changedFields.set(recordIndex, new Set());
+            this.changedFields.set(recordId, new Set());
             // 対応するセルの背景色もクリア
             this.clearCellChangedStyles(recordIndex);
             // 元の値もリセット（保存後の新しい状態を元の値とする）
@@ -362,8 +399,9 @@ class VirtualScroll {
      * 指定行のセルから変更スタイル（背景色）をクリア
      */
     clearCellChangedStyles(recordIndex) {
+        const recordId = this.getRecordId(recordIndex);
         // 該当行の全てのセルから.cell-changedクラスを削除
-        const cells = document.querySelectorAll(`td[data-record-index="${recordIndex}"]`);
+        const cells = document.querySelectorAll(`td[data-record-id="${recordId}"]`);
         cells.forEach(cell => {
             cell.classList.remove('cell-changed');
         });
@@ -386,15 +424,29 @@ class VirtualScroll {
     restoreChangeFlagsUI() {
         // 少し遅延を入れてDOM更新完了後に実行
         setTimeout(() => {
-            this.changeFlags.forEach((isChanged, recordIndex) => {
-                this.updateChangeCheckbox(recordIndex, isChanged);
+            this.changeFlags.forEach((isChanged, recordId) => {
+                // recordIdからrecordIndexを逆引きする必要がある場合は対応
+                // ここでは全行を走査して一致するindexを探す
+                const index = window.tableRenderer.currentSearchResults.findIndex(r => {
+                    const id = r && (r[CONFIG.integrationKey] || r[`${CONFIG.fieldMappings.primaryKeyToLedger['PC番号']}_${CONFIG.fieldMappings.integrationKey}`]);
+                    return id === recordId;
+                });
+                if (index !== -1) {
+                    this.updateChangeCheckbox(index, isChanged);
+                }
             });
             
             // 変更されたセルの背景色も復元
-            this.changedFields.forEach((fieldSet, recordIndex) => {
-                fieldSet.forEach(fieldKey => {
-                    this.setCellChangedStyle(recordIndex, fieldKey);
+            this.changedFields.forEach((fieldSet, recordId) => {
+                const index = window.tableRenderer.currentSearchResults.findIndex(r => {
+                    const id = r && (r[CONFIG.integrationKey] || r[`${CONFIG.fieldMappings.primaryKeyToLedger['PC番号']}_${CONFIG.fieldMappings.integrationKey}`]);
+                    return id === recordId;
                 });
+                if (index !== -1) {
+                    fieldSet.forEach(fieldKey => {
+                        this.setCellChangedStyle(index, fieldKey);
+                    });
+                }
             });
         }, 100);
     }
@@ -444,6 +496,9 @@ class VirtualScroll {
                 td.setAttribute('data-record-index', i);
                 td.setAttribute('data-column', column.key);
                 td.setAttribute('data-field-code', column.fieldCode || '');
+                // 追加: 統合キー属性
+                const recordId = this.getRecordId(i);
+                td.setAttribute('data-record-id', recordId);
                 
                 // レコードIDを埋め込み（台帳別）
                 if (column.ledger && column.ledger !== '共通' && column.ledger !== '操作') {
@@ -458,7 +513,7 @@ class VirtualScroll {
                     // 変更フラグ列の場合はチェックボックスを作成
                     const checkbox = DOMHelper.createElement('input');
                     checkbox.type = 'checkbox';
-                    const isChanged = this.changeFlags.get(i) || false;
+                    const isChanged = this.changeFlags.get(this.getRecordId(i)) || false;
                     checkbox.checked = isChanged;
                     checkbox.disabled = true; // 手動変更不可
                     checkbox.setAttribute('data-record-index', i);
@@ -535,15 +590,18 @@ class VirtualScroll {
         );
         
         // 表示範囲が変わった場合のみ再レンダリング
-        if (bufferStart !== virtualState.startIndex || bufferEnd !== virtualState.endIndex) {
+        // 追加: すでに最下部を表示している場合は再描画しない
+        const isAtBottom = bufferEnd >= virtualState.data.length && virtualState.endIndex >= virtualState.data.length;
+
+        if ((bufferStart !== virtualState.startIndex || bufferEnd !== virtualState.endIndex) && !isAtBottom) {
             virtualState.startIndex = bufferStart;
             virtualState.endIndex = bufferEnd;
-            // 非同期レンダリングを実行
             this.renderVirtualRows(virtualState).catch(error => {
                 console.error('仮想スクロール再レンダリングエラー:', error);
             });
         }
     }
+
 
     /**
      * ヘッダーの横スクロールを同期
@@ -709,11 +767,12 @@ class VirtualScroll {
         const currentValue = inputElement.value;
 
         // 元の値のマップを初期化（必要に応じて）
-        if (!this.originalValues.has(recordIndex)) {
-            this.originalValues.set(recordIndex, new Map());
+        const recordId = this.getRecordId(recordIndex);
+        if (!this.originalValues.has(recordId)) {
+            this.originalValues.set(recordId, new Map());
         }
         
-        const originalValuesMap = this.originalValues.get(recordIndex);
+        const originalValuesMap = this.originalValues.get(recordId);
         
         // まだ元の値が保存されていない場合のみ保存
         if (!originalValuesMap.has(fieldKey)) {
@@ -732,6 +791,7 @@ class VirtualScroll {
         // TableRendererの現在のデータを更新
         if (window.tableRenderer && window.tableRenderer.currentSearchResults) {
             const currentData = window.tableRenderer.currentSearchResults;
+            const recordId = this.getRecordId(recordIndex);
             if (currentData[recordIndex]) {
                 currentData[recordIndex][fieldKey] = newValue;
                 
@@ -745,7 +805,8 @@ class VirtualScroll {
      * 指定セルにcell-changedクラスを付与（背景色変更）
      */
     setCellChangedStyle(recordIndex, fieldKey) {
-        const cell = this.findCellElement(recordIndex, fieldKey);
+        const recordId = this.getRecordId(recordIndex);
+        const cell = this.findCellElementByRecordId(recordId, fieldKey);
         if (cell) {
             cell.classList.add('cell-changed');
         }
@@ -755,7 +816,8 @@ class VirtualScroll {
      * 指定セルからcell-changedクラスを削除（背景色クリア）
      */
     clearCellChangedStyle(recordIndex, fieldKey) {
-        const cell = this.findCellElement(recordIndex, fieldKey);
+        const recordId = this.getRecordId(recordIndex);
+        const cell = this.findCellElementByRecordId(recordId, fieldKey);
         if (cell) {
             cell.classList.remove('cell-changed');
         } else {
@@ -860,6 +922,29 @@ class VirtualScroll {
 
         // ボタンをセルに追加
         td.appendChild(separateButton);
+    }
+
+    findCellElementByRecordId(recordId, fieldKey) {
+        return document.querySelector(`td[data-record-id="${recordId}"][data-column="${fieldKey}"]`);
+    }
+
+    // 空行（全フィールド空）の変更フラグとcell-changedクラスをクリア
+    clearFlagsAndClassesForEmptyRows() {
+        if (!window.tableRenderer || !window.tableRenderer.currentSearchResults) return;
+        window.tableRenderer.currentSearchResults.forEach((row, index) => {
+            const isAllEmpty = CONFIG.integratedTableConfig.columns.every(col => {
+                if (col.isChangeFlag) return true;
+                const v = row[col.key];
+                return v === '' || v === null || v === undefined || v === '-';
+            });
+            if (isAllEmpty) {
+                const recordId = this.getRecordIdFromRow(row);
+                this.changeFlags.set(recordId, false);
+                this.changedFields.set(recordId, new Set());
+                this.clearCellChangedStyles(index);
+                this.updateChangeCheckbox(index, false);
+            }
+        });
     }
 }
 
