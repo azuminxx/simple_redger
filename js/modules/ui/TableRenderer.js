@@ -232,8 +232,6 @@ class TableRenderer {
         }
 
         try {
-            console.log('📤 変更保存開始...');
-            
             // 変更されたレコードのインデックスを取得
             if (!window.virtualScroll) {
                 throw new Error('VirtualScrollインスタンスが見つかりません');
@@ -245,8 +243,6 @@ class TableRenderer {
                 alert('変更されたレコードがありません。');
                 return;
             }
-            
-            console.log(`📝 保存開始: ${changedIndices.length}件のレコードを更新`);
             
             // 変更されたレコードのみから各台帳ごとにレコードをグループ化
             const recordsByApp = this.groupRecordsByApp(changedIndices);
@@ -263,9 +259,6 @@ class TableRenderer {
             
             // 変更フラグをリセット
             this.resetChangeFlags(changedIndices);
-            
-            console.log('✅ 保存完了: 全ての変更がkintoneに反映されました');
-            alert('変更が正常に保存されました。');
             
         } catch (error) {
             console.error('❌ 保存エラー:', error);
@@ -374,10 +367,6 @@ class TableRenderer {
         }
     }
 
-
-
-
-
     /**
      * 特定のアプリのレコードを一括更新
      */
@@ -407,10 +396,10 @@ class TableRenderer {
                 throw new Error(`旧形式のレコードはサポートされていません: ${JSON.stringify(record)}`);
             });
             
-            console.log(`📤 kintone API更新リクエスト全体:`, JSON.stringify({
-                app: appId,
-                records: updateRecords
-            }, null, 2));
+            // console.log(`📤 kintone API更新リクエスト全体:`, JSON.stringify({
+            //     app: appId,
+            //     records: updateRecords
+            // }, null, 2));
             
             // API実行回数をカウント
             window.apiCounter.count(appId, 'レコード一括更新');
@@ -424,7 +413,7 @@ class TableRenderer {
             console.log(`✅ ${CONFIG.apps[appId].name} 更新完了 (${records.length}件)`);
             
             // 更新されたレコードのURLリンクをログ出力
-            this.logUpdatedRecordLinks(appId, records);
+            //this.logUpdatedRecordLinks(appId, records);
             
             return response;
             
@@ -444,18 +433,18 @@ class TableRenderer {
     /**
      * 更新されたレコードのURLリンクをログ出力
      */
-    logUpdatedRecordLinks(appId, records) {
-        const ledgerName = CONFIG.apps[appId]?.name || `App${appId}`;
-        const baseUrl = 'https://fps62oxtrbhh.cybozu.com/k';
+    // logUpdatedRecordLinks(appId, records) {
+    //     const ledgerName = CONFIG.apps[appId]?.name || `App${appId}`;
+    //     const baseUrl = 'https://fps62oxtrbhh.cybozu.com/k';
         
-        console.log(`🔗 ${ledgerName} 更新レコードのリンク:`);
+    //     console.log(`🔗 ${ledgerName} 更新レコードのリンク:`);
         
-        records.forEach((record, index) => {
-            const recordId = record.id;
-            const recordUrl = `${baseUrl}/${appId}/show#record=${recordId}`;
-            console.log(`   ${index + 1}. ${ledgerName} レコード${recordId}: ${recordUrl}`);
-        });
-    }
+    //     records.forEach((record, index) => {
+    //         const recordId = record.id;
+    //         const recordUrl = `${baseUrl}/${appId}/show#record=${recordId}`;
+    //         console.log(`   ${index + 1}. ${ledgerName} レコード${recordId}: ${recordUrl}`);
+    //     });
+    // }
 
 
 
@@ -555,7 +544,6 @@ class TableRenderer {
         changedIndices.forEach(index => {
             window.virtualScroll.setChangeFlag(index, false);
         });
-        console.log(`✅ 変更フラグリセット完了 (${changedIndices.length}件)`);
     }
 
 

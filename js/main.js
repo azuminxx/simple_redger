@@ -87,8 +87,6 @@
                     }
 
                     try {
-                        console.log('🚀 統合台帳検索システム初期化中...');
-                        
                         // フィールド情報を事前に取得
                         await this.preloadFieldInfo();
                         

@@ -96,8 +96,7 @@ class VirtualScroll {
     applyDynamicSizing(container) {
         // 動的CSSを生成してテーブル幅を設定
         DOMHelper.generateTableWidthCSS();
-        
-        console.log(`📐 テーブル表示領域: 固定高さ300px`);
+   
     }
 
 
@@ -749,11 +748,11 @@ class VirtualScroll {
         const cell = this.findCellElement(recordIndex, fieldKey);
         if (cell) {
             cell.classList.add('cell-changed');
-        } else {
-            // $idフィールドは表示されていないため、警告を抑制
-            if (!fieldKey.includes('_$id')) {
-                console.warn(`⚠️ セル要素が見つかりません: 行${recordIndex} ${fieldKey}`);
-            }
+        //} else {
+        //    // $idフィールドは表示されていないため、警告を抑制
+        //    if (!fieldKey.includes('_$id')) {
+        //        console.warn(`⚠️ セル要素が見つかりません: 行${recordIndex} ${fieldKey}`);
+        //    }
         }
     }
 

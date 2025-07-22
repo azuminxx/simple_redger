@@ -129,8 +129,6 @@ class DataIntegrator {
         // OR条件で結合
         const query = queryParts.join(' or ');
         
-        console.log(`🔍 ${ledgerName}での全主キー検索クエリ: ${query}`);
-        
         return window.searchEngine.searchRecordsWithQuery(appId, query);
     }
 
