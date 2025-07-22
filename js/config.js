@@ -50,31 +50,27 @@ const CONFIG = {
     integratedTableConfig: {
         columns: [
             // PC台帳グループ
-            { key: 'PC台帳_PC番号', label: 'PC番号', width: '120px', appId: 6, fieldCode: 'PC番号', readOnly: true },
-            { key: 'PC台帳_ユーザーID', label: 'ユーザーID', width: '100px', appId: 6, fieldCode: 'ユーザーID', readOnly: false },
-            { key: 'PC台帳_ユーザー名', label: 'ユーザー名', width: '120px', appId: 6, fieldCode: 'ユーザー名', isUserListDerived: true, readOnly: true },
-            { key: 'PC台帳_PC用途', label: 'PC用途', width: '130px', appId: 6, fieldCode: 'PC用途', readOnly: false },
-            { key: 'PC台帳_test1', label: 'test1', width: '100px', appId: 6, fieldCode: 'test1', readOnly: false },
-            { key: 'PC台帳_sample', label: 'sample', width: '100px', appId: 6, fieldCode: 'sample', readOnly: false },
+            { key: 'PC台帳_PC番号', label: 'PC番号', width: '120px', appId: 6, fieldCode: 'PC番号', readOnly: true, primaryKey: true },
+            { key: 'PC台帳_ユーザーID', label: 'ユーザーID', width: '100px', appId: 6, fieldCode: 'ユーザーID', readOnly: false, primaryKey: false },
+            { key: 'PC台帳_ユーザー名', label: 'ユーザー名', width: '120px', appId: 6, fieldCode: 'ユーザー名', isUserListDerived: true, readOnly: true, primaryKey: false },
+            { key: 'PC台帳_PC用途', label: 'PC用途', width: '130px', appId: 6, fieldCode: 'PC用途', readOnly: false, primaryKey: false },
+            { key: 'PC台帳_test1', label: 'test1', width: '100px', appId: 6, fieldCode: 'test1', readOnly: false, primaryKey: false },
+            { key: 'PC台帳_sample', label: 'sample', width: '100px', appId: 6, fieldCode: 'sample', readOnly: false, primaryKey: false },
             
             // 内線台帳グループ
-            { key: '内線台帳_内線番号', label: '内線番号', width: '90px', appId: 7, fieldCode: '内線番号', readOnly: true },
-            { key: '内線台帳_電話機種別', label: '電話機種別', width: '100px', appId: 7, fieldCode: '電話機種別', readOnly: false },
+            { key: '内線台帳_内線番号', label: '内線番号', width: '90px', appId: 7, fieldCode: '内線番号', readOnly: true, primaryKey: true },
+            { key: '内線台帳_電話機種別', label: '電話機種別', width: '100px', appId: 7, fieldCode: '電話機種別', readOnly: false, primaryKey: false },
             
             // 座席台帳グループ
-            { key: '座席台帳_座席拠点', label: '座席拠点', width: '80px', appId: 8, fieldCode: '座席拠点', readOnly: false },
-            { key: '座席台帳_階数', label: '階数', width: '60px', appId: 8, fieldCode: '階数', readOnly: false },
-            { key: '座席台帳_座席番号', label: '座席番号', width: '120px', appId: 8, fieldCode: '座席番号', readOnly: true },
-            { key: '座席台帳_座席部署', label: '座席部署', width: '80px', appId: 8, fieldCode: '座席部署', readOnly: false }
+            { key: '座席台帳_座席拠点', label: '座席拠点', width: '80px', appId: 8, fieldCode: '座席拠点', readOnly: false, primaryKey: false },
+            { key: '座席台帳_階数', label: '階数', width: '60px', appId: 8, fieldCode: '階数', readOnly: false, primaryKey: false },
+            { key: '座席台帳_座席番号', label: '座席番号', width: '120px', appId: 8, fieldCode: '座席番号', readOnly: true, primaryKey: true },
+            { key: '座席台帳_座席部署', label: '座席部署', width: '80px', appId: 8, fieldCode: '座席部署', readOnly: false, primaryKey: false }
         ]
     },
-
-    // 主キーフィールド設定
-    primaryKeyFields: ['PC番号', '内線番号', '座席番号'],
     
     // フィールドマッピング設定
     fieldMappings: {
-        integrationKey: '統合キー',
         userId: 'ユーザーID',
         //userName: 'ユーザー名',
         primaryKeyToLedger: {
@@ -82,11 +78,6 @@ const CONFIG = {
             '内線番号': '内線台帳',
             '座席番号': '座席台帳'
         }
-    },
-    
-    // 編集可能/読み取り専用フィールドの設定
-    fieldPermissions: {
-        readOnlyFields: ['PC番号', '内線番号', '座席番号']
     },
 
     // フィールドフィルタリング設定

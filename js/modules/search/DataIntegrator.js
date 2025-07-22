@@ -230,7 +230,7 @@ class DataIntegrator {
 
         // ユーザーリストをユーザーIDでマップ化（CONFIG.jsから取得）
         const userIdFieldName = CONFIG.fieldMappings.userId;
-        const userNameFieldName = CONFIG.fieldMappings.userName;
+        //const userNameFieldName = CONFIG.fieldMappings.userName;
         const userListMapFields = CONFIG.userList.mapFields || [];
         const userMaps = {};
         userListMapFields.forEach(fieldName => {

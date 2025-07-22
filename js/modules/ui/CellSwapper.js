@@ -6,9 +6,6 @@ class CellSwapper {
     constructor(tableRenderer) {
         this.tableRenderer = tableRenderer;
         
-        // ドラッグアンドドロップ用の主キーフィールド定義（CONFIG.jsから取得）
-        this.PRIMARY_KEY_FIELDS = CONFIG.primaryKeyFields;
-        
         // ドラッグアンドドロップの状態管理
         this.dragState = {
             isDragging: false,
@@ -21,27 +18,29 @@ class CellSwapper {
     }
 
     /**
-     * 主キーフィールドかどうかを判定
-     */
-    isPrimaryKeyField(fieldCode) {
-        return this.PRIMARY_KEY_FIELDS.includes(fieldCode);
-    }
-
-    /**
      * 同じ主キータイプかどうかを判定
      */
     isSamePrimaryKeyType(fieldCode1, fieldCode2) {
-        return this.isPrimaryKeyField(fieldCode1) && 
-               this.isPrimaryKeyField(fieldCode2) && 
-               fieldCode1 === fieldCode2;
+        // フィールドコードから台帳名を取得
+        const ledgerName1 = this.getLedgerNameFromFieldCode(fieldCode1);
+        const ledgerName2 = this.getLedgerNameFromFieldCode(fieldCode2);
+
+        // 台帳名が同じで、フィールドコードが同じかどうかを判定
+        return ledgerName1 === ledgerName2 && fieldCode1 === fieldCode2;
     }
 
     /**
      * セルにドラッグアンドドロップ機能を追加
      */
     addDragAndDropToCell(cell, rowIndex, columnKey, fieldCode) {
+        // フィールドコードから台帳名を取得
+        const ledgerName = this.getLedgerNameFromFieldCode(fieldCode);
+        const column = CONFIG.integratedTableConfig.columns.find(col => 
+            col.key === columnKey
+        );
+
         // 主キーフィールドのみドラッグ可能
-        if (!this.isPrimaryKeyField(fieldCode)) {
+        if (!column || !column.primaryKey) {
             return;
         }
 

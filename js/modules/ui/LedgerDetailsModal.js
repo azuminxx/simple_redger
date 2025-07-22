@@ -281,7 +281,7 @@ class LedgerDetailsModal {
     static getIntegrationKeyFromRecord(record) {
         // 各台帳の統合キーフィールドから値を取得
         const pcLedgerName = CONFIG.fieldMappings.primaryKeyToLedger['PC番号']; // 'PC台帳'
-        const integrationKeyField = `${pcLedgerName}_${CONFIG.fieldMappings.integrationKey}`;
+        const integrationKeyField = `${pcLedgerName}_${CONFIG.integrationKey}`;
         return record[integrationKeyField] || 'Unknown';
     }
 }

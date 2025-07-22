@@ -23,8 +23,10 @@ class TableRenderer {
         const rules = {};
         
         // 主キーフィールドは全て exclude_origin ルール
-        CONFIG.primaryKeyFields.forEach(fieldCode => {
-            rules[fieldCode] = 'exclude_origin';
+        CONFIG.integratedTableConfig.columns.forEach(column => {
+            if (column.primaryKey) {
+                rules[column.fieldCode] = 'exclude_origin';
+            }
         });
         
         // ユーザーIDは PC台帳のみ

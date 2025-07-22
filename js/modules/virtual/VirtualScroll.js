@@ -429,7 +429,7 @@ class VirtualScroll {
                 // recordIdからrecordIndexを逆引きする必要がある場合は対応
                 // ここでは全行を走査して一致するindexを探す
                 const index = window.tableRenderer.currentSearchResults.findIndex(r => {
-                    const id = r && (r[CONFIG.integrationKey] || r[`${CONFIG.fieldMappings.primaryKeyToLedger['PC番号']}_${CONFIG.fieldMappings.integrationKey}`]);
+                    const id = r && (r[CONFIG.integrationKey] || r[`${CONFIG.fieldMappings.primaryKeyToLedger['PC番号']}_${CONFIG.integrationKey}`]);
                     return id === recordId;
                 });
                 if (index !== -1) {
@@ -440,7 +440,7 @@ class VirtualScroll {
             // 変更されたセルの背景色も復元
             this.changedFields.forEach((fieldSet, recordId) => {
                 const index = window.tableRenderer.currentSearchResults.findIndex(r => {
-                    const id = r && (r[CONFIG.integrationKey] || r[`${CONFIG.fieldMappings.primaryKeyToLedger['PC番号']}_${CONFIG.fieldMappings.integrationKey}`]);
+                    const id = r && (r[CONFIG.integrationKey] || r[`${CONFIG.fieldMappings.primaryKeyToLedger['PC番号']}_${CONFIG.integrationKey}`]);
                     return id === recordId;
                 });
                 if (index !== -1) {
@@ -536,7 +536,7 @@ class VirtualScroll {
                         td.className = 'null-value readonly-cell';
                     } else {
                         // 主キーフィールドの場合は分離ボタンも追加
-                        if (this.isPrimaryKeyField(column.fieldCode) && value && value.trim() !== '') {
+                        if (column.primaryKey && value && value.trim() !== '') {
                             this.createCellWithSeparateButton(td, value, i, column);
                         } else {
                             td.textContent = value;
@@ -833,15 +833,6 @@ class VirtualScroll {
         // データ属性でセルを検索
         const selector = `td[data-record-index="${recordIndex}"][data-column="${fieldKey}"]`;
         return document.querySelector(selector);
-    }
-
-    /**
-     * 主キーフィールドかどうかを判定
-     */
-    isPrimaryKeyField(fieldCode) {
-        // 主キーとして扱うフィールドコードを定義（CONFIG.jsから取得、$idも含む）
-        const primaryKeyFields = ['$id', ...CONFIG.primaryKeyFields];
-        return primaryKeyFields.includes(fieldCode);
     }
 
     /**
