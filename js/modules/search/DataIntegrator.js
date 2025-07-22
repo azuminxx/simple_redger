@@ -231,7 +231,7 @@ class DataIntegrator {
         // ユーザーリストをユーザーIDでマップ化（CONFIG.jsから取得）
         const userIdFieldName = CONFIG.fieldMappings.userId;
         const userNameFieldName = CONFIG.fieldMappings.userName;
-        const userListMapFields = CONFIG.userListMapFields || [];
+        const userListMapFields = CONFIG.userList.mapFields || [];
         const userMaps = {};
         userListMapFields.forEach(fieldName => {
             userMaps[fieldName] = new Map();
@@ -353,7 +353,7 @@ class DataIntegrator {
             // ユーザーリストからユーザー名等を取得してPC台帳のデータとして動的に設定
             const pcLedgerName = CONFIG.fieldMappings.primaryKeyToLedger['PC番号']; // 'PC台帳'
             if (recordUserId) {
-                CONFIG.userListMapFields.forEach(fieldName => {
+                CONFIG.userList.mapFields.forEach(fieldName => {
                     if (userMaps[fieldName] && userMaps[fieldName].has(recordUserId)) {
                         integratedRecord[`${pcLedgerName}_${fieldName}`] = userMaps[fieldName].get(recordUserId);
                     } else {

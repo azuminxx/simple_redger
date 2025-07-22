@@ -26,12 +26,6 @@ const CONFIG = {
         bufferRows: 5
     },
 
-    // ユーザーリスト設定
-    userList: {
-        appId: 13,
-        name: 'ユーザーリスト'
-    },
-
     // 台帳アプリ設定
     apps: {
         6: { name: 'PC台帳' },
@@ -39,10 +33,18 @@ const CONFIG = {
         8: { name: '座席台帳' }
     },
 
-    // 共通グループ名
-    commonLedgerName: '共通',
-    // 共通グループ扱いにしたいkey名
-    commonLedgerKeys: ['change-flag', 'detail-link'],
+    // ユーザーリスト設定
+    userList: {
+        appId: 13,
+        name: 'ユーザーリスト',
+        mapFields: ['ユーザー名','ユーザー部署']
+    },
+
+    // 共通グループ設定
+    commonLedger: {
+        name: '共通',
+        keys: ['change-flag', 'detail-link']
+    },
 
     // 統合テーブル表示設定
     integratedTableConfig: {
@@ -240,8 +242,5 @@ const CONFIG = {
     async generateIntegratedTableColumns() {
         // 静的設定をそのまま返す（動的生成は不要）
         return this.integratedTableConfig.columns;
-    },
-
-    // ユーザーリストでマップ化したいフィールド名
-    userListMapFields: ['ユーザー名','ユーザー部署']
+    }
 }; 

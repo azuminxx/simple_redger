@@ -53,15 +53,15 @@ class DOMHelper {
      */
     static getLedgerNameFromKey(key) {
         // configで指定した共通グループkeyなら共通名を返す
-        if (CONFIG.commonLedgerKeys && CONFIG.commonLedgerKeys.includes(key)) {
-            return CONFIG.commonLedgerName;
+        if (CONFIG.commonLedger && CONFIG.commonLedger.keys && CONFIG.commonLedger.keys.includes(key)) {
+            return CONFIG.commonLedger.name;
         }
         // キーから台帳名を抽出（例：'PC台帳_PC番号' → 'PC台帳'）
         const parts = key.split('_');
         if (parts.length >= 2) {
             return parts[0];
         }
-        return CONFIG.commonLedgerName;
+        return CONFIG.commonLedger ? CONFIG.commonLedger.name : '';
     }
 
     /**
