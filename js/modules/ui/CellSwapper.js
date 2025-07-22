@@ -330,7 +330,8 @@ class CellSwapper {
      */
     getPrimaryKeySourceApp(primaryKeyField) {
         // CONFIG.jsのフィールドマッピングから取得
-        return CONFIG.fieldMappings.primaryKeyToLedger[primaryKeyField] || null;
+        const col = CONFIG.integratedTableConfig.columns.find(c => c.fieldCode === primaryKeyField && c.primaryKey);
+        return col ? col.ledger : null;
     }
 
     /**

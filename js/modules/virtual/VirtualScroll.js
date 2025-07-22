@@ -425,11 +425,12 @@ class VirtualScroll {
     restoreChangeFlagsUI() {
         // 少し遅延を入れてDOM更新完了後に実行
         setTimeout(() => {
+            const appId = window.tableRenderer.currentAppId;
+            const ledgerName = CONFIG.apps[appId] && CONFIG.apps[appId].name;
+            const integrationKeyField = ledgerName ? `${ledgerName}_${CONFIG.integrationKey}` : CONFIG.integrationKey;
             this.changeFlags.forEach((isChanged, recordId) => {
-                // recordIdからrecordIndexを逆引きする必要がある場合は対応
-                // ここでは全行を走査して一致するindexを探す
                 const index = window.tableRenderer.currentSearchResults.findIndex(r => {
-                    const id = r && (r[CONFIG.integrationKey] || r[`${CONFIG.fieldMappings.primaryKeyToLedger['PC番号']}_${CONFIG.integrationKey}`]);
+                    const id = r && (r[integrationKeyField] || r[CONFIG.integrationKey]);
                     return id === recordId;
                 });
                 if (index !== -1) {
@@ -440,7 +441,7 @@ class VirtualScroll {
             // 変更されたセルの背景色も復元
             this.changedFields.forEach((fieldSet, recordId) => {
                 const index = window.tableRenderer.currentSearchResults.findIndex(r => {
-                    const id = r && (r[CONFIG.integrationKey] || r[`${CONFIG.fieldMappings.primaryKeyToLedger['PC番号']}_${CONFIG.integrationKey}`]);
+                    const id = r && (r[integrationKeyField] || r[CONFIG.integrationKey]);
                     return id === recordId;
                 });
                 if (index !== -1) {
@@ -818,11 +819,11 @@ class VirtualScroll {
         const cell = this.findCellElementByRecordId(recordId, fieldKey);
         if (cell) {
             cell.classList.remove('cell-changed');
-        } else {
-            // $idフィールドは表示されていないため、警告を抑制
-            if (!fieldKey.includes('_$id')) {
-                console.warn(`⚠️ セル要素が見つかりません（クリア時）: 行${recordIndex} ${fieldKey}`);
-            }
+        // } else {
+        //     // $idフィールドは表示されていないため、警告を抑制
+        //     if (!fieldKey.includes('_$id')) {
+        //         console.warn(`⚠️ セル要素が見つかりません（クリア時）: 行${recordIndex} ${fieldKey}`);
+        //     }
         }
     }
 

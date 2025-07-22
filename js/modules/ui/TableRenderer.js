@@ -380,7 +380,7 @@ class TableRenderer {
                 
             case 'pc_only':
                 // PC台帳のみ更新（CONFIG.jsから動的取得）
-                const pcLedgerName = CONFIG.fieldMappings.primaryKeyToLedger['PC番号']; // 'PC台帳'
+                const pcLedgerName = CONFIG.integratedTableConfig.columns.find(c => c.fieldCode === 'PC番号' && c.primaryKey).ledger;
                 return Object.keys(CONFIG.apps).filter(appId => CONFIG.apps[appId].name === pcLedgerName);
                 
             case 'origin':

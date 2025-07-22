@@ -52,16 +52,14 @@ class DOMHelper {
      * キーから台帳名を取得
      */
     static getLedgerNameFromKey(key) {
-        // configで指定した共通グループkeyなら共通名を返す
+        // columnsから直接ledgerを取得
+        const col = CONFIG.integratedTableConfig.columns.find(c => c.key === key);
+        if (col && col.ledger) return col.ledger;
+        // fallback: 共通グループkey
         if (CONFIG.commonLedger && CONFIG.commonLedger.keys && CONFIG.commonLedger.keys.includes(key)) {
             return CONFIG.commonLedger.name;
         }
-        // キーから台帳名を抽出（例：'PC台帳_PC番号' → 'PC台帳'）
-        const parts = key.split('_');
-        if (parts.length >= 2) {
-            return parts[0];
-        }
-        return CONFIG.commonLedger ? CONFIG.commonLedger.name : '';
+        return '';
     }
 
     /**
@@ -184,6 +182,16 @@ class DOMHelper {
         }
         
         return fieldKey;
+    }
+
+    /**
+     * フィールドキーから台帳名を抽出
+     * 例: "PC台帳_PC番号" → "PC台帳"
+     */
+    static extractLedgerNameFromKey(fieldKey) {
+        const col = CONFIG.integratedTableConfig.columns.find(c => c.key === fieldKey || c.fieldCode === fieldKey);
+        if (col && col.ledger) return col.ledger;
+        return '';
     }
 }
 

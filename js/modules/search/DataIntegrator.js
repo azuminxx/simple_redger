@@ -351,7 +351,7 @@ class DataIntegrator {
             }
 
             // ユーザーリストからユーザー名等を取得してPC台帳のデータとして動的に設定
-            const pcLedgerName = CONFIG.fieldMappings.primaryKeyToLedger['PC番号']; // 'PC台帳'
+            const pcLedgerName = CONFIG.integratedTableConfig.columns.find(c => c.fieldCode === 'PC番号' && c.primaryKey).ledger;
             if (recordUserId) {
                 CONFIG.userList.mapFields.forEach(fieldName => {
                     if (userMaps[fieldName] && userMaps[fieldName].has(recordUserId)) {
