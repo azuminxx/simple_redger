@@ -8,6 +8,8 @@
     display: none;
 }
 
+
+
 /* 検索メニューエリア */
 #search-menu {
     padding: 10px;
@@ -15,6 +17,7 @@
     border: 1px solid #dee2e6;
     border-radius: 8px;
     margin-bottom: 10px;
+    box-sizing: border-box;
 }
 
 /* 検索結果表示エリア */
@@ -24,6 +27,7 @@
     border: 1px solid #dee2e6;
     border-radius: 8px;
     min-height: 100px;
+    box-sizing: border-box;
 }
 
 /* 結果がない場合のメッセージ */
@@ -258,11 +262,14 @@ table input {
     border-radius: 8px;
     overflow: hidden;
     background-color: white;
+    box-sizing: border-box;
+    margin: 0 auto;
 }
 
 /* 仮想スクロール用のヘッダーテーブル（固定） */
 .virtual-header {
     width: 100%;
+    min-width: fit-content;
     border-collapse: separate;
     border-spacing: 0;
     table-layout: fixed;
@@ -275,7 +282,7 @@ table input {
 
 /* 仮想スクロールコンテナ */
 .virtual-scroll-container {
-    height: 500px;
+    height: calc(100vh - 450px);
     overflow: auto;
     position: relative;
 }
@@ -298,6 +305,7 @@ table input {
 /* 仮想スクロール用のボディテーブル */
 .virtual-body {
     width: 100%;
+    min-width: fit-content;
     border-collapse: separate;
     border-spacing: 0;
     table-layout: fixed;
@@ -311,7 +319,8 @@ table input {
 
 /* 統合テーブル共通スタイル */
 .integrated-table {
-    width: 100%;
+    width: 100% !important;
+    max-width: 100% !important;
     border-collapse: separate;
     border-spacing: 0;
     table-layout: fixed;

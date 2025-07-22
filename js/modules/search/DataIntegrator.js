@@ -25,10 +25,11 @@ class DataIntegrator {
         
         Object.keys(CONFIG.apps).forEach(appId => {
             if (appId !== originalAppId) {
-                const promise = this.searchByIntegrationKeys(appId, integrationKeys)
+                // 主キー検索のみ実行
+                const promise = this.searchByPrimaryKeys(appId, integrationKeys)
                     .then(records => {
                         allLedgerData[appId] = records;
-                        // 各台帳の検索結果ログは削除
+                        console.log(`🔍 ${CONFIG.apps[appId].name}の主キー検索結果: ${records.length}件`);
                         return records;
                     });
                 searchPromises.push(promise);
@@ -50,6 +51,126 @@ class DataIntegrator {
                 const userListData = results.pop();
                 return await this.integrateAllLedgerDataWithUserList(allLedgerData, integrationKeys, userListData);
             });
+    }
+
+    /**
+     * 統合キーから主キーを抽出
+     */
+    parseIntegrationKey(integrationKey) {
+        if (!integrationKey || typeof integrationKey !== 'string') {
+            return { PC: null, EXT: null, SEAT: null };
+        }
+
+        const result = { PC: null, EXT: null, SEAT: null };
+        
+        // PC:値|EXT:値|SEAT:値 の形式をパース
+        const parts = integrationKey.split('|');
+        
+        parts.forEach(part => {
+            const [key, value] = part.split(':');
+            if (key && value && value.trim() !== '') {
+                result[key] = value;
+            }
+        });
+
+        return result;
+    }
+
+    /**
+     * 統合キーから抽出した主キーで各台帳を検索（全主キーフィールドをOR条件で検索）
+     */
+    async searchByPrimaryKeys(appId, integrationKeys) {
+        const appConfig = CONFIG.apps[appId];
+        if (!appConfig) return [];
+
+        const ledgerName = appConfig.name;
+        
+        // 統合キーから全ての主キー値を抽出
+        const pcValues = new Set();
+        const extValues = new Set();
+        const seatValues = new Set();
+
+        integrationKeys.forEach(integrationKey => {
+            const parsed = this.parseIntegrationKey(integrationKey);
+            
+            if (parsed.PC) {
+                pcValues.add(parsed.PC);
+            }
+            if (parsed.EXT) {
+                extValues.add(parsed.EXT);
+            }
+            if (parsed.SEAT) {
+                seatValues.add(parsed.SEAT);
+            }
+        });
+
+        // OR条件クエリを構築
+        const queryParts = [];
+        
+        if (pcValues.size > 0) {
+            const pcList = Array.from(pcValues).map(value => `"${value}"`).join(',');
+            queryParts.push(`PC番号 in (${pcList})`);
+        }
+        
+        if (extValues.size > 0) {
+            const extList = Array.from(extValues).map(value => `"${value}"`).join(',');
+            queryParts.push(`内線番号 in (${extList})`);
+        }
+        
+        if (seatValues.size > 0) {
+            const seatList = Array.from(seatValues).map(value => `"${value}"`).join(',');
+            queryParts.push(`座席番号 in (${seatList})`);
+        }
+
+        if (queryParts.length === 0) {
+            return [];
+        }
+
+        // OR条件で結合
+        const query = queryParts.join(' or ');
+        
+        console.log(`🔍 ${ledgerName}での全主キー検索クエリ: ${query}`);
+        
+        return window.searchEngine.searchRecordsWithQuery(appId, query);
+    }
+
+    /**
+     * 2つの検索結果をマージ（重複除去）
+     */
+    mergeSearchResults(existingRecords, newRecords) {
+        if (!existingRecords || existingRecords.length === 0) {
+            return newRecords || [];
+        }
+        
+        if (!newRecords || newRecords.length === 0) {
+            return existingRecords;
+        }
+
+        // 既存レコードのIDセットを作成
+        const existingIds = new Set();
+        existingRecords.forEach(record => {
+            const recordId = record['$id'] && record['$id'].value !== undefined 
+                ? record['$id'].value 
+                : record['$id'];
+            if (recordId) {
+                existingIds.add(recordId);
+            }
+        });
+
+        // 新しいレコードから重複していないものを追加
+        const mergedRecords = [...existingRecords];
+        newRecords.forEach(record => {
+            const recordId = record['$id'] && record['$id'].value !== undefined 
+                ? record['$id'].value 
+                : record['$id'];
+            
+            if (recordId && !existingIds.has(recordId)) {
+                mergedRecords.push(record);
+                existingIds.add(recordId);
+            }
+        });
+
+        return mergedRecords;
     }
 
     /**
@@ -108,7 +229,8 @@ class DataIntegrator {
     }
 
     /**
-     * 全台帳のデータを統合キーで統合し、ユーザーリストからユーザー名を取得
+     * 全台帳のデータを統合し、ユーザーリストからユーザー名を取得
+     * 統合キーでの一致に関係なく、全ての検索結果を表示
      */
     async integrateAllLedgerDataWithUserList(allLedgerData, integrationKeys, userListData) {
         const integratedData = [];
@@ -125,21 +247,66 @@ class DataIntegrator {
             }
         });
 
-        for (const integrationKey of integrationKeys) {
-            const integratedRecord = {};
+        // 全台帳の全レコードから統合キーを収集
+        const allIntegrationKeys = new Set();
+        
+        // 起点台帳の統合キー
+        integrationKeys.forEach(key => allIntegrationKeys.add(key));
+        
+        // 他台帳の統合キーも収集
+        Object.values(allLedgerData).forEach(records => {
+            records.forEach(record => {
+                const keyField = record[CONFIG.integrationKey];
+                if (keyField && keyField.value) {
+                    allIntegrationKeys.add(keyField.value);
+                }
+            });
+        });
 
-            // 各台帳からこの統合キーに対応するレコードを取得
+        // 統合キーが存在しないレコード用の一意キーを生成
+        const recordsWithoutIntegrationKey = [];
+        Object.entries(allLedgerData).forEach(([appId, records]) => {
+            records.forEach(record => {
+                const keyField = record[CONFIG.integrationKey];
+                if (!keyField || !keyField.value) {
+                    const recordId = record['$id'] && record['$id'].value !== undefined 
+                        ? record['$id'].value 
+                        : record['$id'];
+                    const uniqueKey = `EMPTY_${appId}_${recordId}`;
+                    allIntegrationKeys.add(uniqueKey);
+                    recordsWithoutIntegrationKey.push({ key: uniqueKey, appId, record });
+                }
+            });
+        });
+
+        console.log(`📊 統合処理対象: ${allIntegrationKeys.size}件 (統合キー有り: ${integrationKeys.length}件, 統合キー無し: ${recordsWithoutIntegrationKey.length}件)`);
+
+        for (const integrationKey of allIntegrationKeys) {
+            const integratedRecord = {};
             let recordUserId = null;
             
             for (const [appId, records] of Object.entries(allLedgerData)) {
-                const matchingRecord = records.find(record => {
-                    const keyField = record[CONFIG.integrationKey];
-                    return keyField && keyField.value === integrationKey;
-                });
-
                 const appConfig = CONFIG.apps[appId];
                 const ledgerName = appConfig.name;
                 const displayFields = CONFIG.getDisplayFields(appId);
+                
+                let matchingRecord = null;
+                
+                if (integrationKey.startsWith('EMPTY_')) {
+                    // 統合キーが存在しないレコードの場合
+                    const emptyRecord = recordsWithoutIntegrationKey.find(item => 
+                        item.key === integrationKey && item.appId === appId
+                    );
+                    if (emptyRecord) {
+                        matchingRecord = emptyRecord.record;
+                    }
+                } else {
+                    // 通常の統合キーでの検索
+                    matchingRecord = records.find(record => {
+                        const keyField = record[CONFIG.integrationKey];
+                        return keyField && keyField.value === integrationKey;
+                    });
+                }
                 
                 if (matchingRecord) {
                     // レコードが存在する場合、displayFieldsで指定されたフィールドを追加
@@ -169,7 +336,7 @@ class DataIntegrator {
                     const integrationKeyValue = integrationKeyField && integrationKeyField.value !== undefined 
                         ? integrationKeyField.value 
                         : integrationKeyField;
-                    integratedRecord[`${ledgerName}_${CONFIG.integrationKey}`] = integrationKeyValue;
+                    integratedRecord[`${ledgerName}_${CONFIG.integrationKey}`] = integrationKeyValue || integrationKey;
                 } else {
                     // レコードが存在しない場合、displayFieldsのフィールドをnullで埋める
                     displayFields.forEach(fieldCode => {
@@ -179,8 +346,8 @@ class DataIntegrator {
                     // レコードIDもnullで追加
                     integratedRecord[`${ledgerName}_$id`] = null;
                     
-                    // 統合キーもnullで追加
-                    integratedRecord[`${ledgerName}_${CONFIG.integrationKey}`] = null;
+                    // 統合キーもnullで追加（EMPTY_の場合は統合キー自体もnull）
+                    integratedRecord[`${ledgerName}_${CONFIG.integrationKey}`] = integrationKey.startsWith('EMPTY_') ? null : null;
                 }
             }
 

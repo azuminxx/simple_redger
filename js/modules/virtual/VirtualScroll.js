@@ -17,6 +17,9 @@ class VirtualScroll {
         // メインコンテナ
         const container = DOMHelper.createElement('div', {}, 'integrated-table-container');
         
+        // 動的サイズ調整を適用
+        this.applyDynamicSizing(container);
+        
         // 仮想スクロールコンテナ（ボディ専用）
         const scrollContainer = DOMHelper.createElement('div', {}, 'virtual-scroll-container');
         
@@ -70,6 +73,9 @@ class VirtualScroll {
             this.savedScrollTop = scrollContainer.scrollTop;
         });
         
+        // 動的CSSを生成してテーブル幅を設定
+        DOMHelper.generateTableWidthCSS();
+        
         scrollContainer.appendChild(spacer);
         scrollContainer.appendChild(content);
         container.appendChild(scrollContainer);
@@ -83,6 +89,18 @@ class VirtualScroll {
         
         return container;
     }
+
+    /**
+     * 動的サイズ調整を適用
+     */
+    applyDynamicSizing(container) {
+        // 動的CSSを生成してテーブル幅を設定
+        DOMHelper.generateTableWidthCSS();
+        
+        console.log(`📐 テーブル表示領域: 固定高さ300px`);
+    }
+
+
 
     /**
      * ヘッダーテーブルを作成（固定表示用）
