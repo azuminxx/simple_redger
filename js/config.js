@@ -53,7 +53,8 @@ const CONFIG = {
             // PC台帳グループ
             { key: 'PC台帳_PC番号', appId: 6, ledger: 'PC台帳', fieldCode: 'PC番号', primaryKey: true, label: 'PC番号', width: '120px', readOnly: true },
             { key: 'PC台帳_ユーザーID', appId: 6, ledger: 'PC台帳', fieldCode: 'ユーザーID', primaryKey: false, label: 'ユーザーID', width: '100px', readOnly: false },
-            { key: 'PC台帳_ユーザー名', appId: 6, ledger: 'PC台帳', fieldCode: 'ユーザー名', primaryKey: false, label: 'ユーザー名', width: '120px', readOnly: true, isUserListDerived: true },
+            { key: 'PC台帳_ユーザー名', appId: 13, ledger: 'PC台帳', fieldCode: 'ユーザー名', primaryKey: false, label: 'ユーザー名', width: '120px', readOnly: true, isUserListDerived: true },
+            { key: 'PC台帳_ユーザー部署', appId: 13, ledger: 'PC台帳', fieldCode: 'ユーザー部署', primaryKey: false, label: 'ユーザー部署', width: '120px', readOnly: true, isUserListDerived: true },
             { key: 'PC台帳_PC用途', appId: 6, ledger: 'PC台帳', fieldCode: 'PC用途', primaryKey: false, label: 'PC用途', width: '130px', readOnly: false },
             { key: 'PC台帳_test1', appId: 6, ledger: 'PC台帳', fieldCode: 'test1', primaryKey: false, label: 'test1', width: '100px', readOnly: false },
             { key: 'PC台帳_sample', appId: 6, ledger: 'PC台帳', fieldCode: 'sample', primaryKey: false, label: 'sample', width: '100px', readOnly: false },
