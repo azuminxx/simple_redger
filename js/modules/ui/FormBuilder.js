@@ -131,14 +131,14 @@ class FormBuilder {
             
             inputHTML += `</div>`;
         } else if (field.type === 'number') {
-            inputHTML += `<input type="number" id="${fieldId}" name="${field.code}" placeholder="${field.label}を入力">`;
+            inputHTML += `<input type="number" id="${fieldId}" name="${field.code}" placeholder="${field.label}を入力" autocomplete="off">`;
         } else if (field.type === 'date') {
-            inputHTML += `<input type="date" id="${fieldId}" name="${field.code}">`;
+            inputHTML += `<input type="date" id="${fieldId}" name="${field.code}" autocomplete="off">`;
         } else if (field.type === 'datetime-local') {
-            inputHTML += `<input type="datetime-local" id="${fieldId}" name="${field.code}">`;
+            inputHTML += `<input type="datetime-local" id="${fieldId}" name="${field.code}" autocomplete="off">`;
         } else {
             // text, textarea などのデフォルト
-            inputHTML += `<input type="text" id="${fieldId}" name="${field.code}" placeholder="${field.label}を入力">`;
+            inputHTML += `<input type="text" id="${fieldId}" name="${field.code}" placeholder="${field.label}を入力" autocomplete="off">`;
         }
 
         inputHTML += `</div>`;
@@ -147,4 +147,4 @@ class FormBuilder {
 }
 
 // グローバルに公開
-window.FormBuilder = FormBuilder; 
+window.FormBuilder = FormBuilder;
