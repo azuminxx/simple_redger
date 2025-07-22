@@ -99,8 +99,6 @@ class VirtualScroll {
    
     }
 
-
-
     /**
      * ヘッダーテーブルを作成（固定表示用）
      */
@@ -819,11 +817,6 @@ class VirtualScroll {
         const cell = this.findCellElementByRecordId(recordId, fieldKey);
         if (cell) {
             cell.classList.remove('cell-changed');
-        // } else {
-        //     // $idフィールドは表示されていないため、警告を抑制
-        //     if (!fieldKey.includes('_$id')) {
-        //         console.warn(`⚠️ セル要素が見つかりません（クリア時）: 行${recordIndex} ${fieldKey}`);
-        //     }
         }
     }
 

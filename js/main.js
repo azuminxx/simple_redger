@@ -114,17 +114,6 @@
                 // 全アプリのフィールド情報を一括取得
                 const fieldsMap = await CONFIG.getAllAppFields();
 
-                // ユーザーリストアプリのフィールド情報からユーザーID以外を読み取り専用に追加
-                // const userListFields = fieldsMap[CONFIG.userList.appId] || [];
-                // const userIdField = CONFIG.userList.primaryKey;
-                // const userListReadOnlyFields = userListFields
-                //     .map(f => f.code)
-                //     .filter(code => code !== userIdField);
-                // CONFIG.fieldPermissions.readOnlyFields = Array.from(new Set([
-                //     ...CONFIG.fieldPermissions.readOnlyFields,
-                //     ...userListReadOnlyFields
-                // ]));
-
                 // 統合テーブルのカラム設定を動的生成
                 const dynamicColumns = await CONFIG.generateIntegratedTableColumns();
                 // 変更フラグ列とリンク列を最初に追加
