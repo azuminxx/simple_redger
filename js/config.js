@@ -39,6 +39,11 @@ const CONFIG = {
         8: { name: '座席台帳' }
     },
 
+    // 共通グループ名
+    commonLedgerName: '共通',
+    // 共通グループ扱いにしたいkey名
+    commonLedgerKeys: ['change-flag', 'detail-link'],
+
     // 統合テーブル表示設定
     integratedTableConfig: {
         columns: [

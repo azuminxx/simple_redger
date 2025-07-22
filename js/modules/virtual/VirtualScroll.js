@@ -322,6 +322,14 @@ class VirtualScroll {
         return null;
     }
 
+    // PC:PC番号|EXT:内線番号|SEAT:座席番号 形式で統合キーを生成
+    generateIntegrationKeyFromRow(row) {
+        const pc = row['PC台帳_PC番号'] || '';
+        const ext = row['内線台帳_内線番号'] || '';
+        const seat = row['座席台帳_座席番号'] || '';
+        return `PC:${pc}|EXT:${ext}|SEAT:${seat}`;
+    }
+
 
     /**
      * フィールドの元の値を保存し、現在の値と比較して変更状態を更新

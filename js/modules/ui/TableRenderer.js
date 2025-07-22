@@ -260,6 +260,29 @@ class TableRenderer {
             // 空行のフラグ・クラスもクリア
             if (window.virtualScroll) {
                 window.virtualScroll.clearFlagsAndClassesForEmptyRows();
+                // 変更対象行の統合キーを再生成し、MAPも新しい統合キーで更新
+                changedIndices.forEach(index => {
+                    const row = this.currentSearchResults[index];
+                    const oldKey = window.virtualScroll.getRecordIdFromRow(row);
+                    const newKey = window.virtualScroll.generateIntegrationKeyFromRow(row);
+                    // currentSearchResultsの統合キーも更新
+                    row[CONFIG.integrationKey] = newKey;
+                    // MAPのキーも新しい統合キーに移し替え
+                    if (oldKey !== newKey) {
+                        if (window.virtualScroll.changeFlags.has(oldKey)) {
+                            window.virtualScroll.changeFlags.set(newKey, window.virtualScroll.changeFlags.get(oldKey));
+                            window.virtualScroll.changeFlags.delete(oldKey);
+                        }
+                        if (window.virtualScroll.changedFields.has(oldKey)) {
+                            window.virtualScroll.changedFields.set(newKey, window.virtualScroll.changedFields.get(oldKey));
+                            window.virtualScroll.changedFields.delete(oldKey);
+                        }
+                        if (window.virtualScroll.originalValues.has(oldKey)) {
+                            window.virtualScroll.originalValues.set(newKey, window.virtualScroll.originalValues.get(oldKey));
+                            window.virtualScroll.originalValues.delete(oldKey);
+                        }
+                    }
+                });
             }
             
         } catch (error) {

@@ -52,20 +52,16 @@ class DOMHelper {
      * キーから台帳名を取得
      */
     static getLedgerNameFromKey(key) {
-        // 変更フラグ列の場合は「共通」を返す
-        if (key === 'change-flag') {
-            return '共通';
+        // configで指定した共通グループkeyなら共通名を返す
+        if (CONFIG.commonLedgerKeys && CONFIG.commonLedgerKeys.includes(key)) {
+            return CONFIG.commonLedgerName;
         }
-        
-
-        
         // キーから台帳名を抽出（例：'PC台帳_PC番号' → 'PC台帳'）
         const parts = key.split('_');
         if (parts.length >= 2) {
             return parts[0];
         }
-        
-        return '不明';
+        return CONFIG.commonLedgerName;
     }
 
     /**
