@@ -115,11 +115,11 @@
                 const fieldsMap = await CONFIG.getAllAppFields();
 
                 // ユーザーリストアプリのフィールド情報からユーザーID以外を読み取り専用に追加
-                const userListFields = fieldsMap[CONFIG.userList.appId] || [];
-                const userIdField = CONFIG.fieldMappings.userId;
-                const userListReadOnlyFields = userListFields
-                    .map(f => f.code)
-                    .filter(code => code !== userIdField);
+                // const userListFields = fieldsMap[CONFIG.userList.appId] || [];
+                // const userIdField = CONFIG.userList.primaryKey;
+                // const userListReadOnlyFields = userListFields
+                //     .map(f => f.code)
+                //     .filter(code => code !== userIdField);
                 // CONFIG.fieldPermissions.readOnlyFields = Array.from(new Set([
                 //     ...CONFIG.fieldPermissions.readOnlyFields,
                 //     ...userListReadOnlyFields

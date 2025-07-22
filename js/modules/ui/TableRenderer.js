@@ -30,7 +30,7 @@ class TableRenderer {
         });
         
         // ユーザーIDは PC台帳のみ
-        rules[CONFIG.fieldMappings.userId] = 'pc_only';
+        rules[CONFIG.userList.primaryKey] = 'pc_only';
         
         // その他のフィールドは元台帳のみ
         rules['*'] = 'origin';

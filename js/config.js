@@ -1,6 +1,6 @@
 // 台帳設定をconfigオブジェクトで管理
 const CONFIG = {
-    // 統合キー
+    // 各台帳の統合キーフィールド名
     integrationKey: '統合キー',
     
     // システム設定
@@ -37,6 +37,7 @@ const CONFIG = {
     userList: {
         appId: 13,
         name: 'ユーザーリスト',
+        primaryKey: 'ユーザーID',
         mapFields: ['ユーザー名','ユーザー部署']
     },
 
@@ -67,17 +68,6 @@ const CONFIG = {
             { key: '座席台帳_座席番号', appId: 8, ledger: '座席台帳', fieldCode: '座席番号', primaryKey: true, label: '座席番号', width: '120px', readOnly: true },
             { key: '座席台帳_座席部署', appId: 8, ledger: '座席台帳', fieldCode: '座席部署', primaryKey: false, label: '座席部署', width: '80px', readOnly: false }
         ]
-    },
-    
-    // フィールドマッピング設定
-    fieldMappings: {
-        userId: 'ユーザーID',
-        //userName: 'ユーザー名',
-        primaryKeyToLedger: {
-            'PC番号': 'PC台帳',
-            '内線番号': '内線台帳',
-            '座席番号': '座席台帳'
-        }
     },
 
     // フィールドフィルタリング設定
@@ -113,31 +103,6 @@ const CONFIG = {
     // デフォルトフィールドタイプ
     defaultFieldType: 'text',
 
-    // 台帳更新設定（保存時のフィールドマッピング）
-    ledgerUpdateConfig: {
-        'PC台帳': {
-            ownFields: ['ユーザーID', 'PC用途', 'test1', 'sample'],
-            crossReferenceFields: {
-                '内線番号': '内線台帳',
-                '座席番号': '座席台帳'
-            }
-        },
-        '内線台帳': {
-            ownFields: ['電話機種別'],
-            crossReferenceFields: {
-                'PC番号': 'PC台帳',
-                '座席番号': '座席台帳'
-            }
-        },
-        '座席台帳': {
-            ownFields: ['座席拠点', '階数', '座席部署'],
-            crossReferenceFields: {
-                'PC番号': 'PC台帳',
-                '内線番号': '内線台帳'
-            }
-        }
-    },
-
     // 台帳名の配列（処理順序用）
     get ledgerNames() {
         return Object.values(this.apps).map(app => app.name);
@@ -157,25 +122,34 @@ const CONFIG = {
      * 指定台帳の更新フィールド構成を取得
      */
     getLedgerUpdateFields(ledgerName) {
-        const config = this.ledgerUpdateConfig[ledgerName];
-        if (!config) return {};
-        
         const updateFields = {};
         
-        // 自台帳のフィールド
-        config.ownFields.forEach(fieldCode => {
+        // 自台帳のフィールド（primaryKey: falseのフィールドを動的に取得）
+        const ownFields = this.integratedTableConfig.columns
+            .filter(column => column.ledger === ledgerName && !column.primaryKey && !column.isChangeFlag && !column.isDetailLink)
+            .map(column => column.fieldCode);
+        
+        ownFields.forEach(fieldCode => {
             updateFields[fieldCode] = {
                 sourceKey: `${ledgerName}_${fieldCode}`,
                 fieldCode: fieldCode
             };
         });
         
-        // 他台帳からの参照フィールド
-        Object.entries(config.crossReferenceFields).forEach(([fieldCode, sourceLedger]) => {
-            updateFields[fieldCode] = {
-                sourceKey: `${sourceLedger}_${fieldCode}`,
-                fieldCode: fieldCode
-            };
+        // 他台帳からの参照フィールド（appsオブジェクトから動的に取得）
+        Object.values(this.apps).forEach(app => {
+            if (app.name !== ledgerName) {
+                // 他台帳の主キーフィールドを取得
+                const primaryKeyColumns = this.integratedTableConfig.columns
+                    .filter(column => column.ledger === app.name && column.primaryKey);
+                
+                primaryKeyColumns.forEach(column => {
+                    updateFields[column.fieldCode] = {
+                        sourceKey: `${app.name}_${column.fieldCode}`,
+                        fieldCode: column.fieldCode
+                    };
+                });
+            }
         });
         
         return updateFields;
@@ -202,13 +176,6 @@ const CONFIG = {
         
         return columns.map(column => column.fieldCode);
     },
-
-    /**
-     * ユーザーリストのフィールド情報を取得
-     */
-    // async getUserListFields() {
-    //     return await window.fieldInfoAPI.getAppFields(this.userList.appId);
-    // },
 
     /**
      * 全アプリのフィールド情報を取得

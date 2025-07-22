@@ -203,7 +203,7 @@ class DataIntegrator {
      */
     searchUserListByUserIds(allLedgerData) {
         const userIds = new Set();
-        const userIdFieldName = CONFIG.fieldMappings.userId;
+        const userIdFieldName = CONFIG.userList.primaryKey;
         // PC台帳のappIdを取得
         const pcAppId = Object.keys(CONFIG.apps).find(appId => CONFIG.apps[appId].name === 'PC台帳');
         const pcRecords = allLedgerData[pcAppId] || [];
@@ -229,7 +229,7 @@ class DataIntegrator {
         const integratedData = [];
 
         // ユーザーリストをユーザーIDでマップ化（CONFIG.jsから取得）
-        const userIdFieldName = CONFIG.fieldMappings.userId;
+        const userIdFieldName = CONFIG.userList.primaryKey;
         //const userNameFieldName = CONFIG.fieldMappings.userName;
         const userListMapFields = CONFIG.userList.mapFields || [];
         const userMaps = {};
