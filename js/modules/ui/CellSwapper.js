@@ -347,7 +347,6 @@ class CellSwapper {
             const targetRow = this.findRowByIndex(tbody, targetRowIndex);
 
             if (!sourceRow || !targetRow) {
-                //console.warn(`⚠️ DOM行が見つかりません: ${sourceRowIndex} または ${targetRowIndex}`);
                 return;
             }
 
@@ -356,7 +355,6 @@ class CellSwapper {
             const targetCell = this.findCellInRow(targetRow, fieldKey);
 
             if (!sourceCell || !targetCell) {
-                //console.warn(`⚠️ フィールド ${fieldKey} のセルが見つかりません`);
                 return;
             }
 

@@ -315,9 +315,6 @@ class TableRenderer {
             });
         });
         
-        // console.log(`🔚 フィールド値の出力が完了しました。実際の更新処理を開始します。`);
-        // console.log(`📦 更新対象アプリ:`, Object.keys(updateRecordsByApp));
-        
         return updateRecordsByApp;
     }
 
@@ -381,8 +378,6 @@ class TableRenderer {
                     throw new Error(`レコードIDが見つかりません`);
                 }
                 
-                // console.log(`📋 レコード${index + 1}の更新データ準備開始 (ID: ${recordIdValue})`);
-                
                 // 新しい形式の場合は直接recordオブジェクトを使用、旧形式の場合は従来の処理
                 if (record.id && record.record) {
                     // 新しい形式: {id: 6163, record: {...}}
@@ -395,11 +390,6 @@ class TableRenderer {
                 // 旧形式は現在サポートしていません
                 throw new Error(`旧形式のレコードはサポートされていません: ${JSON.stringify(record)}`);
             });
-            
-            // console.log(`📤 kintone API更新リクエスト全体:`, JSON.stringify({
-            //     app: appId,
-            //     records: updateRecords
-            // }, null, 2));
             
             // API実行回数をカウント
             window.apiCounter.count(appId, 'レコード一括更新');
@@ -431,24 +421,6 @@ class TableRenderer {
     }
 
     /**
-     * 更新されたレコードのURLリンクをログ出力
-     */
-    // logUpdatedRecordLinks(appId, records) {
-    //     const ledgerName = CONFIG.apps[appId]?.name || `App${appId}`;
-    //     const baseUrl = 'https://fps62oxtrbhh.cybozu.com/k';
-        
-    //     console.log(`🔗 ${ledgerName} 更新レコードのリンク:`);
-        
-    //     records.forEach((record, index) => {
-    //         const recordId = record.id;
-    //         const recordUrl = `${baseUrl}/${appId}/show#record=${recordId}`;
-    //         console.log(`   ${index + 1}. ${ledgerName} レコード${recordId}: ${recordUrl}`);
-    //     });
-    // }
-
-
-
-    /**
      * VirtualScrollテーブルを再描画
      */
     refreshVirtualScrollTable() {
@@ -468,8 +440,6 @@ class TableRenderer {
                 // 変更フラグを保持（再描画前に現在の状態を保存）
                 const currentChangeFlags = new Map(this.virtualScroll.changeFlags);
                 const currentChangedFields = new Map(this.virtualScroll.changedFields);
-                
-                // console.log(`🔄 変更フラグ保持: ${currentChangeFlags.size}件のフラグ, ${currentChangedFields.size}件のフィールド`);
                 
                 // 新しいVirtualScrollテーブルを作成
                 const newTableContainer = this.virtualScroll.createVirtualScrollTable(this.currentSearchResults);

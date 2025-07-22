@@ -172,13 +172,6 @@ class TabManager {
     }
 
     /**
-     * 現在のアクティブタブを取得
-     */
-    // getCurrentActiveTab() {
-    //     return this.currentActiveTab;
-    // }
-
-    /**
      * 個別タブ用のボタングループを作成
      */
     createIndividualButtonGroup(appId) {
