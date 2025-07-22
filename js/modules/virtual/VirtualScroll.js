@@ -336,32 +336,25 @@ class VirtualScroll {
      */
     updateFieldChangeStatus(recordIndex, fieldKey, currentValue) {
         const recordId = this.getRecordId(recordIndex);
-        // 元の値のマップを初期化（必要に応じて）
         if (!this.originalValues.has(recordId)) {
             this.originalValues.set(recordId, new Map());
         }
-        
         const originalValuesMap = this.originalValues.get(recordId);
-        
-        // 元の値が保存されていない場合はエラー（フォーカス時に保存されるはず）
         if (!originalValuesMap.has(fieldKey)) {
             console.warn(`⚠️ 元の値が見つかりません: 行${recordIndex} ${fieldKey} - 変更フラグ追加`);
             this.setChangedField(recordIndex, fieldKey);
             return;
         }
-        
         const originalValue = originalValuesMap.get(fieldKey);
-        
-        // 現在の値が元の値と同じかどうかを判定
-        if (currentValue === originalValue) {
+        const isOriginalEmpty = this.isEmptyValue(originalValue);
+        const isCurrentEmpty = this.isEmptyValue(currentValue);
+        if ((isOriginalEmpty && isCurrentEmpty) || currentValue === originalValue) {
             // 元に戻った場合は変更フラグから削除
             this.removeChangedField(recordIndex, fieldKey);
-            // 背景色もクリア
             this.clearCellChangedStyle(recordIndex, fieldKey);
         } else {
             // 変更されている場合は変更フラグに追加
             this.setChangedField(recordIndex, fieldKey);
-            // 背景色を設定
             this.setCellChangedStyle(recordIndex, fieldKey);
         }
     }
@@ -953,6 +946,11 @@ class VirtualScroll {
                 this.updateChangeCheckbox(index, false);
             }
         });
+    }
+
+    // 空欄値の等価判定用ユーティリティ
+    isEmptyValue(val) {
+        return val === null || val === undefined || val === '' || val === '-';
     }
 }
 

@@ -12,11 +12,11 @@
 
 /* 検索メニューエリア */
 #search-menu {
-    padding: 10px;
+    padding: 6px;
     background-color: #f8f9fa;
     border: 1px solid #dee2e6;
     border-radius: 8px;
-    margin-bottom: 10px;
+    margin-bottom: 6px;
     box-sizing: border-box;
 }
 
@@ -100,16 +100,16 @@
 /* 検索フォーム */
 .search-form {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 200px));
-    gap: 5px;
-    margin-bottom: 10px;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 170px));
+    gap: 2px;
+    margin-bottom: 6px;
     justify-content: start;
 }
 
 .field-group {
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    gap: 2px;
 }
 
 .field-group label {
@@ -120,7 +120,7 @@
 
 .field-group input,
 .field-group select {
-    padding: 6px 10px;
+    padding: 4px 6px;
     border: 1px solid #ced4da;
     border-radius: 3px;
     font-size: 12px;
@@ -153,8 +153,10 @@ table input {
     padding: 6px 10px;
 }
 
-
-
+.search-form label {
+  min-width: 150px;
+  width: 150px;
+}
 /* selectボックス専用の追加スタイル */
 .field-group select {
     appearance: none;
@@ -647,7 +649,7 @@ div.integrated-table-container table input {
 div.search-form .field-group select,
 div.search-form .field-group input {
     font-size: 12px;
-    padding: 6px 10px;
+    padding: 4px 6px;
 } 
 
 /* タブボタンのフォントサイズを確実に適用 */
