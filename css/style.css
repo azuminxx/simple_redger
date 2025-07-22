@@ -712,3 +712,28 @@ td.editable-cell select,
     font-size: 11px;
     line-height: 1.2;
 } 
+
+/* 主キーフィールドをボールドに */
+.integrated-table td[data-field-code="PC番号"],
+.integrated-table td[data-field-code="内線番号"],
+.integrated-table td[data-field-code="座席番号"] {
+    font-weight: bold !important;
+}
+
+/* 主キーフィールドのヘッダーもボールドに */
+.integrated-table th[data-field-code="PC番号"],
+.integrated-table th[data-field-code="内線番号"],
+.integrated-table th[data-field-code="座席番号"] {
+    font-weight: bold !important;
+    background-color: #e8f4fd !important;
+}
+
+/* 主キーフィールドの入力要素もボールドに */
+.integrated-table td[data-field-code="PC番号"] input,
+.integrated-table td[data-field-code="内線番号"] input,
+.integrated-table td[data-field-code="座席番号"] input,
+.integrated-table td[data-field-code="PC番号"] select,
+.integrated-table td[data-field-code="内線番号"] select,
+.integrated-table td[data-field-code="座席番号"] select {
+    font-weight: bold !important;
+} 

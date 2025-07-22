@@ -150,6 +150,11 @@ class TableRenderer {
             th.textContent = column.label;
             th.className = 'header-field-cell';
             
+            // data-field-code属性を追加（主キーフィールドのスタイル適用用）
+            if (column.fieldCode) {
+                th.setAttribute('data-field-code', column.fieldCode);
+            }
+            
             row.appendChild(th);
         });
         
