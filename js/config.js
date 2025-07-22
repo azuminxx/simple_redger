@@ -74,7 +74,7 @@ const CONFIG = {
     fieldMappings: {
         integrationKey: '統合キー',
         userId: 'ユーザーID',
-        userName: 'ユーザー名',
+        //userName: 'ユーザー名',
         primaryKeyToLedger: {
             'PC番号': 'PC台帳',
             '内線番号': '内線台帳',
@@ -84,7 +84,7 @@ const CONFIG = {
     
     // 編集可能/読み取り専用フィールドの設定
     fieldPermissions: {
-        readOnlyFields: ['PC番号', '内線番号', '座席番号', 'ユーザー名']
+        readOnlyFields: ['PC番号', '内線番号', '座席番号']
     },
 
     // フィールドフィルタリング設定
@@ -213,9 +213,9 @@ const CONFIG = {
     /**
      * ユーザーリストのフィールド情報を取得
      */
-    async getUserListFields() {
-        return await window.fieldInfoAPI.getAppFields(this.userList.appId);
-    },
+    // async getUserListFields() {
+    //     return await window.fieldInfoAPI.getAppFields(this.userList.appId);
+    // },
 
     /**
      * 全アプリのフィールド情報を取得
@@ -225,8 +225,8 @@ const CONFIG = {
             if (!window.fieldInfoAPI) {
                 throw new Error('FieldInfoAPIが初期化されていません');
             }
-
-            const appIds = Object.keys(this.apps);
+            // 台帳アプリ＋ユーザーリストアプリのappIdをまとめて取得
+            const appIds = [...Object.keys(this.apps), this.userList.appId];
             return await window.fieldInfoAPI.getMultipleAppFields(appIds);
         } catch (error) {
             console.error('全アプリのフィールド情報取得エラー:', error);
@@ -240,5 +240,8 @@ const CONFIG = {
     async generateIntegratedTableColumns() {
         // 静的設定をそのまま返す（動的生成は不要）
         return this.integratedTableConfig.columns;
-    }
+    },
+
+    // ユーザーリストでマップ化したいフィールド名
+    userListMapFields: ['ユーザー名','ユーザー部署']
 }; 
