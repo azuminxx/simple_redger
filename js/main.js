@@ -120,10 +120,10 @@
                 const userListReadOnlyFields = userListFields
                     .map(f => f.code)
                     .filter(code => code !== userIdField);
-                CONFIG.fieldPermissions.readOnlyFields = Array.from(new Set([
-                    ...CONFIG.fieldPermissions.readOnlyFields,
-                    ...userListReadOnlyFields
-                ]));
+                // CONFIG.fieldPermissions.readOnlyFields = Array.from(new Set([
+                //     ...CONFIG.fieldPermissions.readOnlyFields,
+                //     ...userListReadOnlyFields
+                // ]));
 
                 // 統合テーブルのカラム設定を動的生成
                 const dynamicColumns = await CONFIG.generateIntegratedTableColumns();

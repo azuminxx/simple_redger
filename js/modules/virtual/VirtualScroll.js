@@ -619,11 +619,8 @@ class VirtualScroll {
         if (column.isChangeFlag) {
             return false;
         }
-        
-        // 編集不可のフィールドを定義（CONFIG.jsから取得）
-        const readOnlyFields = CONFIG.fieldPermissions.readOnlyFields;
-        
-        return !readOnlyFields.includes(column.fieldCode);
+        // カラム定義のreadOnlyプロパティで判定
+        return !column.readOnly;
     }
 
     /**
