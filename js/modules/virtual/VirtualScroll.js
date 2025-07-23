@@ -87,6 +87,29 @@ class VirtualScroll {
             }, 0);
         }
         
+        // 高さ調整関数・リサイズイベントリスナーの追加を削除
+        
+        // 高さ調整関数
+        function adjustTableHeight() {
+            const selectors = [
+                '.contents-actionmenu-gaia',
+                '#search-menu'
+            ];
+            let totalHeight = 0;
+            selectors.forEach(sel => {
+                const el = document.querySelector(sel);
+                if (el) totalHeight += el.offsetHeight;
+            });
+            const windowHeight = window.innerHeight;
+            // .results-title-containerと.integrated-tableは除外し、固定値-85pxを引く
+            const tableHeight = Math.max(200, windowHeight - totalHeight - 120);
+            scrollContainer.style.height = tableHeight + 'px';
+        }
+        adjustTableHeight();
+        window.addEventListener('resize', adjustTableHeight);
+        // グローバルで呼び出せるように
+        window.adjustTableHeight = adjustTableHeight;
+        
         return container;
     }
 

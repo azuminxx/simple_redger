@@ -25,8 +25,7 @@ class TabManager {
         toggleBtn.id = 'toggle-search-form';
         toggleBtn.className = 'search-toggle-btn';
         toggleBtn.textContent = '▲';
-        toggleBtn.style.display = 'block';
-        toggleBtn.style.margin = '8px auto 0 auto';
+        // ここでのstyle設定は削除（CSSで統一）
         searchMenuContainer.appendChild(toggleBtn);
 
         // タブボタン以外の.tab-contentをまとめて取得
@@ -54,6 +53,7 @@ class TabManager {
                 updateTabContentVisibility(false);
                 toggleBtn.textContent = '▼';
             }
+            if (window.adjustTableHeight) window.adjustTableHeight();
         });
 
         const firstAppId = Object.keys(CONFIG.apps)[0];
