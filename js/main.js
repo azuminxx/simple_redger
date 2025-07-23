@@ -132,6 +132,14 @@
                     appId: null,
                     isDetailLink: true,
                     width: '50px'
+                }, {
+                    key: 'consistency-check',
+                    label: '整合性',
+                    ledger: '操作',
+                    fieldCode: 'consistency-check',
+                    appId: null,
+                    isConsistencyCheck: true,
+                    width: '70px'
                 }, ...dynamicColumns];
                 CONFIG.integratedTableConfig.columns = columnsWithSpecialColumns;
                 console.log(`📋 統合テーブル設定完了 (${dynamicColumns.length}列)`);

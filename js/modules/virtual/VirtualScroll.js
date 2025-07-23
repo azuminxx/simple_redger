@@ -523,6 +523,49 @@ class VirtualScroll {
                 } else if (column.isDetailLink) {
                     // 詳細リンク列の場合はファイル絵文字リンクを作成
                     this.createDetailLinkCell(td, i, record);
+                } else if (column.isConsistencyCheck) {
+                    // 不整合チェック列の場合
+                    const DataIntegratorClass = window.DataIntegrator;
+                    const dataIntegrator = new DataIntegratorClass();
+                    // 編集中かどうか判定
+                    const isEditing = this.changeFlags.get(this.getRecordId(i)) || false;
+                    let resultText = '-';
+                    if (isEditing) {
+                        td.className = 'readonly-cell';
+                    } else {
+                        // 統合キーを取得
+                        let integrationKey = null;
+                        for (const appId in CONFIG.apps) {
+                            const ledgerName = CONFIG.apps[appId].name;
+                            const key = `${ledgerName}_${CONFIG.integrationKey}`;
+                            if (record[key]) {
+                                integrationKey = record[key];
+                                break;
+                            }
+                        }
+                        if (integrationKey) {
+                            const parsed = dataIntegrator.parseIntegrationKey(integrationKey);
+                            // 実際のフィールド値
+                            const pc = record['PC台帳_PC番号'] || '';
+                            const ext = record['内線台帳_内線番号'] || '';
+                            const seat = record['座席台帳_座席番号'] || '';
+                            function isFieldConsistent(a, b) {
+                                const isEmpty = v => v === null || v === undefined || v === '';
+                                if (isEmpty(a) && isEmpty(b)) return true;
+                                return a === b;
+                            }
+                            // デバッグ出力（削除済み）
+                            const isConsistent =
+                                isFieldConsistent(parsed.PC, pc) &&
+                                isFieldConsistent(parsed.EXT, ext) &&
+                                isFieldConsistent(parsed.SEAT, seat);
+                            resultText = isConsistent ? '✅' : '❌';
+                            td.className = isConsistent ? 'consistency-ok readonly-cell' : 'consistency-ng readonly-cell';
+                        } else {
+                            td.className = 'null-value readonly-cell';
+                        }
+                    }
+                    td.textContent = resultText;
                 } else if (this.isEditableField(column)) {
                     // 編集可能フィールドの場合は入力要素を作成
                     const inputElement = await this.createEditableInput(column, value, i, columnIndex);

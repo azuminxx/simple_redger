@@ -739,3 +739,17 @@ td.editable-cell select,
 .integrated-table td[data-field-code="座席番号"] select {
     font-weight: bold !important;
 } 
+
+.consistency-ok, .consistency-ng {
+    font-size: 18px;
+    text-align: center;
+    vertical-align: middle;
+} 
+
+.integrated-table td.consistency-ok,
+.integrated-table td.consistency-ng {
+    font-size: 18px;
+    text-align: center;
+    vertical-align: middle;
+} 
+
