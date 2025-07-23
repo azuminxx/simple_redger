@@ -763,3 +763,17 @@ td.editable-cell select,
     background-image: none;
 } 
 
+.search-toggle-btn {
+    display: block;
+    margin: 8px auto 0 auto;
+    background: none;
+    border: none;
+    font-size: 22px;
+    cursor: pointer;
+    color: #666;
+    transition: color 0.2s;
+}
+.search-toggle-btn:hover {
+    color: #3498DB;
+} 
+

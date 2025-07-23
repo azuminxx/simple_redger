@@ -16,8 +16,45 @@ class TabManager {
             return;
         }
 
+        // タブコンテナを作成
         const tabContainer = await this.createTabContainer();
         searchMenuContainer.appendChild(tabContainer);
+
+        // 開閉トグルボタンを下部に追加
+        const toggleBtn = document.createElement('button');
+        toggleBtn.id = 'toggle-search-form';
+        toggleBtn.className = 'search-toggle-btn';
+        toggleBtn.textContent = '▲';
+        toggleBtn.style.display = 'block';
+        toggleBtn.style.margin = '8px auto 0 auto';
+        searchMenuContainer.appendChild(toggleBtn);
+
+        // タブボタン以外の.tab-contentをまとめて取得
+        const updateTabContentVisibility = (open) => {
+            const tabContents = tabContainer.querySelectorAll('.tab-content');
+            tabContents.forEach(tabContent => {
+                if (open) {
+                    tabContent.style.height = 'auto';
+                    tabContent.style.overflow = 'visible';
+                } else {
+                    tabContent.style.height = '0px';
+                    tabContent.style.overflow = 'hidden';
+                }
+            });
+        };
+        // 初期状態は開いている
+        updateTabContentVisibility(true);
+
+        toggleBtn.addEventListener('click', () => {
+            const isClosed = Array.from(tabContainer.querySelectorAll('.tab-content')).every(tc => tc.style.height === '0px');
+            if (isClosed) {
+                updateTabContentVisibility(true);
+                toggleBtn.textContent = '▲';
+            } else {
+                updateTabContentVisibility(false);
+                toggleBtn.textContent = '▼';
+            }
+        });
 
         const firstAppId = Object.keys(CONFIG.apps)[0];
         this.switchTab(firstAppId);
