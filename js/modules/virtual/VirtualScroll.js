@@ -879,6 +879,145 @@ class VirtualScroll {
                 
                 // 元の値と比較して変更状態を更新
                 this.updateFieldChangeStatus(recordIndex, fieldKey, newValue);
+                
+                // --- 追加: ユーザーIDフィールド変更時の処理 ---
+                this.handleUserIdChange(recordIndex, fieldKey, newValue);
+                // --- ここまで追加 ---
+            }
+        }
+    }
+
+    /**
+     * ユーザーIDフィールド変更時の処理
+     */
+    async handleUserIdChange(recordIndex, fieldKey, newUserId) {
+        // ユーザーIDフィールドかどうかを判定
+        if (!fieldKey.includes('ユーザーID')) {
+            return;
+        }
+
+        try {
+            const currentData = window.tableRenderer.currentSearchResults;
+            const record = currentData[recordIndex];
+            if (!record) return;
+
+            // ユーザーリストAPIインスタンスを取得
+            if (!window.userListAPI) {
+                window.userListAPI = new UserListAPI();
+            }
+
+            if (!newUserId || newUserId.trim() === '') {
+                // ユーザーIDが空の場合：mapFieldsの値をクリア
+                this.clearUserMapFields(recordIndex);
+            } else {
+                // ユーザーIDが入力された場合：ユーザーリストから検索してmapFieldsの値を更新
+                await this.updateUserMapFields(recordIndex, newUserId);
+            }
+        } catch (error) {
+            console.error('ユーザーID変更処理エラー:', error);
+        }
+    }
+
+    /**
+     * mapFieldsの値をクリア
+     */
+    clearUserMapFields(recordIndex) {
+        const currentData = window.tableRenderer.currentSearchResults;
+        const record = currentData[recordIndex];
+        if (!record) return;
+
+        // ユーザーIDフィールドの台帳名を取得
+        const userIdFieldKey = Object.keys(record).find(key => key.includes('ユーザーID'));
+        const ledgerName = userIdFieldKey ? this.getLedgerNameFromFieldKey(userIdFieldKey) : 'PC台帳';
+        if (!ledgerName) return;
+
+        // mapFieldsの値をクリア
+        CONFIG.userList.mapFields.forEach(fieldName => {
+            const fieldKey = `${ledgerName}_${fieldName}`;
+            record[fieldKey] = null;
+            
+            // DOM上の表示も更新
+            this.updateCellDisplay(recordIndex, fieldKey, '');
+        });
+    }
+
+    /**
+     * ユーザーIDからmapFieldsの値を更新
+     */
+    async updateUserMapFields(recordIndex, userId) {
+        const currentData = window.tableRenderer.currentSearchResults;
+        const record = currentData[recordIndex];
+        if (!record) return;
+
+        // ユーザーIDフィールドの台帳名を取得
+        const userIdFieldKey = Object.keys(record).find(key => key.includes('ユーザーID'));
+        const ledgerName = userIdFieldKey ? this.getLedgerNameFromFieldKey(userIdFieldKey) : 'PC台帳';
+        if (!ledgerName) return;
+
+        try {
+            // ユーザーリストから検索
+            const userRecord = await window.userListAPI.searchUserById(userId);
+            
+            // 検索結果が0件の場合
+            if (!userRecord) {
+                alert(`ユーザーID "${userId}" が見つかりませんでした。`);
+                return;
+            }
+            
+            // データベース上のユーザーIDを取得（大文字・小文字を統一）
+            const databaseUserId = userRecord[window.userListAPI.primaryKey];
+            const actualUserId = databaseUserId && databaseUserId.value !== undefined 
+                ? databaseUserId.value 
+                : databaseUserId;
+            
+            // ユーザーIDフィールドの値をデータベース上の値に書き換え
+            if (actualUserId && actualUserId !== userId) {
+                record[userIdFieldKey] = actualUserId;
+                // DOM上のユーザーIDフィールドも更新
+                this.updateCellDisplay(recordIndex, userIdFieldKey, actualUserId);
+            }
+            
+            // mapFieldsの値を取得
+            const mapValues = window.userListAPI.getUserMapValues(userRecord);
+            
+            // mapFieldsの値を更新
+            CONFIG.userList.mapFields.forEach(fieldName => {
+                const fieldKey = `${ledgerName}_${fieldName}`;
+                const value = mapValues[fieldName] || '';
+                record[fieldKey] = value;
+                
+                // DOM上の表示も更新
+                this.updateCellDisplay(recordIndex, fieldKey, value);
+            });
+        } catch (error) {
+            console.error('ユーザー情報取得エラー:', error);
+            alert('ユーザー情報の取得中にエラーが発生しました。');
+        }
+    }
+
+    /**
+     * フィールドキーから台帳名を取得
+     */
+    getLedgerNameFromFieldKey(fieldKey) {
+        const parts = fieldKey.split('_');
+        if (parts.length >= 2) {
+            return parts[0];
+        }
+        return null;
+    }
+
+    /**
+     * セルの表示を更新
+     */
+    updateCellDisplay(recordIndex, fieldKey, value) {
+        const cell = this.findCellElement(recordIndex, fieldKey);
+        if (cell) {
+            // 既存のinput要素があれば更新、なければテキストを更新
+            const input = cell.querySelector('input, select');
+            if (input) {
+                input.value = value;
+            } else {
+                cell.textContent = value || '-';
             }
         }
     }
