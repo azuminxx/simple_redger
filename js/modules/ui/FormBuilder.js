@@ -91,13 +91,16 @@ class FormBuilder {
     createFieldInput(field, appName, appId) {
         const fieldId = `${field.code}-${appId}`;
         let inputHTML = '';
+        // required判定
+        const columnConfig = CONFIG.integratedTableConfig.columns.find(col => col.fieldCode === field.code && col.appId == appId);
+        const isRequired = columnConfig && columnConfig.required === true;
 
         inputHTML += `<div class="field-group">`;
         inputHTML += `<label for="${fieldId}">${field.label}:</label>`;
 
         if (field.type === 'dropdown' || field.type === 'radio') {
             // 複数選択可能なリストボックスに変更
-            inputHTML += `<select id="${fieldId}" name="${field.code}" multiple size="5">`;
+            inputHTML += `<select id="${fieldId}" name="${field.code}" multiple size="5"${isRequired ? ' required' : ''}>`;
             if (field.options && field.options.length > 0) {
                 field.options.forEach(option => {
                     const optionValue = option.label || option.value || option;
@@ -129,14 +132,14 @@ class FormBuilder {
             
             inputHTML += `</div>`;
         } else if (field.type === 'number') {
-            inputHTML += `<input type="number" id="${fieldId}" name="${field.code}" placeholder="${field.label}を入力" autocomplete="off">`;
+            inputHTML += `<input type="number" id="${fieldId}" name="${field.code}" placeholder="${field.label}を入力" autocomplete="off"${isRequired ? ' required' : ''}>`;
         } else if (field.type === 'date') {
-            inputHTML += `<input type="date" id="${fieldId}" name="${field.code}" autocomplete="off">`;
+            inputHTML += `<input type="date" id="${fieldId}" name="${field.code}" autocomplete="off"${isRequired ? ' required' : ''}>`;
         } else if (field.type === 'datetime-local') {
-            inputHTML += `<input type="datetime-local" id="${fieldId}" name="${field.code}" autocomplete="off">`;
+            inputHTML += `<input type="datetime-local" id="${fieldId}" name="${field.code}" autocomplete="off"${isRequired ? ' required' : ''}>`;
         } else {
             // text, textarea などのデフォルト
-            inputHTML += `<input type="text" id="${fieldId}" name="${field.code}" placeholder="${field.label}を入力" autocomplete="off">`;
+            inputHTML += `<input type="text" id="${fieldId}" name="${field.code}" placeholder="${field.label}を入力" autocomplete="off"${isRequired ? ' required' : ''}>`;
         }
 
         inputHTML += `</div>`;

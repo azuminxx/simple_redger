@@ -745,10 +745,13 @@ class VirtualScroll {
             'data-field-key': column.key
         }, 'editable-cell-select');
 
-        // 空の選択肢を追加
-        const emptyOption = DOMHelper.createElement('option', { value: '' });
-        emptyOption.textContent = '-';
-        select.appendChild(emptyOption);
+        // required:trueの場合のみ「値が空欄のときだけ空欄選択肢を表示」
+        // required:falseなら常に空欄選択肢を表示
+        if (!value || !column.required) {
+            const emptyOption = DOMHelper.createElement('option', { value: '' });
+            emptyOption.textContent = '-';
+            select.appendChild(emptyOption);
+        }
 
         // 選択肢を追加
         if (options && options.length > 0) {
