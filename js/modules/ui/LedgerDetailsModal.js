@@ -94,7 +94,7 @@ class LedgerDetailsModal {
         `;
         header.setAttribute('data-drag-handle', 'true');
 
-        const title = DOMHelper.createElement('h3');
+        const title = DOMHelper.createElement('h5');
         title.textContent = `統合キー: ${integrationKey} の詳細`;
         title.style.cssText = 'font-size: 15px; font-weight: bold; color: #495057; margin: 0;';
 

@@ -73,7 +73,7 @@ class TableRenderer {
         // タイトルと保存ボタンのコンテナを作成
         const titleContainer = DOMHelper.createElement('div', {}, 'results-title-container');
         
-        const title = DOMHelper.createElement('h3');
+        const title = DOMHelper.createElement('h5');
         title.textContent = `統合検索結果（${integratedData.length}件）`;
         titleContainer.appendChild(title);
         
@@ -108,7 +108,7 @@ class TableRenderer {
         const integratedResultsContainer = DOMHelper.createElement('div', {}, 'integrated-results');
 
         // タイトルを作成
-        const title = DOMHelper.createElement('h3');
+        const title = DOMHelper.createElement('h5');
         title.textContent = '統合検索結果（0件）';
         integratedResultsContainer.appendChild(title);
 

@@ -250,10 +250,10 @@ table input {
     margin-top: 5px;
 } */
 
-.integrated-results h3 {
+.integrated-results h5 {
     margin-bottom: 5px;
     color: #495057;
-    font-size: 18px;
+    font-size: 14px;
     font-weight: 600;
 }
 
@@ -488,12 +488,13 @@ table input {
 /* 結果タイトルコンテナ */
 .results-title-container {
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-start;
     align-items: center;
     margin-bottom: 2px;
+    gap: 8px;
 }
 
-.results-title-container h3 {
+.results-title-container h5 {
     margin: 0;
 }
 
