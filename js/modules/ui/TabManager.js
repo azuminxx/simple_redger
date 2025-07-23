@@ -222,7 +222,12 @@ class TabManager {
         // セレクトボックスをリセット
         const selects = tabContent.querySelectorAll('select');
         selects.forEach(select => {
-            select.selectedIndex = 0;
+            if (select.multiple) {
+                // 複数選択リストボックスは全て未選択に
+                Array.from(select.options).forEach(option => option.selected = false);
+            } else {
+                select.selectedIndex = 0;
+            }
         });
 
         // チェックボックスをクリア

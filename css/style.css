@@ -61,7 +61,7 @@
 .tab-menu {
     display: flex;
     border-bottom: 2px solid #dee2e6;
-    margin-bottom: 20px;
+    margin-bottom: 5px;
     gap: 2px;
 }
 
@@ -182,7 +182,7 @@ table input {
     display: flex;
     gap: 10px;
     justify-content: center;
-    margin-top: 10px;
+    margin-top: 5px;
 }
 
 .search-button,
@@ -649,7 +649,7 @@ div.integrated-table-container table input {
 div.search-form .field-group select,
 div.search-form .field-group input {
     font-size: 12px;
-    padding: 4px 6px;
+    padding: 2px 6px;
 } 
 
 /* タブボタンのフォントサイズを確実に適用 */
@@ -657,7 +657,7 @@ div.search-form .field-group input {
 div.tab-menu .tab-button,
 button.tab-button {
     font-size: 12px;
-    padding: 8px 14px;
+    padding: 6px 14px;
 } 
 
 /* モーダルドラッグ機能のスタイル */
@@ -751,5 +751,15 @@ td.editable-cell select,
     font-size: 18px;
     text-align: center;
     vertical-align: middle;
+} 
+
+.search-form select[multiple] {
+    min-height: 120px;
+    min-width: 80px;
+    height: auto;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: none;
 } 
 

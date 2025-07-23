@@ -112,10 +112,18 @@ class SearchEngine {
                         conditions[field.code] = values;
                     }
                 } else if (field.type === 'dropdown' || field.type === 'radio') {
-                    // ドロップダウン/ラジオボタンの場合は単一選択
+                    // ドロップダウン/ラジオボタンの場合
                     const select = document.getElementById(`${field.code}-${appId}`);
-                    if (select && select.value && select.value.trim() !== '') {
-                        conditions[field.code] = select.value.trim();
+                    if (select) {
+                        if (select.multiple) {
+                            // 複数選択リストボックス
+                            const selected = Array.from(select.selectedOptions).map(opt => opt.value).filter(v => v !== '');
+                            if (selected.length > 0) {
+                                conditions[field.code] = selected;
+                            }
+                        } else if (select.value && select.value.trim() !== '') {
+                            conditions[field.code] = select.value.trim();
+                        }
                     }
                 } else {
                     // その他のフィールドは単一値を取得
@@ -149,7 +157,11 @@ class SearchEngine {
                     continue;
                 }
                 
-                if (fieldConfig.type === 'dropdown' || fieldConfig.type === 'radio') {
+                if ((fieldConfig.type === 'dropdown' || fieldConfig.type === 'radio') && Array.isArray(value)) {
+                    // 複数選択時はin ("A","B")形式
+                    const quoted = value.map(v => `"${v}"`).join(',');
+                    queryParts.push(`${fieldCode} in (${quoted})`);
+                } else if (fieldConfig.type === 'dropdown' || fieldConfig.type === 'radio') {
                     queryParts.push(`${fieldCode} in ("${value}")`);
                 } else if (fieldConfig.type === 'checkbox' && Array.isArray(value)) {
                     // チェックボックスの場合は OR 条件で結合

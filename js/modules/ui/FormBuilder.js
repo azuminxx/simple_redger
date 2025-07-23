@@ -96,9 +96,8 @@ class FormBuilder {
         inputHTML += `<label for="${fieldId}">${field.label}:</label>`;
 
         if (field.type === 'dropdown' || field.type === 'radio') {
-            inputHTML += `<select id="${fieldId}" name="${field.code}">`;
-            inputHTML += `<option value="">選択してください</option>`;
-            
+            // 複数選択可能なリストボックスに変更
+            inputHTML += `<select id="${fieldId}" name="${field.code}" multiple size="5">`;
             if (field.options && field.options.length > 0) {
                 field.options.forEach(option => {
                     const optionValue = option.label || option.value || option;
@@ -108,7 +107,6 @@ class FormBuilder {
                     }
                 });
             }
-            
             inputHTML += `</select>`;
         } else if (field.type === 'checkbox') {
             inputHTML += `<div class="checkbox-group">`;
