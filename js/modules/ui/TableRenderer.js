@@ -42,6 +42,7 @@ class TableRenderer {
      * 統合データをテーブル表示
      */
     displayIntegratedTable(appId, integratedData) {
+        // console.log('[DEBUG] displayIntegratedTable called', { appId, integratedDataLength: integratedData.length });
         // 結果表示エリアを取得
         const resultsContainer = document.getElementById(CONFIG.system.resultsContainerId);
         if (!resultsContainer) {
@@ -72,9 +73,51 @@ class TableRenderer {
 
         // タイトルと保存ボタンのコンテナを作成
         const titleContainer = DOMHelper.createElement('div', {}, 'results-title-container');
-        
+
+        // --- 追加: 整合性件数の集計 ---
+        // let normalCount = 0;
+        // let inconsistentCount = 0;
+        // console.log('[DEBUG] consistencyMap:', window.consistencyMap, 'currentSearchResults:', this.currentSearchResults);
+        // if (window.consistencyMap && this.currentSearchResults) {
+        //     this.currentSearchResults.forEach((row, idx) => {
+        //         const key = window.virtualScroll.getRecordIdFromRow(row);
+        //         const val = window.consistencyMap.get(key);
+        //         if (val === true) normalCount++;
+        //         else if (val === false) inconsistentCount++;
+        //         // デバッグ: キーと値を出力
+        //         if (normalCount === 0 && inconsistentCount === 0 && idx < 10) {
+        //             console.log('[DEBUG] row', idx, row);
+        //             console.log('[DEBUG] key', key, 'val', val);
+        //         }
+        //     });
+        //     // デバッグ: 全体のマップと件数
+        //     if (normalCount === 0 && inconsistentCount === 0) {
+        //         console.log('[DEBUG] consistencyMap', window.consistencyMap);
+        //         console.log('[DEBUG] currentSearchResults', this.currentSearchResults);
+        //     }
+        // }
+        // --- ここまで追加 ---
+
+        // 仮想スクロール対応のテーブルコンテナを作成
+        const tableContainer = this.virtualScroll.createVirtualScrollTable(integratedData);
+
+        // --- ここでconsistencyMapが生成されるので、ここから下でカウント ---
+        let normalCount = 0;
+        let inconsistentCount = 0;
+        if (window.consistencyMap && this.currentSearchResults) {
+            this.currentSearchResults.forEach((row, idx) => {
+                const key = window.virtualScroll.getRecordIdFromRow(row);
+                const val = window.consistencyMap.get(key);
+                if (val === true) normalCount++;
+                else if (val === false) inconsistentCount++;
+            });
+        }
+        // --- ここまで追加 ---
+
         const title = DOMHelper.createElement('h5');
-        title.textContent = `統合検索結果（${integratedData.length}件）`;
+        // 件数表示を拡張
+        title.textContent = `統合検索結果：${integratedData.length}件（` +
+            `正常：${normalCount}件／不整合：${inconsistentCount}件）`;
         titleContainer.appendChild(title);
         
         // 保存ボタンを作成
@@ -87,9 +130,6 @@ class TableRenderer {
         
         integratedResultsContainer.appendChild(titleContainer);
 
-        // 仮想スクロール対応のテーブルコンテナを作成
-        const tableContainer = this.virtualScroll.createVirtualScrollTable(integratedData);
-        
         integratedResultsContainer.appendChild(tableContainer);
         resultsContainer.appendChild(integratedResultsContainer);
     }
