@@ -92,7 +92,14 @@ class TabManager {
 
         // 設定タブのタブコンテンツを追加
         const settingsContent = DOMHelper.createElement('div', { id: 'tab-settings' }, 'tab-content');
-        settingsContent.innerHTML = '<div style="padding: 24px; text-align: center;">ここに設定UIを実装</div>';
+        // ボタンと説明文を追加
+        const exportBtn = DOMHelper.createElement('button', {}, 'export-all-btn');
+        exportBtn.textContent = '全データエクスポート（CSV）';
+        exportBtn.addEventListener('click', () => this.exportAllData());
+        settingsContent.appendChild(exportBtn);
+        const info = DOMHelper.createElement('div', {}, 'export-info');
+        info.textContent = '全台帳（PC台帳・内線台帳・座席台帳）を検索条件なしで全件抽出し、ユーザーリストはPC台帳のユーザーIDでin検索してマージしたCSVを出力します。';
+        settingsContent.appendChild(info);
         tabContainer.appendChild(settingsContent);
 
         return tabContainer;
@@ -285,6 +292,130 @@ class TabManager {
         });
     }
 
+    // 全データエクスポート処理
+    async exportAllData() {
+        try {
+            // DataIntegratorインスタンス取得
+            const dataIntegrator = window.dataIntegrator || new DataIntegrator();
+            // 1. 各台帳の全件取得
+            const allLedgerData = {};
+            for (const appId of Object.keys(CONFIG.apps)) {
+                // 検索条件なしで全件取得
+                allLedgerData[appId] = await window.searchEngine.searchRecordsWithQuery(appId, '');
+            }
+            console.log(allLedgerData);
+            // 2. ユーザーリスト抽出
+            const userListRecords = await dataIntegrator.searchUserListByUserIds(allLedgerData);
+            console.log(userListRecords);
+            // 3. データをマージ（統合キーで3台帳をマージ→ユーザーIDでユーザーリストをマージ）
+            // ① 3台帳を統合キーでマージ
+            const mergedByIntegrationKey = {};
+            for (const appId of Object.keys(CONFIG.apps)) {
+                const ledgerName = CONFIG.apps[appId].name;
+                (allLedgerData[appId] || []).forEach(record => {
+                    const key = record[CONFIG.integrationKey]?.value;
+                    if (!key) return;
+                    if (!mergedByIntegrationKey[key]) mergedByIntegrationKey[key] = {};
+                    mergedByIntegrationKey[key][ledgerName] = record;
+                });
+            }
+            // ② ユーザーリストをユーザーIDでマージ
+            const userListMap = {};
+            userListRecords.forEach(user => {
+                const userId = user[CONFIG.userList.primaryKey]?.value;
+                if (userId) userListMap[userId] = user;
+            });
+            const finalMerged = [];
+            Object.entries(mergedByIntegrationKey).forEach(([integrationKey, ledgerGroup]) => {
+                const mergedRecord = {};
+                // 各台帳のフィールドを展開
+                Object.entries(ledgerGroup).forEach(([ledgerName, record]) => {
+                    Object.entries(record).forEach(([field, val]) => {
+                        // 各台帳の統合キーフィールドは除外
+                        if (field === CONFIG.integrationKey) return;
+                        mergedRecord[`${ledgerName}_${field}`] = val?.value ?? val;
+                    });
+                });
+                // 統合キーを1つだけ追加
+                mergedRecord['統合キー'] = integrationKey;
+                // ユーザーIDでユーザーリスト情報を付与
+                const userId = mergedRecord['PC台帳_ユーザーID'];
+                if (userId && userListMap[userId]) {
+                    Object.entries(userListMap[userId]).forEach(([field, val]) => {
+                        if (field === '$revision') return; // $revisionは除外
+                        mergedRecord[`ユーザーリスト_${field}`] = val?.value ?? val;
+                    });
+                }
+                finalMerged.push(mergedRecord);
+            });
+            // 4. CSV出力
+            const csv = this.convertToCSV(finalMerged);
+            this.downloadCSV(csv, 'all_data_export.csv');
+        } catch (error) {
+            alert('エクスポート中にエラーが発生しました: ' + error.message);
+            console.error(error);
+        }
+    }
+
+    // 配列→CSV変換
+    convertToCSV(records) {
+        if (!records.length) return '';
+        let allFields = Array.from(new Set(records.flatMap(r => Object.keys(r))));
+        allFields = ['統合キー', ...allFields.filter(f => f !== '統合キー' && !f.endsWith('_' + CONFIG.integrationKey))];
+        console.log(records);
+        function formatToJST(datetimeStr) {
+            if (!datetimeStr) return '';
+            const date = new Date(datetimeStr);
+            if (isNaN(date)) return datetimeStr;
+            const yyyy = date.getFullYear();
+            const mm = String(date.getMonth() + 1).padStart(2, '0');
+            const dd = String(date.getDate()).padStart(2, '0');
+            const hh = String(date.getHours()).padStart(2, '0');
+            const min = String(date.getMinutes()).padStart(2, '0');
+            return `${yyyy}/${mm}/${dd} ${hh}:${min}`;
+        }
+
+        // ISO8601（Z付き）形式かどうか
+        function isISO8601Z(str) {
+            return typeof str === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(str);
+        }
+
+        const header = allFields.join(',');
+        const rows = records.map(r =>
+            allFields.map(f => {
+                let v = r[f];
+                if (v && typeof v === 'object' && 'value' in v) v = v.value;
+                // 作成者・更新者など{code, name}オブジェクトの場合はcodeのみ出力
+                if (v && typeof v === 'object' && 'code' in v && 'name' in v) v = v.code;
+                if (v === undefined || v === null) v = '';
+                // ISO8601（Z付き）形式ならJST変換
+                if (isISO8601Z(v)) {
+                    v = formatToJST(v);
+                }
+                v = String(v).replace(/"/g, '""');
+                if (v.includes(',') || v.includes('"') || v.includes('\n')) v = `"${v}"`;
+                return v;
+            }).join(',')
+        );
+        return [header, ...rows].join('\r\n');
+    }
+
+    // CSVダウンロード
+    downloadCSV(csv, filename) {
+        // UTF-8 BOMを付与
+        const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+        const blob = new Blob([bom, csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }, 100);
+    }
 }
 
 // グローバルに公開
