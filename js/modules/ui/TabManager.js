@@ -94,11 +94,13 @@ class TabManager {
         const settingsContent = DOMHelper.createElement('div', { id: 'tab-settings' }, 'tab-content');
         // ボタンと説明文を追加
         const exportBtn = DOMHelper.createElement('button', {}, 'export-all-btn');
-        exportBtn.textContent = '全データエクスポート（CSV）';
+        exportBtn.textContent = '全データ抽出';
+        exportBtn.style.fontSize = '12px';
         exportBtn.addEventListener('click', () => this.exportAllData());
         settingsContent.appendChild(exportBtn);
         const info = DOMHelper.createElement('div', {}, 'export-info');
-        info.textContent = '全台帳（PC台帳・内線台帳・座席台帳）を検索条件なしで全件抽出し、ユーザーリストはPC台帳のユーザーIDでin検索してマージしたCSVを出力します。';
+        info.textContent = '※全台帳を無条件でCSVファイル出力します';
+        info.style.fontSize = '12px';
         settingsContent.appendChild(info);
         tabContainer.appendChild(settingsContent);
 
@@ -112,10 +114,16 @@ class TabManager {
         const tabMenu = DOMHelper.createElement('div', {}, 'tab-menu');
 
         // 検索用タブ（左寄せ）
+        const ledgerIcons = {
+            'PC台帳': '💻',
+            '内線台帳': '📞',
+            '座席台帳': '💺'
+        };
         Object.entries(CONFIG.apps).forEach(([appId, appConfig]) => {
             const tabButton = DOMHelper.createElement('button', {}, 'tab-button');
             tabButton.setAttribute('data-app', appId);
-            tabButton.textContent = appConfig.name;
+            const icon = ledgerIcons[appConfig.name] || '';
+            tabButton.textContent = icon + ' ' + appConfig.name;
             tabButton.addEventListener('click', () => this.switchTab(appId));
             tabMenu.appendChild(tabButton);
         });
