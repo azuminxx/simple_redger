@@ -19,6 +19,11 @@ class FormBuilder {
             displayFields.forEach(fieldCode => {
                 // 統合キーは除外
                 if (fieldCode !== CONFIG.integrationKey) {
+                    // searchMenuフラグで表示制御
+                    const columnConfig = CONFIG.integratedTableConfig.columns.find(col => col.fieldCode === fieldCode && col.appId == appId);
+                    if (columnConfig && columnConfig.searchMenu === false) {
+                        return; // 表示しない
+                    }
                     const field = fields.find(f => f.code === fieldCode);
                     if (field) {
                         formHTML += this.createFieldInput(field, appConfig.name, appId);

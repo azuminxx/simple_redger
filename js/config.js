@@ -51,23 +51,168 @@ const CONFIG = {
     integratedTableConfig: {
         columns: [
             // PC台帳グループ
-            { key: 'PC台帳_PC番号', appId: 6, ledger: 'PC台帳', fieldCode: 'PC番号', primaryKey: true, label: 'PC番号', width: '120px', readOnly: true, required: false },
-            { key: 'PC台帳_ユーザーID', appId: 6, ledger: 'PC台帳', fieldCode: 'ユーザーID', primaryKey: false, label: 'ユーザーID', width: '100px', readOnly: false, required: false },
-            { key: 'PC台帳_ユーザー名', appId: 13, ledger: 'PC台帳', fieldCode: 'ユーザー名', primaryKey: false, label: 'ユーザー名', width: '120px', readOnly: true, isUserListDerived: true, required: false },
-            { key: 'PC台帳_ユーザー部署', appId: 13, ledger: 'PC台帳', fieldCode: 'ユーザー部署', primaryKey: false, label: 'ユーザー部署', width: '120px', readOnly: true, isUserListDerived: true, required: false },
-            { key: 'PC台帳_PC用途', appId: 6, ledger: 'PC台帳', fieldCode: 'PC用途', primaryKey: false, label: 'PC用途', width: '130px', readOnly: false, required: true },
-            { key: 'PC台帳_test1', appId: 6, ledger: 'PC台帳', fieldCode: 'test1', primaryKey: false, label: 'test1', width: '100px', readOnly: false, required: false },
-            { key: 'PC台帳_sample', appId: 6, ledger: 'PC台帳', fieldCode: 'sample', primaryKey: false, label: 'sample', width: '100px', readOnly: false, required: false },
-            
+            {
+                key:        'PC台帳_PC番号',
+                appId:      6,
+                ledger:     'PC台帳',
+                fieldCode:  'PC番号',
+                primaryKey: true,
+                label:      'PC番号',
+                width:      '120px',
+                readOnly:   true,
+                required:   false,
+                searchMenu: true
+            },
+            {
+                key:        'PC台帳_ユーザーID',
+                appId:      6,
+                ledger:     'PC台帳',
+                fieldCode:  'ユーザーID',
+                primaryKey: false,
+                label:      'ユーザーID',
+                width:      '100px',
+                readOnly:   false,
+                required:   false,
+                searchMenu: true
+            },
+            {
+                key:        'PC台帳_ユーザー名',
+                appId:      13,
+                ledger:     'PC台帳',
+                fieldCode:  'ユーザー名',
+                primaryKey: false,
+                label:      'ユーザー名',
+                width:      '120px',
+                readOnly:   true,
+                isUserListDerived: true,
+                required:   false,
+                searchMenu: false
+            },
+            {
+                key:        'PC台帳_ユーザー部署',
+                appId:      13,
+                ledger:     'PC台帳',
+                fieldCode:  'ユーザー部署',
+                primaryKey: false,
+                label:      'ユーザー部署',
+                width:      '120px',
+                readOnly:   true,
+                isUserListDerived: true,
+                required:   false,
+                searchMenu: false
+            },
+            {
+                key:        'PC台帳_PC用途',
+                appId:      6,
+                ledger:     'PC台帳',
+                fieldCode:  'PC用途',
+                primaryKey: false,
+                label:      'PC用途',
+                width:      '130px',
+                readOnly:   false,
+                required:   true,
+                searchMenu: true
+            },
+            {
+                key:        'PC台帳_test1',
+                appId:      6,
+                ledger:     'PC台帳',
+                fieldCode:  'test1',
+                primaryKey: false,
+                label:      'test1',
+                width:      '100px',
+                readOnly:   false,
+                required:   false,
+                searchMenu: false
+            },
+            {
+                key:        'PC台帳_sample',
+                appId:      6,
+                ledger:     'PC台帳',
+                fieldCode:  'sample',
+                primaryKey: false,
+                label:      'sample',
+                width:      '100px',
+                readOnly:   false,
+                required:   false,
+                searchMenu: true
+            },
+
             // 内線台帳グループ
-            { key: '内線台帳_内線番号', appId: 7, ledger: '内線台帳', fieldCode: '内線番号', primaryKey: true, label: '内線番号', width: '90px', readOnly: true, required: false },
-            { key: '内線台帳_電話機種別', appId: 7, ledger: '内線台帳', fieldCode: '電話機種別', primaryKey: false, label: '電話機種別', width: '100px', readOnly: false, required: true },
-            
+            {
+                key:        '内線台帳_内線番号',
+                appId:      7,
+                ledger:     '内線台帳',
+                fieldCode:  '内線番号',
+                primaryKey: true,
+                label:      '内線番号',
+                width:      '90px',
+                readOnly:   true,
+                required:   false,
+                searchMenu: true
+            },
+            {
+                key:        '内線台帳_電話機種別',
+                appId:      7,
+                ledger:     '内線台帳',
+                fieldCode:  '電話機種別',
+                primaryKey: false,
+                label:      '電話機種別',
+                width:      '100px',
+                readOnly:   false,
+                required:   true,
+                searchMenu: true
+            },
+
             // 座席台帳グループ
-            { key: '座席台帳_座席拠点', appId: 8, ledger: '座席台帳', fieldCode: '座席拠点', primaryKey: false, label: '座席拠点', width: '80px', readOnly: false, required: true },
-            { key: '座席台帳_階数', appId: 8, ledger: '座席台帳', fieldCode: '階数', primaryKey: false, label: '階数', width: '60px', readOnly: false, required: true },
-            { key: '座席台帳_座席番号', appId: 8, ledger: '座席台帳', fieldCode: '座席番号', primaryKey: true, label: '座席番号', width: '120px', readOnly: true, required: false },
-            { key: '座席台帳_座席部署', appId: 8, ledger: '座席台帳', fieldCode: '座席部署', primaryKey: false, label: '座席部署', width: '80px', readOnly: false, required: false }
+            {
+                key:        '座席台帳_座席拠点',
+                appId:      8,
+                ledger:     '座席台帳',
+                fieldCode:  '座席拠点',
+                primaryKey: false,
+                label:      '座席拠点',
+                width:      '80px',
+                readOnly:   false,
+                required:   true,
+                searchMenu: true
+            },
+            {
+                key:        '座席台帳_階数',
+                appId:      8,
+                ledger:     '座席台帳',
+                fieldCode:  '階数',
+                primaryKey: false,
+                label:      '階数',
+                width:      '60px',
+                readOnly:   false,
+                required:   true,
+                searchMenu: false
+            },
+            {
+                key:        '座席台帳_座席番号',
+                appId:      8,
+                ledger:     '座席台帳',
+                fieldCode:  '座席番号',
+                primaryKey: true,
+                label:      '座席番号',
+                width:      '120px',
+                readOnly:   true,
+                required:   false,
+                searchMenu: true
+            },
+            {
+                key:        '座席台帳_座席部署',
+                appId:      8,
+                ledger:     '座席台帳',
+                fieldCode:  '座席部署',
+                primaryKey: false,
+                label:      '座席部署',
+                width:      '80px',
+                readOnly:   false,
+                required:   false,
+                searchMenu: true
+            }
         ]
     },
 
