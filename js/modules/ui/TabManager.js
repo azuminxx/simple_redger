@@ -360,9 +360,36 @@ class TabManager {
     // 配列→CSV変換
     convertToCSV(records) {
         if (!records.length) return '';
+        // 整合判定カラムを追加
+        const dataIntegrator = window.dataIntegrator || new DataIntegrator();
+        records.forEach(record => {
+            const integrationKey = record['統合キー'];
+            const parsed = dataIntegrator.parseIntegrationKey(integrationKey);
+            let isConsistent = true;
+            // PC台帳_PC番号
+            let pc = record['PC台帳_PC番号'] ?? '';
+            if (pc && typeof pc === 'object' && 'value' in pc) pc = pc.value ?? '';
+            let parsedPC = parsed.PC ?? '';
+            if (pc !== parsedPC) isConsistent = false;
+            // 内線台帳_内線番号
+            let ext = record['内線台帳_内線番号'] ?? '';
+            if (ext && typeof ext === 'object' && 'value' in ext) ext = ext.value ?? '';
+            let parsedEXT = parsed.EXT ?? '';
+            if (ext !== parsedEXT) isConsistent = false;
+            // 座席台帳_座席番号
+            let seat = record['座席台帳_座席番号'] ?? '';
+            if (seat && typeof seat === 'object' && 'value' in seat) seat = seat.value ?? '';
+            let parsedSEAT = parsed.SEAT ?? '';
+            if (seat !== parsedSEAT) isConsistent = false;
+            record['整合判定'] = isConsistent ? '整合' : '不整合';
+        });
+
+        // 必ずallFieldsを生成・フィルタ
         let allFields = Array.from(new Set(records.flatMap(r => Object.keys(r))));
         allFields = allFields.filter(f => !f.endsWith('_$revision') && !f.endsWith('_$id'));
         allFields = allFields.filter(f => f !== '統合キー' && !f.endsWith('_' + CONFIG.integrationKey));
+        // 整合判定を先頭に
+        allFields = ['整合判定', '統合キー', ...allFields.filter(f => f !== '整合判定' && f !== '統合キー')];
 
         // 並び順制御
         const mainOrder = [
@@ -376,22 +403,24 @@ class TabManager {
             'レコード番号', '作成者', '作成日時', '更新者', '更新日時', 'PC番号', '内線番号', '座席番号'
         ];
 
+        // --- ここから必須ユーティリティ関数（削除禁止） ---
         // ISO8601（Z付き）形式かどうか
         function isISO8601Z(str) {
             return typeof str === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(str);
         }
-        
+        // JST変換関数
         function formatToJST(datetimeStr) {
-                    if (!datetimeStr) return '';
-                    const date = new Date(datetimeStr);
-                    if (isNaN(date)) return datetimeStr;
-                    const yyyy = date.getFullYear();
-                    const mm = String(date.getMonth() + 1).padStart(2, '0');
-                    const dd = String(date.getDate()).padStart(2, '0');
-                    const hh = String(date.getHours()).padStart(2, '0');
-                    const min = String(date.getMinutes()).padStart(2, '0');
-                    return `${yyyy}/${mm}/${dd} ${hh}:${min}`;
+            if (!datetimeStr) return '';
+            const date = new Date(datetimeStr);
+            if (isNaN(date)) return datetimeStr;
+            const yyyy = date.getFullYear();
+            const mm = String(date.getMonth() + 1).padStart(2, '0');
+            const dd = String(date.getDate()).padStart(2, '0');
+            const hh = String(date.getHours()).padStart(2, '0');
+            const min = String(date.getMinutes()).padStart(2, '0');
+            return `${yyyy}/${mm}/${dd} ${hh}:${min}`;
         }
+        // --- ここまで必須ユーティリティ関数（削除禁止） ---
         function groupFields(fields, groupName) {
             return fields.filter(f => f.startsWith(groupName + '_'));
         }
