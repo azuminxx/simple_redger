@@ -87,6 +87,10 @@
     font-weight: 600;
 }
 
+.tab-button.settings-tab {
+    margin-left: auto;
+}
+
 /* タブコンテンツ */
 .tab-content {
     display: none;

@@ -90,6 +90,11 @@ class TabManager {
             }
         }
 
+        // 設定タブのタブコンテンツを追加
+        const settingsContent = DOMHelper.createElement('div', { id: 'tab-settings' }, 'tab-content');
+        settingsContent.innerHTML = '<div style="padding: 24px; text-align: center;">ここに設定UIを実装</div>';
+        tabContainer.appendChild(settingsContent);
+
         return tabContainer;
     }
 
@@ -99,15 +104,21 @@ class TabManager {
     createTabMenu() {
         const tabMenu = DOMHelper.createElement('div', {}, 'tab-menu');
 
-        // 各台帳のタブを作成
+        // 検索用タブ（左寄せ）
         Object.entries(CONFIG.apps).forEach(([appId, appConfig]) => {
             const tabButton = DOMHelper.createElement('button', {}, 'tab-button');
             tabButton.setAttribute('data-app', appId);
             tabButton.textContent = appConfig.name;
             tabButton.addEventListener('click', () => this.switchTab(appId));
-            
             tabMenu.appendChild(tabButton);
         });
+
+        // 設定タブ（右寄せ）
+        const settingsTabButton = DOMHelper.createElement('button', {}, 'tab-button settings-tab');
+        settingsTabButton.setAttribute('data-app', 'settings');
+        settingsTabButton.textContent = '⚙️ 設定';
+        settingsTabButton.addEventListener('click', () => this.switchTab('settings'));
+        tabMenu.appendChild(settingsTabButton);
 
         return tabMenu;
     }
