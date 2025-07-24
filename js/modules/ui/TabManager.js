@@ -368,17 +368,14 @@ class TabManager {
             let isConsistent = true;
             // PC台帳_PC番号
             let pc = record['PC台帳_PC番号'] ?? '';
-            //if (pc && typeof pc === 'object' && 'value' in pc) pc = pc.value ?? '';
             let parsedPC = parsed.PC ?? '';
             if (pc !== parsedPC) isConsistent = false;
             // 内線台帳_内線番号
             let ext = record['内線台帳_内線番号'] ?? '';
-            //if (ext && typeof ext === 'object' && 'value' in ext) ext = ext.value ?? '';
             let parsedEXT = parsed.EXT ?? '';
             if (ext !== parsedEXT) isConsistent = false;
             // 座席台帳_座席番号
             let seat = record['座席台帳_座席番号'] ?? '';
-            //if (seat && typeof seat === 'object' && 'value' in seat) seat = seat.value ?? '';
             let parsedSEAT = parsed.SEAT ?? '';
             if (seat !== parsedSEAT) isConsistent = false;
             record['整合判定'] = isConsistent ? '整合' : '不整合';
@@ -393,6 +390,7 @@ class TabManager {
 
         // 並び順制御
         const mainOrder = [
+            '整合判定',
             '統合キー',
             'PC台帳',
             'ユーザーリスト',
@@ -437,7 +435,7 @@ class TabManager {
             // 残りはそのまま
             return [...ordered, ...fields];
         }
-        let finalFields = [];
+        let finalFields = ['整合判定'];
         mainOrder.forEach(group => {
             if (group === '統合キー') {
                 finalFields.push('統合キー');
