@@ -123,7 +123,8 @@
                     ledger: '操作',
                     fieldCode: 'change-flag',
                     appId: null,
-                    isChangeFlag: true
+                    isChangeFlag: true,
+                    width: '50px'
                 }, {
                     key: 'detail-link',
                     label: '📁',
@@ -139,7 +140,7 @@
                     fieldCode: 'consistency-check',
                     appId: null,
                     isConsistencyCheck: true,
-                    width: '70px'
+                    width: '50px'
                 }, ...dynamicColumns];
                 CONFIG.integratedTableConfig.columns = columnsWithSpecialColumns;
                 console.log(`📋 統合テーブル設定完了 (${dynamicColumns.length}列)`);

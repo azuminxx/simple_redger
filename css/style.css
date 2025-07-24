@@ -330,7 +330,7 @@ table input {
 .integrated-table th,
 .integrated-table td {
     padding: 6px 5px;
-    text-align: left;
+    text-align: center;
     border-right: 1px solid #dee2e6;
     border-bottom: 1px solid #dee2e6;
     overflow: hidden;
@@ -440,6 +440,21 @@ table input {
 .detail-link-cell a {
     display: inline-block;
     transition: transform 0.2s ease;
+}
+
+.detail-link-cell-link {
+    color: #007bff;
+    text-decoration: none;
+    font-size: 14px;
+    cursor: pointer;
+    display: block;
+    text-align: center;
+    padding: 4px;
+    transition: transform 0.2s ease;
+}
+
+.detail-link-cell-link.hovered {
+    transform: scale(1.2);
 }
 
 .change-flag-cell input[type="checkbox"] {
@@ -741,14 +756,14 @@ td.editable-cell select,
 } 
 
 .consistency-ok, .consistency-ng {
-    font-size: 18px;
+    font-size: 14px;
     text-align: center;
     vertical-align: middle;
 } 
 
 .integrated-table td.consistency-ok,
 .integrated-table td.consistency-ng {
-    font-size: 18px;
+    font-size: 14px;
     text-align: center;
     vertical-align: middle;
 } 

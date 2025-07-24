@@ -75,7 +75,7 @@ class DOMHelper {
         
         CONFIG.integratedTableConfig.columns.forEach((column, index) => {
             // 変更フラグ列は固定幅
-            const width = column.isChangeFlag ? '60px' : (column.width || CONFIG.system.defaultColumnWidth);
+            const width = column.isChangeFlag ? '50px' : (column.width || CONFIG.system.defaultColumnWidth);
             css += `.integrated-table .col-${index} { 
                 width: ${width} !important; 
                 min-width: ${width} !important; 

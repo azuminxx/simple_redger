@@ -1062,23 +1062,14 @@ class VirtualScroll {
             'data-record-index': recordIndex
         });
         link.textContent = '📁';
-        link.style.cssText = `
-            color: #007bff;
-            text-decoration: none;
-            font-size: 18px;
-            cursor: pointer;
-            display: block;
-            text-align: center;
-            padding: 4px;
-        `;
+        link.classList.add('detail-link-cell-link');
         
         // ホバーエフェクト
         link.addEventListener('mouseenter', () => {
-            link.style.transform = 'scale(1.2)';
-            link.style.transition = 'transform 0.2s ease';
+            link.classList.add('hovered');
         });
         link.addEventListener('mouseleave', () => {
-            link.style.transform = 'scale(1)';
+            link.classList.remove('hovered');
         });
 
         // クリックイベント
@@ -1091,7 +1082,7 @@ class VirtualScroll {
 
         td.appendChild(link);
         td.className = 'detail-link-cell';
-        td.style.cssText = 'text-align: center; vertical-align: middle;';
+        // インラインスタイルは削除
     }
 
 
