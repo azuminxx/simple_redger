@@ -361,28 +361,73 @@ class TabManager {
     convertToCSV(records) {
         if (!records.length) return '';
         let allFields = Array.from(new Set(records.flatMap(r => Object.keys(r))));
-        allFields = ['統合キー', ...allFields.filter(f => f !== '統合キー' && !f.endsWith('_' + CONFIG.integrationKey))];
-        console.log(records);
-        function formatToJST(datetimeStr) {
-            if (!datetimeStr) return '';
-            const date = new Date(datetimeStr);
-            if (isNaN(date)) return datetimeStr;
-            const yyyy = date.getFullYear();
-            const mm = String(date.getMonth() + 1).padStart(2, '0');
-            const dd = String(date.getDate()).padStart(2, '0');
-            const hh = String(date.getHours()).padStart(2, '0');
-            const min = String(date.getMinutes()).padStart(2, '0');
-            return `${yyyy}/${mm}/${dd} ${hh}:${min}`;
-        }
+        allFields = allFields.filter(f => !f.endsWith('_$revision') && !f.endsWith('_$id'));
+        allFields = allFields.filter(f => f !== '統合キー' && !f.endsWith('_' + CONFIG.integrationKey));
+
+        // 並び順制御
+        const mainOrder = [
+            '統合キー',
+            'PC台帳',
+            'ユーザーリスト',
+            '内線台帳',
+            '座席台帳'
+        ];
+        const fieldOrder = [
+            'レコード番号', '作成者', '作成日時', '更新者', '更新日時', 'PC番号', '内線番号', '座席番号'
+        ];
 
         // ISO8601（Z付き）形式かどうか
         function isISO8601Z(str) {
             return typeof str === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(str);
         }
+        
+        function formatToJST(datetimeStr) {
+                    if (!datetimeStr) return '';
+                    const date = new Date(datetimeStr);
+                    if (isNaN(date)) return datetimeStr;
+                    const yyyy = date.getFullYear();
+                    const mm = String(date.getMonth() + 1).padStart(2, '0');
+                    const dd = String(date.getDate()).padStart(2, '0');
+                    const hh = String(date.getHours()).padStart(2, '0');
+                    const min = String(date.getMinutes()).padStart(2, '0');
+                    return `${yyyy}/${mm}/${dd} ${hh}:${min}`;
+        }
+        function groupFields(fields, groupName) {
+            return fields.filter(f => f.startsWith(groupName + '_'));
+        }
+        function sortGroupFields(fields, groupName) {
+            const ordered = [];
+            fieldOrder.forEach(field => {
+                const fullName = groupName + '_' + field;
+                const idx = fields.indexOf(fullName);
+                if (idx !== -1) {
+                    ordered.push(fullName);
+                    fields.splice(idx, 1);
+                }
+            });
+            // 残りはそのまま
+            return [...ordered, ...fields];
+        }
+        let finalFields = [];
+        mainOrder.forEach(group => {
+            if (group === '統合キー') {
+                finalFields.push('統合キー');
+            } else {
+                let groupFieldsArr = groupFields(allFields, group);
+                groupFieldsArr = sortGroupFields(groupFieldsArr, group);
+                finalFields.push(...groupFieldsArr);
+            }
+        });
+        // 残りのフィールド（どのグループにも属さないもの）
+        const used = new Set(finalFields);
+        finalFields = finalFields.concat(allFields.filter(f => !used.has(f)));
 
-        const header = allFields.join(',');
+        // 1行目: 台帳名
+        const ledgerRow = finalFields.map(f => f === '統合キー' ? '統合キー' : f.split('_')[0]).join(',');
+        // 2行目: フィールド名
+        const fieldRow = finalFields.map(f => f === '統合キー' ? '統合キー' : f.split('_').slice(1).join('_')).join(',');
         const rows = records.map(r =>
-            allFields.map(f => {
+            finalFields.map(f => {
                 let v = r[f];
                 if (v && typeof v === 'object' && 'value' in v) v = v.value;
                 // 作成者・更新者など{code, name}オブジェクトの場合はcodeのみ出力
@@ -397,7 +442,7 @@ class TabManager {
                 return v;
             }).join(',')
         );
-        return [header, ...rows].join('\r\n');
+        return [ledgerRow, fieldRow, ...rows].join('\r\n');
     }
 
     // CSVダウンロード
