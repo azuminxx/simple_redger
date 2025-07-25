@@ -102,7 +102,7 @@ class TableRenderer {
         searchBoxWrapper.style.alignItems = 'center';
         searchBoxWrapper.style.gap = '8px';
         const searchLabel = DOMHelper.createElement('label');
-        searchLabel.textContent = 'テーブル内検索:';
+        searchLabel.textContent = '🔎テーブル内検索:';
         searchLabel.style.fontWeight = '600';
         searchLabel.style.fontSize = '13px';
         searchLabel.style.color = '#495057';
@@ -118,6 +118,7 @@ class TableRenderer {
         searchInput.style.fontSize = '12px';
         searchInput.style.borderRadius = '4px';
         searchInput.style.padding = '4px';
+        searchInput.autocomplete = 'off';
         searchInput.id = 'table-search-input';
         // 検索用データの保持
         this._originalIntegratedData = integratedData.slice();
