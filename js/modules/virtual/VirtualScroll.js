@@ -18,7 +18,10 @@ class VirtualScroll {
         const container = DOMHelper.createElement('div', {}, 'integrated-table-container');
         
         // 動的サイズ調整を適用
-        this.applyDynamicSizing(container);
+        //this.applyDynamicSizing(container);
+
+        // 動的CSSを生成してテーブル幅を設定
+        DOMHelper.generateTableWidthCSS();
         
         // 仮想スクロールコンテナ（ボディ専用）
         const scrollContainer = DOMHelper.createElement('div', {}, 'virtual-scroll-container');
@@ -124,8 +127,6 @@ class VirtualScroll {
             }, 0);
         }
         
-        // 高さ調整関数・リサイズイベントリスナーの追加を削除
-        
         // 高さ調整関数
         function adjustTableHeight() {
             const selectors = [
@@ -153,11 +154,11 @@ class VirtualScroll {
     /**
      * 動的サイズ調整を適用
      */
-    applyDynamicSizing(container) {
-        // 動的CSSを生成してテーブル幅を設定
-        DOMHelper.generateTableWidthCSS();
+    // applyDynamicSizing(container) {
+    //     // 動的CSSを生成してテーブル幅を設定
+    //     DOMHelper.generateTableWidthCSS();
    
-    }
+    // }
 
     /**
      * ヘッダーテーブルを作成（固定表示用）
@@ -197,7 +198,7 @@ class VirtualScroll {
         }
     }
 
-        /**
+    /**
      * 元の値を保存
      */
     saveOriginalValues(data) {
@@ -536,6 +537,11 @@ class VirtualScroll {
         // 既存の行をクリア
         tbody.innerHTML = '';
         
+        // 主キー用フィールドコードリスト（configから動的取得）
+        const copyFieldCodes = CONFIG.integratedTableConfig.columns
+            .filter(col => col.primaryKey)
+            .map(col => col.fieldCode);
+        
         // 表示範囲の行を作成
         for (let i = startIndex; i < endIndex; i++) {
             if (i >= data.length) break;
@@ -543,8 +549,6 @@ class VirtualScroll {
             const record = data[i];
             const row = DOMHelper.createElement('tr');
             row.setAttribute('data-record-index', i);
-            
-
             
             // 各カラムのセルを作成
             for (let columnIndex = 0; columnIndex < CONFIG.integratedTableConfig.columns.length; columnIndex++) {
@@ -568,7 +572,23 @@ class VirtualScroll {
                         td.setAttribute(`data-record-id-${column.ledger}`, recordIdValue);
                     }
                 }
-                
+
+                // --- ダブルクリックコピー機能追加 ---
+                if (copyFieldCodes.includes(column.fieldCode) && column.readOnly) {
+                    td.style.cursor = 'pointer';
+                    td.ondblclick = (e) => {
+                        // 分離ボタンがある場合は値部分のみコピー
+                        const valueSpan = td.querySelector('.cell-value');
+                        const text = valueSpan ? valueSpan.textContent : td.textContent;
+                        if (text && text !== '-') {
+                            navigator.clipboard.writeText(text).then(() => {
+                                showCopyToast('コピーしました');
+                            });
+                        }
+                    };
+                }
+                // --- ここまで追加 ---
+
                 if (column.isChangeFlag) {
                     // 変更フラグ列の場合はチェックボックスを作成
                     const checkbox = DOMHelper.createElement('input');
@@ -618,7 +638,11 @@ class VirtualScroll {
                     } else {
                         // 主キーフィールドの場合は分離ボタンも追加
                         if (column.primaryKey && value && value.trim() !== '') {
-                            this.createCellWithSeparateButton(td, value, i, column);
+                            // 値部分をspanでラップ
+                            const valueSpan = DOMHelper.createElement('span', {}, 'cell-value');
+                            valueSpan.textContent = value;
+                            td.appendChild(valueSpan);
+                            this.createCellWithSeparateButton(td, value, i, column, true); // true: appendOnlyButton
                         } else {
                             td.textContent = value;
                         }
@@ -1090,10 +1114,10 @@ class VirtualScroll {
     /**
      * 主キーフィールドのセルに分離ボタンを追加
      */
-    createCellWithSeparateButton(td, value, recordIndex, column) {
-        // テキストを表示
-        td.textContent = value;
-
+    createCellWithSeparateButton(td, value, recordIndex, column, appendOnlyButton = false) {
+        if (!appendOnlyButton) {
+            td.textContent = value;
+        }
         // 分離ボタンを作成
         const separateButton = DOMHelper.createElement('button', {
             type: 'button',
@@ -1101,23 +1125,19 @@ class VirtualScroll {
             'data-field-key': column.key,
             'data-field-code': column.fieldCode
         }, 'separate-button');
-        separateButton.textContent = '分離';
+        separateButton.innerHTML = '分<br>離';
 
         // ボタンのイベントリスナー
         separateButton.addEventListener('click', (event) => {
             event.preventDefault();
             event.stopPropagation();
-            
             const fieldCode = event.target.getAttribute('data-field-code');
-            
-            // CellSwapperの分離処理を呼び出し
             if (window.tableRenderer && window.tableRenderer.cellSwapper) {
                 window.tableRenderer.cellSwapper.separateLedger(recordIndex, fieldCode);
             } else {
                 console.error('❌ CellSwapperが見つかりません');
             }
         });
-
         // ボタンをセルに追加
         td.appendChild(separateButton);
     }
@@ -1153,3 +1173,29 @@ class VirtualScroll {
 
 // グローバルに公開
 window.VirtualScroll = VirtualScroll; 
+
+// ===== トースト表示用関数をファイル末尾に追加 =====
+function showCopyToast(message) {
+    let toast = document.getElementById('copy-toast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'copy-toast';
+        toast.style.position = 'fixed';
+        toast.style.bottom = '40px';
+        toast.style.left = '50%';
+        toast.style.transform = 'translateX(-50%)';
+        toast.style.background = 'rgba(0,0,0,0.8)';
+        toast.style.color = '#fff';
+        toast.style.padding = '8px 24px';
+        toast.style.borderRadius = '6px';
+        toast.style.zIndex = 9999;
+        toast.style.fontSize = '1.1em';
+        document.body.appendChild(toast);
+    }
+    toast.textContent = message;
+    toast.style.display = 'block';
+    setTimeout(() => {
+        toast.style.display = 'none';
+    }, 1200);
+}
+// ===== ここまで追加 ===== 

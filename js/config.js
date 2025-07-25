@@ -58,7 +58,7 @@ const CONFIG = {
                 fieldCode:  'PC番号',
                 primaryKey: true,
                 label:      'PC番号',
-                width:      '120px',
+                width:      '150px',
                 readOnly:   true,
                 required:   false,
                 searchMenu: true
@@ -146,7 +146,7 @@ const CONFIG = {
                 fieldCode:  '内線番号',
                 primaryKey: true,
                 label:      '内線番号',
-                width:      '90px',
+                width:      '120px',
                 readOnly:   true,
                 required:   false,
                 searchMenu: true
@@ -196,7 +196,7 @@ const CONFIG = {
                 fieldCode:  '座席番号',
                 primaryKey: true,
                 label:      '座席番号',
-                width:      '120px',
+                width:      '150px',
                 readOnly:   true,
                 required:   false,
                 searchMenu: true

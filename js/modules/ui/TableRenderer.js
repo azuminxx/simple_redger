@@ -96,6 +96,62 @@ class TableRenderer {
             `正常：${normalCount}件／不整合：${inconsistentCount}件）`;
         titleContainer.appendChild(title);
         
+        // ===== 検索ボックス追加（タイトルと保存ボタンの間） =====
+        const searchBoxWrapper = DOMHelper.createElement('div');
+        searchBoxWrapper.style.display = 'flex';
+        searchBoxWrapper.style.alignItems = 'center';
+        searchBoxWrapper.style.gap = '8px';
+        const searchLabel = DOMHelper.createElement('label');
+        searchLabel.textContent = 'テーブル内検索:';
+        searchLabel.style.fontWeight = '600';
+        searchLabel.style.fontSize = '13px';
+        searchLabel.style.color = '#495057';
+        searchLabel.htmlFor = 'table-search-input';
+        searchLabel.style.background = '#f4f4f4';
+        const searchInput = DOMHelper.createElement('input');
+        searchInput.type = 'text';
+        searchInput.placeholder = 'テーブル全体から検索（カンマ・スペース区切りで複数検索可）';
+        searchInput.className = 'field-group-input';
+        searchInput.style.width = '500px';
+        searchInput.style.marginRight = '100px';
+        searchInput.style.border = '1px solid #ced4da';
+        searchInput.style.fontSize = '12px';
+        searchInput.style.borderRadius = '4px';
+        searchInput.style.padding = '4px';
+        searchInput.id = 'table-search-input';
+        // 検索用データの保持
+        this._originalIntegratedData = integratedData.slice();
+        // 検索イベント
+        searchInput.addEventListener('input', (e) => {
+            const raw = e.target.value.trim();
+            // カンマ・スペース・改行で分割し、空要素を除外
+            const keywords = raw.split(/[\s,\r\n]+/).filter(Boolean);
+            let filteredData;
+            if (keywords.length === 0) {
+                filteredData = this._originalIntegratedData;
+            } else {
+                filteredData = this._originalIntegratedData.filter(row =>
+                    keywords.some(keyword =>
+                        Object.values(row).some(val =>
+                            val && val.toString().toLowerCase().includes(keyword.toLowerCase())
+                        )
+                    )
+                );
+            }
+            // 仮想テーブル再描画
+            this.currentSearchResults = filteredData;
+            // テーブル部のみ差し替え
+            const oldTable = integratedResultsContainer.querySelector('.integrated-table-container');
+            const newTable = this.virtualScroll.createVirtualScrollTable(filteredData);
+            if (oldTable && newTable) {
+                oldTable.parentNode.replaceChild(newTable, oldTable);
+            }
+        });
+        searchBoxWrapper.appendChild(searchLabel);
+        searchBoxWrapper.appendChild(searchInput);
+        titleContainer.appendChild(searchBoxWrapper);
+        // ===== ここまで追加 =====
+        
         // 保存ボタンを作成
         const saveButton = DOMHelper.createElement('button', {}, 'save-changes-button');
         saveButton.textContent = '変更を保存';
