@@ -34,6 +34,22 @@ const CONFIG = {
         8: { name: '座席台帳' }
     },
 
+    // 履歴管理アプリ設定
+    historyApp: {
+        appId: 17,
+        name: '更新履歴管理',
+        fields: {
+            batchId: 'バッチID',
+            recordId: 'レコードID',
+            appId: 'アプリID',
+            ledgerName: '台帳名',
+            result: '結果',
+            request: 'request',
+            response: 'response',
+            error: 'error'
+        }
+    },
+
     // ユーザー台帳設定
     userList: {
         appId: 13,

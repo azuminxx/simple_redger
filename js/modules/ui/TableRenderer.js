@@ -14,6 +14,9 @@ class TableRenderer {
         
         // 更新ルール定義（主キー交換対応）- CONFIG.jsから動的に生成
         this.UPDATE_RULES = this.generateUpdateRules();
+        
+        // 更新履歴データを台帳別に保存するMap
+        this.updateHistoryMap = new Map(); // 台帳別のMapを格納するMap
     }
 
     /**
@@ -515,6 +518,9 @@ class TableRenderer {
                 return;
             }
             
+            // バッチIDを生成（一括更新全体で共通）
+            const batchId = this.generateBatchId();
+            
             // 変更されたレコードのみから各台帳ごとにレコードをグループ化
             const recordsByApp = this.groupRecordsByApp(changedIndices);
             
@@ -522,7 +528,7 @@ class TableRenderer {
             const updatePromises = [];
             for (const [appId, records] of Object.entries(recordsByApp)) {
                 if (records.length > 0) {
-                    updatePromises.push(this.updateAppRecordsBatch(appId, records));
+                    updatePromises.push(this.updateAppRecordsBatch(appId, records, batchId));
                 }
             }
             
@@ -670,29 +676,30 @@ class TableRenderer {
     /**
      * 特定のアプリのレコードを一括更新
      */
-    async updateAppRecordsBatch(appId, records) {
+    async updateAppRecordsBatch(appId, records, batchId) {
         
+        // 一括更新用のデータを準備
+        const updateRecords = records.map((record, index) => {
+            // 新しい形式 {id: 6163, record: {...}} と旧形式 {$id: {value: 6163}, ...} の両方に対応
+            const recordIdValue = record.id || record.$id?.value;
+            if (!recordIdValue) {
+                throw new Error(`レコードIDが見つかりません`);
+            }
+            
+            // 新しい形式の場合は直接recordオブジェクトを使用、旧形式の場合は従来の処理
+            if (record.id && record.record) {
+                // 新しい形式: {id: 6163, record: {...}}
+                return {
+                    id: recordIdValue,
+                    record: record.record
+                };
+            }
+            
+            // 旧形式は現在サポートしていません
+            throw new Error(`旧形式のレコードはサポートされていません: ${JSON.stringify(record)}`);
+        });
+
         try {
-            // 一括更新用のデータを準備
-            const updateRecords = records.map((record, index) => {
-                // 新しい形式 {id: 6163, record: {...}} と旧形式 {$id: {value: 6163}, ...} の両方に対応
-                const recordIdValue = record.id || record.$id?.value;
-                if (!recordIdValue) {
-                    throw new Error(`レコードIDが見つかりません`);
-                }
-                
-                // 新しい形式の場合は直接recordオブジェクトを使用、旧形式の場合は従来の処理
-                if (record.id && record.record) {
-                    // 新しい形式: {id: 6163, record: {...}}
-                    return {
-                        id: recordIdValue,
-                        record: record.record
-                    };
-                }
-                
-                // 旧形式は現在サポートしていません
-                throw new Error(`旧形式のレコードはサポートされていません: ${JSON.stringify(record)}`);
-            });
             
             // API実行回数をカウント
             window.apiCounter.count(appId, 'レコード一括更新');
@@ -702,17 +709,226 @@ class TableRenderer {
                 app: appId,
                 records: updateRecords
             });
+            // 更新履歴データを保存
+            const ledgerName = CONFIG.apps[appId].name;
+            const timestamp = new Date().toISOString();
             
-            console.log(`✅ ${CONFIG.apps[appId].name} 更新完了 (${records.length}件)`);
+            // 台帳別のMapを取得または作成
+            if (!this.updateHistoryMap.has(appId)) {
+                this.updateHistoryMap.set(appId, new Map());
+            }
+            const ledgerHistoryMap = this.updateHistoryMap.get(appId);
+            
+            records.forEach((record, index) => {
+                const recordIdValue = record.id || record.$id?.value;
+                const historyKey = `${recordIdValue}_${timestamp}`;
+                
+                // リクエストデータを取得（updateRecordsから該当するレコードを検索）
+                const requestData = updateRecords.find(reqRecord => reqRecord.id === parseInt(recordIdValue)) || null;
+                
+                const historyData = {
+                    appId: appId,
+                    ledgerName: ledgerName,
+                    recordId: recordIdValue,
+                    updateResult: 'success',
+                    timestamp: timestamp,
+                    batchId: batchId,
+                    request: requestData,
+                    response: (response && Array.isArray(response.records) && response.records[index]) ? response.records[index] : null
+                };
+                
+                ledgerHistoryMap.set(historyKey, historyData);
+            });
+            
+            console.log(`✅ ${ledgerName} 更新完了 (${records.length}件)`);
             
             // 更新されたレコードのURLリンクをログ出力
             //this.logUpdatedRecordLinks(appId, records);
             
+            // 台帳別に履歴データを投入
+            await this.uploadHistoryToApp(appId);
+            
             return response;
             
         } catch (error) {
-            this.logError(`${CONFIG.apps[appId].name} 一括更新`, error);
+            // エラー時も履歴データを保存
+            const ledgerName = CONFIG.apps[appId].name;
+            const timestamp = new Date().toISOString();
+            
+            // 台帳別のMapを取得または作成
+            if (!this.updateHistoryMap.has(appId)) {
+                this.updateHistoryMap.set(appId, new Map());
+            }
+            const ledgerHistoryMap = this.updateHistoryMap.get(appId);
+            
+            records.forEach((record) => {
+                const recordIdValue = record.id || record.$id?.value;
+                const historyKey = `${recordIdValue}_${timestamp}`;
+                
+                // リクエストデータを取得（updateRecordsから該当するレコードを検索）
+                const requestData = updateRecords.find(reqRecord => reqRecord.id === parseInt(recordIdValue)) || null;
+                
+                const historyData = {
+                    appId: appId,
+                    ledgerName: ledgerName,
+                    recordId: recordIdValue,
+                    updateResult: 'failure',
+                    timestamp: timestamp,
+                    batchId: batchId,
+                    request: requestData,
+                    error: error // Store the full error object
+                };
+                
+                ledgerHistoryMap.set(historyKey, historyData);
+            });
+            
+            // エラー時も履歴データを投入
+            await this.uploadHistoryToApp(appId);
+            
+            this.logError(`${ledgerName} 一括更新`, error);
             throw error;
+        }
+    }
+
+
+
+    /**
+     * バッチIDを生成
+     */
+    generateBatchId() {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+        
+        const timestamp = `${year}${month}${day}_${hours}${minutes}${seconds}`;
+        const random = Math.random().toString(36).substring(2, 8);
+        return `batch_${timestamp}_${random}`;
+    }
+
+    /**
+     * 履歴管理アプリに台帳別に投入
+     */
+    async uploadHistoryToApp(appId = null) {
+        try {
+            // appIdが指定されている場合はその台帳のデータのみ処理
+            if (appId) {
+                const ledgerHistoryMap = this.updateHistoryMap.get(appId);
+                if (!ledgerHistoryMap || ledgerHistoryMap.size === 0) {
+                    console.log(`📝 台帳 ${appId} の履歴データがありません`);
+                    return;
+                }
+
+                // 指定された台帳の履歴データを収集
+                const ledgerHistoryData = [];
+                for (const [historyKey, historyData] of ledgerHistoryMap) {
+                    ledgerHistoryData.push(historyData);
+                }
+
+                if (ledgerHistoryData.length === 0) {
+                    console.log(`📝 台帳 ${appId} の履歴データがありません`);
+                    return;
+                }
+
+                // 履歴データをレコード形式に変換
+                const records = ledgerHistoryData.map(historyData => {
+                    const record = {
+                        [CONFIG.historyApp.fields.batchId]: { value: historyData.batchId },
+                        [CONFIG.historyApp.fields.recordId]: { value: historyData.recordId },
+                        [CONFIG.historyApp.fields.appId]: { value: historyData.appId },
+                        [CONFIG.historyApp.fields.ledgerName]: { value: historyData.ledgerName },
+                        [CONFIG.historyApp.fields.result]: { value: historyData.updateResult }
+                    };
+
+                    // request, response, errorはオブジェクト形式で投入
+                    if (historyData.request) {
+                        record[CONFIG.historyApp.fields.request] = { value: JSON.stringify(historyData.request) };
+                    }
+                    if (historyData.response) {
+                        record[CONFIG.historyApp.fields.response] = { value: JSON.stringify(historyData.response) };
+                    }
+                    if (historyData.error) {
+                        record[CONFIG.historyApp.fields.error] = { value: JSON.stringify(historyData.error) };
+                    }
+
+                    return record;
+                });
+
+                // kintone REST API で台帳別に登録
+                const response = await kintone.api(kintone.api.url('/k/v1/records', true), 'POST', {
+                    app: CONFIG.historyApp.appId,
+                    records: records
+                });
+
+                console.log(`✅ 台帳 ${appId} の履歴管理アプリへの投入完了 (${records.length}件)`);
+                console.log('📊 投入された履歴データ:', response.ids);
+
+                // 該当台帳の履歴データをクリア
+                this.updateHistoryMap.delete(appId);
+
+            } else {
+                // appIdが指定されていない場合は全台帳のデータを処理（従来の動作）
+                if (this.updateHistoryMap.size === 0) {
+                    console.log('📝 履歴データがありません');
+                    return;
+                }
+
+                // 全台帳の履歴データを収集
+                const allHistoryData = [];
+                for (const [appId, ledgerHistoryMap] of this.updateHistoryMap) {
+                    for (const [historyKey, historyData] of ledgerHistoryMap) {
+                        allHistoryData.push(historyData);
+                    }
+                }
+
+                if (allHistoryData.length === 0) {
+                    console.log('📝 履歴データがありません');
+                    return;
+                }
+
+                // 履歴データをレコード形式に変換
+                const records = allHistoryData.map(historyData => {
+                    const record = {
+                        [CONFIG.historyApp.fields.batchId]: { value: historyData.batchId },
+                        [CONFIG.historyApp.fields.recordId]: { value: historyData.recordId },
+                        [CONFIG.historyApp.fields.appId]: { value: historyData.appId },
+                        [CONFIG.historyApp.fields.ledgerName]: { value: historyData.ledgerName },
+                        [CONFIG.historyApp.fields.result]: { value: historyData.updateResult }
+                    };
+
+                    // request, response, errorはオブジェクト形式で投入
+                    if (historyData.request) {
+                        record[CONFIG.historyApp.fields.request] = { value: JSON.stringify(historyData.request) };
+                    }
+                    if (historyData.response) {
+                        record[CONFIG.historyApp.fields.response] = { value: JSON.stringify(historyData.response) };
+                    }
+                    if (historyData.error) {
+                        record[CONFIG.historyApp.fields.error] = { value: JSON.stringify(historyData.error) };
+                    }
+
+                    return record;
+                });
+
+                // kintone REST API で一括登録
+                const response = await kintone.api(kintone.api.url('/k/v1/records', true), 'POST', {
+                    app: CONFIG.historyApp.appId,
+                    records: records
+                });
+
+                console.log(`✅ 履歴管理アプリへの投入完了 (${records.length}件)`);
+                console.log('📊 投入された履歴データ:', response.ids);
+
+                // 履歴データをクリア
+                this.updateHistoryMap.clear();
+            }
+
+        } catch (error) {
+            console.error('❌ 履歴管理アプリへの投入エラー:', error);
+            // エラーが発生しても処理を継続（履歴データは保持）
         }
     }
 
