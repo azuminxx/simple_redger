@@ -20,7 +20,7 @@ class DataIntegrator {
         const allLedgerData = {};
         allLedgerData[originalAppId] = originalRecords;
 
-        // 他の台帳を検索するPromiseを作成（ユーザーリストは除外）
+        // 他の台帳を検索するPromiseを作成（ユーザー台帳は除外）
         const searchPromises = [];
         
         Object.keys(CONFIG.apps).forEach(appId => {
@@ -36,10 +36,10 @@ class DataIntegrator {
             }
         });
 
-        // ユーザーリストをユーザーIDで検索するPromiseを追加
+        // ユーザー台帳をBSSIDで検索するPromiseを追加
         const userListPromise = this.searchUserListByUserIds(allLedgerData)
             .then(userListData => {
-                // ユーザーリスト検索結果ログは削除
+                // ユーザー台帳検索結果ログは削除
                 return userListData;
             });
         searchPromises.push(userListPromise);
@@ -47,7 +47,7 @@ class DataIntegrator {
         // 全ての検索が完了したらデータを統合
         return Promise.all(searchPromises)
             .then(async (results) => {
-                // 最後の結果がユーザーリストデータ
+                // 最後の結果がユーザー台帳データ
                 const userListData = results.pop();
                 return await this.integrateAllLedgerDataWithUserList(allLedgerData, integrationKeys, userListData);
             });
@@ -199,7 +199,7 @@ class DataIntegrator {
     }
 
     /**
-     * 全台帳からユーザーIDを抽出してユーザーリストを検索
+     * 全台帳からBSSIDを抽出してユーザー台帳を検索
      */
     searchUserListByUserIds(allLedgerData) {
         const userIds = new Set();
@@ -222,13 +222,13 @@ class DataIntegrator {
     }
 
     /**
-     * 全台帳のデータを統合し、ユーザーリストからユーザー名を取得
+     * 全台帳のデータを統合し、ユーザー台帳から氏名漢字を取得
      * 統合キーでの一致に関係なく、全ての検索結果を表示
      */
     async integrateAllLedgerDataWithUserList(allLedgerData, integrationKeys, userListData) {
         const integratedData = [];
 
-        // ユーザーリストをユーザーIDでマップ化（CONFIG.jsから取得）
+        // ユーザー台帳をBSSIDでマップ化（CONFIG.jsから取得）
         const userIdFieldName = CONFIG.userList.primaryKey;
         //const userNameFieldName = CONFIG.fieldMappings.userName;
         const userListMapFields = CONFIG.userList.mapFields || [];
@@ -317,7 +317,7 @@ class DataIntegrator {
                         
                         integratedRecord[`${ledgerName}_${fieldCode}`] = displayValue;
                         
-                        // ユーザーIDを記録（CONFIG.jsから取得）
+                        // BSSIDを記録（CONFIG.jsから取得）
                         if (fieldCode === userIdFieldName && displayValue) {
                             recordUserId = displayValue;
                         }
@@ -350,7 +350,7 @@ class DataIntegrator {
                 }
             }
 
-            // ユーザーリストからユーザー名等を取得してPC台帳のデータとして動的に設定
+            // ユーザー台帳から氏名漢字等を取得してPC台帳のデータとして動的に設定
             const pcLedgerName = CONFIG.integratedTableConfig.columns.find(c => c.fieldCode === 'PC番号' && c.primaryKey).ledger;
             if (recordUserId) {
                 CONFIG.userList.mapFields.forEach(fieldName => {

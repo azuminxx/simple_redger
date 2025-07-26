@@ -138,7 +138,7 @@ class LedgerDetailsModal {
      * 台帳iframeセクションを作成
      */
     createLedgerIframeSection(ledgerName, record) {
-        const baseUrl = 'https://fps62oxtrbhh.cybozu.com/k';
+        const baseUrl = CONFIG.system.baseUrl;
         const appId = CONFIG.getAppIdByLedgerName(ledgerName);
         
         const section = DOMHelper.createElement('div');

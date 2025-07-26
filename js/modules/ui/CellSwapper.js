@@ -239,7 +239,7 @@ class CellSwapper {
      *   - 他台帳のレコードIDは交換しない（データの整合性を保つため）
      * 
      * ■ 例：PC番号交換時の動作
-     *   - PC台帳：PC番号、ユーザーID、ユーザー名、PC用途等の全フィールドを交換
+     *   - PC台帳：PC番号、BSSID、氏名漢字、PC用途等の全フィールドを交換
      *   - 内線台帳：PC番号フィールドのみ交換（内線番号、電話機種別は交換しない）
      *   - 座席台帳：PC番号フィールドのみ交換（座席番号、座席拠点等は交換しない）
      */
@@ -273,7 +273,7 @@ class CellSwapper {
             // 【重要】各台帳での交換対象フィールド判定
             if (ledgerName === sourceApp) {
                 // ■ 起点台帳（例：PC番号交換時のPC台帳）
-                // → 全フィールドを交換（PC番号、ユーザーID、ユーザー名、PC用途等すべて）
+                // → 全フィールドを交換（PC番号、BSSID、氏名漢字、PC用途等すべて）
                 this.swapFieldValues(sourceRecord, targetRecord, sourceRowIndex, targetRowIndex, fieldKey, swappedFields);
             } else {
                 // ■ 他台帳（例：PC番号交換時の内線台帳・座席台帳）

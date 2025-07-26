@@ -29,7 +29,7 @@ class TableRenderer {
             }
         });
         
-        // ユーザーIDは PC台帳のみ
+        // BSSIDは PC台帳のみ
         rules[CONFIG.userList.primaryKey] = 'pc_only';
         
         // その他のフィールドは元台帳のみ
@@ -110,7 +110,7 @@ class TableRenderer {
         searchLabel.style.background = '#f4f4f4';
         const searchInput = DOMHelper.createElement('input');
         searchInput.type = 'text';
-        searchInput.placeholder = 'テーブル全体から検索（カンマ・スペース区切りで複数検索可）';
+        searchInput.placeholder = 'テーブル全体から検索（フィールド名:値、not:値、カンマ・スペース区切りで複数検索可）';
         searchInput.className = 'field-group-input';
         searchInput.style.width = '500px';
         searchInput.style.marginRight = '100px';
@@ -126,18 +126,52 @@ class TableRenderer {
         searchInput.addEventListener('input', (e) => {
             const raw = e.target.value.trim();
             // カンマ・スペース・改行で分割し、空要素を除外
-            const keywords = raw.split(/[\s,\r\n]+/).filter(Boolean);
+            const keywords = raw.split(/[	\s,\r\n]+/).filter(Boolean);
             let filteredData;
             if (keywords.length === 0) {
                 filteredData = this._originalIntegratedData;
             } else {
-                filteredData = this._originalIntegratedData.filter(row =>
-                    keywords.some(keyword =>
-                        Object.values(row).some(val =>
+                filteredData = this._originalIntegratedData.filter(row => {
+                    // 各検索条件を評価
+                    const result = keywords.every(keyword => {
+                        // 否定検索: "not:検索値" を最優先で判定
+                        if (keyword.toLowerCase().startsWith('not:')) {
+                            const searchValue = keyword.substring(4);
+                            if (!searchValue) return true; // 値が空の場合は無視
+                            // 否定条件：検索値に一致するレコードを除外
+                            const hasMatch = Object.values(row).some(val =>
+                                val && val.toString().toLowerCase().includes(searchValue.toLowerCase())
+                            );
+                            return !hasMatch; // 一致しない場合のみtrue
+                        }
+                        
+                        // フィールド名指定検索: "フィールド名:検索値"
+                        if (keyword.includes(':')) {
+                            const [fieldName, searchValue] = keyword.split(':', 2);
+                            if (!searchValue) return true; // 値が空の場合は無視
+                            
+                            // フィールド名に部分一致するキーをすべて探す
+                            const matchingKeys = Object.keys(row).filter(key => {
+                                const column = CONFIG.integratedTableConfig.columns.find(col => col.key === key);
+                                return column && column.label.toLowerCase().includes(fieldName.toLowerCase());
+                            });
+                            
+                            // いずれかのフィールド値が部分一致すればOK
+                            const hit = matchingKeys.some(matchingKey => {
+                                const value = row[matchingKey];
+                                return value && value.toString().toLowerCase().includes(searchValue.toLowerCase());
+                            });
+                            return hit;
+                        }
+                        
+                        // 通常の検索（部分一致）
+                        const hasMatch = Object.values(row).some(val =>
                             val && val.toString().toLowerCase().includes(keyword.toLowerCase())
-                        )
-                    )
-                );
+                        );
+                        return hasMatch;
+                    });
+                    return result;
+                });
             }
             // 仮想テーブル再描画
             this.currentSearchResults = filteredData;

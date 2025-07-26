@@ -5,6 +5,7 @@ const CONFIG = {
     
     // システム設定
     system: {
+        baseUrl: 'https://fps62oxtrbhh.cybozu.com/k',
         viewName: '統合台帳検索',
         searchMenuId: 'search-menu',
         resultsContainerId: 'search-results',
@@ -33,12 +34,12 @@ const CONFIG = {
         8: { name: '座席台帳' }
     },
 
-    // ユーザーリスト設定
+    // ユーザー台帳設定
     userList: {
         appId: 13,
-        name: 'ユーザーリスト',
-        primaryKey: 'ユーザーID',
-        mapFields: ['ユーザー名','ユーザー部署']
+        name: 'ユーザー台帳',
+        primaryKey: 'BSSID',
+        mapFields: ['氏名漢字','ユーザー部署']
     },
 
     // 共通グループ設定
@@ -64,24 +65,24 @@ const CONFIG = {
                 searchMenu: true
             },
             {
-                key:        'PC台帳_ユーザーID',
+                key:        'PC台帳_BSSID',
                 appId:      6,
                 ledger:     'PC台帳',
-                fieldCode:  'ユーザーID',
+                fieldCode:  'BSSID',
                 primaryKey: false,
-                label:      'ユーザーID',
+                label:      'BSSID',
                 width:      '100px',
                 readOnly:   false,
                 required:   false,
                 searchMenu: true
             },
             {
-                key:        'PC台帳_ユーザー名',
+                key:        'PC台帳_氏名漢字',
                 appId:      13,
                 ledger:     'PC台帳',
-                fieldCode:  'ユーザー名',
+                fieldCode:  '氏名漢字',
                 primaryKey: false,
-                label:      'ユーザー名',
+                label:      '氏名漢字',
                 width:      '120px',
                 readOnly:   true,
                 isUserListDerived: true,
@@ -178,12 +179,12 @@ const CONFIG = {
                 searchMenu: true
             },
             {
-                key:        '座席台帳_階数',
+                key:        '座席台帳_階',
                 appId:      8,
                 ledger:     '座席台帳',
-                fieldCode:  '階数',
+                fieldCode:  '階',
                 primaryKey: false,
-                label:      '階数',
+                label:      '階',
                 width:      '60px',
                 readOnly:   false,
                 required:   true,
@@ -315,7 +316,7 @@ const CONFIG = {
     getDisplayFields: function(appId, excludeUserListDerived = false) {
         let columns = this.integratedTableConfig.columns.filter(column => column.appId == appId);
         
-        // ユーザーリスト由来のフィールドを除外する場合
+        // ユーザー台帳由来のフィールドを除外する場合
         if (excludeUserListDerived) {
             columns = columns.filter(column => !column.isUserListDerived);
         }
@@ -331,7 +332,7 @@ const CONFIG = {
             if (!window.fieldInfoAPI) {
                 throw new Error('FieldInfoAPIが初期化されていません');
             }
-            // 台帳アプリ＋ユーザーリストアプリのappIdをまとめて取得
+            // 台帳アプリ＋ユーザー台帳アプリのappIdをまとめて取得
             const appIds = [...Object.keys(this.apps), this.userList.appId];
             return await window.fieldInfoAPI.getMultipleAppFields(appIds);
         } catch (error) {

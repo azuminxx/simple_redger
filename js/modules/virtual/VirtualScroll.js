@@ -904,7 +904,7 @@ class VirtualScroll {
                 // 元の値と比較して変更状態を更新
                 this.updateFieldChangeStatus(recordIndex, fieldKey, newValue);
                 
-                // --- 追加: ユーザーIDフィールド変更時の処理 ---
+                // --- 追加: BSSIDフィールド変更時の処理 ---
                 this.handleUserIdChange(recordIndex, fieldKey, newValue);
                 // --- ここまで追加 ---
             }
@@ -912,11 +912,11 @@ class VirtualScroll {
     }
 
     /**
-     * ユーザーIDフィールド変更時の処理
+     * BSSIDフィールド変更時の処理
      */
     async handleUserIdChange(recordIndex, fieldKey, newUserId) {
-        // ユーザーIDフィールドかどうかを判定
-        if (!fieldKey.includes('ユーザーID')) {
+        // BSSIDフィールドかどうかを判定
+        if (!fieldKey.includes('BSSID')) {
             return;
         }
 
@@ -925,20 +925,20 @@ class VirtualScroll {
             const record = currentData[recordIndex];
             if (!record) return;
 
-            // ユーザーリストAPIインスタンスを取得
+            // ユーザー台帳APIインスタンスを取得
             if (!window.userListAPI) {
                 window.userListAPI = new UserListAPI();
             }
 
             if (!newUserId || newUserId.trim() === '') {
-                // ユーザーIDが空の場合：mapFieldsの値をクリア
+                // BSSIDが空の場合：mapFieldsの値をクリア
                 this.clearUserMapFields(recordIndex);
             } else {
-                // ユーザーIDが入力された場合：ユーザーリストから検索してmapFieldsの値を更新
+                // BSSIDが入力された場合：ユーザー台帳から検索してmapFieldsの値を更新
                 await this.updateUserMapFields(recordIndex, newUserId);
             }
         } catch (error) {
-            console.error('ユーザーID変更処理エラー:', error);
+            console.error('BSSID変更処理エラー:', error);
         }
     }
 
@@ -950,8 +950,8 @@ class VirtualScroll {
         const record = currentData[recordIndex];
         if (!record) return;
 
-        // ユーザーIDフィールドの台帳名を取得
-        const userIdFieldKey = Object.keys(record).find(key => key.includes('ユーザーID'));
+        // BSSIDフィールドの台帳名を取得
+        const userIdFieldKey = Object.keys(record).find(key => key.includes('BSSID'));
         const ledgerName = userIdFieldKey ? this.getLedgerNameFromFieldKey(userIdFieldKey) : 'PC台帳';
         if (!ledgerName) return;
 
@@ -966,38 +966,38 @@ class VirtualScroll {
     }
 
     /**
-     * ユーザーIDからmapFieldsの値を更新
+     * BSSIDからmapFieldsの値を更新
      */
     async updateUserMapFields(recordIndex, userId) {
         const currentData = window.tableRenderer.currentSearchResults;
         const record = currentData[recordIndex];
         if (!record) return;
 
-        // ユーザーIDフィールドの台帳名を取得
-        const userIdFieldKey = Object.keys(record).find(key => key.includes('ユーザーID'));
+        // BSSIDフィールドの台帳名を取得
+        const userIdFieldKey = Object.keys(record).find(key => key.includes('BSSID'));
         const ledgerName = userIdFieldKey ? this.getLedgerNameFromFieldKey(userIdFieldKey) : 'PC台帳';
         if (!ledgerName) return;
 
         try {
-            // ユーザーリストから検索
+            // ユーザー台帳から検索
             const userRecord = await window.userListAPI.searchUserById(userId);
             
             // 検索結果が0件の場合
             if (!userRecord) {
-                alert(`ユーザーID "${userId}" が見つかりませんでした。`);
+                alert(`BSSID "${userId}" が見つかりませんでした。`);
                 return;
             }
             
-            // データベース上のユーザーIDを取得（大文字・小文字を統一）
+            // データベース上のBSSIDを取得（大文字・小文字を統一）
             const databaseUserId = userRecord[window.userListAPI.primaryKey];
             const actualUserId = databaseUserId && databaseUserId.value !== undefined 
                 ? databaseUserId.value 
                 : databaseUserId;
             
-            // ユーザーIDフィールドの値をデータベース上の値に書き換え
+            // BSSIDフィールドの値をデータベース上の値に書き換え
             if (actualUserId && actualUserId !== userId) {
                 record[userIdFieldKey] = actualUserId;
-                // DOM上のユーザーIDフィールドも更新
+                // DOM上のBSSIDフィールドも更新
                 this.updateCellDisplay(recordIndex, userIdFieldKey, actualUserId);
             }
             

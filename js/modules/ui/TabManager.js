@@ -312,10 +312,10 @@ class TabManager {
                 allLedgerData[appId] = await window.searchEngine.searchRecordsWithQuery(appId, '');
             }
             console.log(allLedgerData);
-            // 2. ユーザーリスト抽出
+            // 2. ユーザー台帳抽出
             const userListRecords = await dataIntegrator.searchUserListByUserIds(allLedgerData);
             console.log(userListRecords);
-            // 3. データをマージ（統合キーで3台帳をマージ→ユーザーIDでユーザーリストをマージ）
+            // 3. データをマージ（統合キーで3台帳をマージ→BSSIDでユーザー台帳をマージ）
             // ① 3台帳を統合キーでマージ
             const mergedByIntegrationKey = {};
             for (const appId of Object.keys(CONFIG.apps)) {
@@ -327,7 +327,7 @@ class TabManager {
                     mergedByIntegrationKey[key][ledgerName] = record;
                 });
             }
-            // ② ユーザーリストをユーザーIDでマージ
+            // ② ユーザー台帳をBSSIDでマージ
             const userListMap = {};
             userListRecords.forEach(user => {
                 const userId = user[CONFIG.userList.primaryKey]?.value;
@@ -346,12 +346,12 @@ class TabManager {
                 });
                 // 統合キーを1つだけ追加
                 mergedRecord['統合キー'] = integrationKey;
-                // ユーザーIDでユーザーリスト情報を付与
-                const userId = mergedRecord['PC台帳_ユーザーID'];
+                // BSSIDでユーザー台帳情報を付与
+                const userId = mergedRecord['PC台帳_BSSID'];
                 if (userId && userListMap[userId]) {
                     Object.entries(userListMap[userId]).forEach(([field, val]) => {
                         if (field === '$revision') return; // $revisionは除外
-                        mergedRecord[`ユーザーリスト_${field}`] = val?.value ?? val;
+                        mergedRecord[`ユーザー台帳_${field}`] = val?.value ?? val;
                     });
                 }
                 finalMerged.push(mergedRecord);
@@ -401,7 +401,7 @@ class TabManager {
             '整合判定',
             '統合キー',
             'PC台帳',
-            'ユーザーリスト',
+            'ユーザー台帳',
             '内線台帳',
             '座席台帳'
         ];

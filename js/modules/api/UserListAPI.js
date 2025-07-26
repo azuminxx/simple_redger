@@ -1,5 +1,5 @@
 /**
- * ユーザーリスト検索APIクラス
+ * ユーザー台帳検索APIクラス
  */
 class UserListAPI {
     constructor() {
@@ -9,7 +9,7 @@ class UserListAPI {
     }
 
     /**
-     * ユーザーIDでユーザー情報を検索（大文字・小文字の両方でin検索）
+     * BSSIDでユーザー情報を検索（大文字・小文字の両方でin検索）
      */
     async searchUserById(userId) {
         if (!userId || userId.trim() === '') {
@@ -17,7 +17,7 @@ class UserListAPI {
         }
 
         try {
-            // 入力されたユーザーIDの大文字・小文字の両方で検索
+            // 入力されたBSSIDの大文字・小文字の両方で検索
             const upperUserId = userId.toUpperCase();
             const lowerUserId = userId.toLowerCase();
             
@@ -33,7 +33,7 @@ class UserListAPI {
             }
             return null;
         } catch (error) {
-            console.error('ユーザーリスト検索エラー:', error);
+            console.error('ユーザー台帳検索エラー:', error);
             return null;
         }
     }
@@ -58,7 +58,7 @@ class UserListAPI {
     }
 
     /**
-     * ユーザーIDからmapFieldsの値を取得（検索付き）
+     * BSSIDからmapFieldsの値を取得（検索付き）
      */
     async getUserMapValuesById(userId) {
         const userRecord = await this.searchUserById(userId);
