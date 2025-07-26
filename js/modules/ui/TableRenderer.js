@@ -59,6 +59,9 @@ class TableRenderer {
         // 現在の検索結果を更新
         this.currentSearchResults = integratedData;
 
+        // 検索用データの保持
+        this._originalIntegratedData = integratedData.slice();
+
         // データが0件の場合は0件メッセージを表示
         if (integratedData.length === 0) {
             this.displayNoResultsMessage();
@@ -96,97 +99,6 @@ class TableRenderer {
             `正常：${normalCount}件／不整合：${inconsistentCount}件）`;
         titleContainer.appendChild(title);
         
-        // ===== 検索ボックス追加（タイトルと保存ボタンの間） =====
-        const searchBoxWrapper = DOMHelper.createElement('div');
-        searchBoxWrapper.style.display = 'flex';
-        searchBoxWrapper.style.alignItems = 'center';
-        searchBoxWrapper.style.gap = '8px';
-        const searchLabel = DOMHelper.createElement('label');
-        searchLabel.textContent = '🔎テーブル内検索:';
-        searchLabel.style.fontWeight = '600';
-        searchLabel.style.fontSize = '13px';
-        searchLabel.style.color = '#495057';
-        searchLabel.htmlFor = 'table-search-input';
-        searchLabel.style.background = '#f4f4f4';
-        const searchInput = DOMHelper.createElement('input');
-        searchInput.type = 'text';
-        searchInput.placeholder = 'テーブル全体から検索（フィールド名:値、not:値、カンマ・スペース区切りで複数検索可）';
-        searchInput.className = 'field-group-input';
-        searchInput.style.width = '500px';
-        searchInput.style.marginRight = '100px';
-        searchInput.style.border = '1px solid #ced4da';
-        searchInput.style.fontSize = '12px';
-        searchInput.style.borderRadius = '4px';
-        searchInput.style.padding = '4px';
-        searchInput.autocomplete = 'off';
-        searchInput.id = 'table-search-input';
-        // 検索用データの保持
-        this._originalIntegratedData = integratedData.slice();
-        // 検索イベント
-        searchInput.addEventListener('input', (e) => {
-            const raw = e.target.value.trim();
-            // カンマ・スペース・改行で分割し、空要素を除外
-            const keywords = raw.split(/[	\s,\r\n]+/).filter(Boolean);
-            let filteredData;
-            if (keywords.length === 0) {
-                filteredData = this._originalIntegratedData;
-            } else {
-                filteredData = this._originalIntegratedData.filter(row => {
-                    // 各検索条件を評価
-                    const result = keywords.every(keyword => {
-                        // 否定検索: "not:検索値" を最優先で判定
-                        if (keyword.toLowerCase().startsWith('not:')) {
-                            const searchValue = keyword.substring(4);
-                            if (!searchValue) return true; // 値が空の場合は無視
-                            // 否定条件：検索値に一致するレコードを除外
-                            const hasMatch = Object.values(row).some(val =>
-                                val && val.toString().toLowerCase().includes(searchValue.toLowerCase())
-                            );
-                            return !hasMatch; // 一致しない場合のみtrue
-                        }
-                        
-                        // フィールド名指定検索: "フィールド名:検索値"
-                        if (keyword.includes(':')) {
-                            const [fieldName, searchValue] = keyword.split(':', 2);
-                            if (!searchValue) return true; // 値が空の場合は無視
-                            
-                            // フィールド名に部分一致するキーをすべて探す
-                            const matchingKeys = Object.keys(row).filter(key => {
-                                const column = CONFIG.integratedTableConfig.columns.find(col => col.key === key);
-                                return column && column.label.toLowerCase().includes(fieldName.toLowerCase());
-                            });
-                            
-                            // いずれかのフィールド値が部分一致すればOK
-                            const hit = matchingKeys.some(matchingKey => {
-                                const value = row[matchingKey];
-                                return value && value.toString().toLowerCase().includes(searchValue.toLowerCase());
-                            });
-                            return hit;
-                        }
-                        
-                        // 通常の検索（部分一致）
-                        const hasMatch = Object.values(row).some(val =>
-                            val && val.toString().toLowerCase().includes(keyword.toLowerCase())
-                        );
-                        return hasMatch;
-                    });
-                    return result;
-                });
-            }
-            // 仮想テーブル再描画
-            this.currentSearchResults = filteredData;
-            // テーブル部のみ差し替え
-            const oldTable = integratedResultsContainer.querySelector('.integrated-table-container');
-            const newTable = this.virtualScroll.createVirtualScrollTable(filteredData);
-            if (oldTable && newTable) {
-                oldTable.parentNode.replaceChild(newTable, oldTable);
-            }
-        });
-        searchBoxWrapper.appendChild(searchLabel);
-        searchBoxWrapper.appendChild(searchInput);
-        titleContainer.appendChild(searchBoxWrapper);
-        // ===== ここまで追加 =====
-        
         // 保存ボタンを作成
         const saveButton = DOMHelper.createElement('button', {}, 'save-changes-button');
         saveButton.textContent = '変更を保存';
@@ -194,8 +106,259 @@ class TableRenderer {
             this.saveChanges();
         });
         titleContainer.appendChild(saveButton);
-        
+
         integratedResultsContainer.appendChild(titleContainer);
+
+        // ===== 検索ボックス追加（肯定系・否定系分離） =====
+        const searchBoxWrapper = DOMHelper.createElement('div', {}, 'search-box-wrapper');
+        searchBoxWrapper.style.fontSize = '12px';
+
+        // 肯定系検索
+        const positiveInput = DOMHelper.createElement('input', { type: 'text', id: 'positive-search-input', placeholder: 'カンマ、スペース、改行で複数指定可（列名は 列名:検索値 で指定可）', autocomplete: 'off' }, 'positive-search-input');
+        positiveInput.style.marginRight = '1em';
+        positiveInput.style.fontSize = '12px';
+        positiveInput.style.height = '32px';
+        positiveInput.style.width = '500px';
+        positiveInput.style.border = '1px solid #ced4da';
+
+        // 否定系検索
+        const negativeInput = DOMHelper.createElement('input', { type: 'text', id: 'negative-search-input', placeholder: 'カンマ、スペース、改行で複数指定可（列名は 列名:検索値 で指定可）', autocomplete: 'off' }, 'negative-search-input');
+        negativeInput.style.fontSize = '12px';
+        negativeInput.style.height = '32px';
+        negativeInput.style.width = '500px';
+        negativeInput.style.border = '1px solid #ced4da';
+
+        // 条件結合方法選択
+        const positiveLogicLabel = DOMHelper.createElement('label');
+        positiveLogicLabel.textContent = '➕検索条件:';
+        positiveLogicLabel.setAttribute('for', 'positive-logic-select');
+
+        // 条件結合方法選択
+        const positiveLogicSelect = DOMHelper.createElement('select', { id: 'positive-logic-select' }, 'positive-logic-select');
+        const positiveOrOption = DOMHelper.createElement('option', { value: 'or' }, 'positive-or-option');
+        positiveOrOption.textContent = 'OR';
+        const positiveAndOption = DOMHelper.createElement('option', { value: 'and' }, 'positive-and-option');
+        positiveAndOption.textContent = 'AND';
+        positiveLogicSelect.style.fontSize = '12px';
+        positiveLogicSelect.style.height = '37.2px';
+        positiveLogicSelect.style.border = '1px solid #ced4da';
+        positiveLogicSelect.appendChild(positiveOrOption);
+        positiveLogicSelect.appendChild(positiveAndOption);
+
+        // 条件結合方法選択
+        const negativeLogicLabel = DOMHelper.createElement('label');
+        negativeLogicLabel.textContent = '➖除外条件:';
+        negativeLogicLabel.setAttribute('for', 'negative-logic-select');
+
+        // 条件結合方法選択
+        const negativeLogicSelect = DOMHelper.createElement('select', { id: 'negative-logic-select' }, 'negative-logic-select');
+        const negativeOrOption = DOMHelper.createElement('option', { value: 'or' }, 'negative-or-option');
+        negativeOrOption.textContent = 'OR';
+        const negativeAndOption = DOMHelper.createElement('option', { value: 'and' }, 'negative-and-option');
+        negativeAndOption.textContent = 'AND';
+        negativeLogicSelect.style.fontSize = '12px';
+        negativeLogicSelect.style.height = '37.2px';
+        negativeLogicSelect.style.border = '1px solid #ced4da';
+        negativeLogicSelect.appendChild(negativeOrOption);
+        negativeLogicSelect.appendChild(negativeAndOption);
+
+        searchBoxWrapper.appendChild(positiveLogicLabel);
+        searchBoxWrapper.appendChild(positiveLogicSelect);
+        //searchBoxWrapper.appendChild(positiveLabel);
+        searchBoxWrapper.appendChild(positiveInput);
+        searchBoxWrapper.appendChild(negativeLogicLabel);
+        searchBoxWrapper.appendChild(negativeLogicSelect);
+        //searchBoxWrapper.appendChild(negativeLabel);
+        searchBoxWrapper.appendChild(negativeInput);
+
+        // クリアボタンを作成
+        const clearButton = DOMHelper.createElement('button', { type: 'button' }, 'clear-search-button');
+        clearButton.textContent = '条件をクリアする';
+        clearButton.style.fontSize = '12px';
+        clearButton.style.height = '32px';
+        clearButton.style.border = '1px solid #ced4da';
+        clearButton.style.backgroundColor = '#f8f9fa';
+        clearButton.style.cursor = 'pointer';
+        clearButton.style.marginLeft = '0.5em';
+        clearButton.addEventListener('click', () => {
+            positiveInput.value = '';
+            negativeInput.value = '';
+            handleSearch();
+        });
+
+        searchBoxWrapper.appendChild(clearButton);
+        integratedResultsContainer.appendChild(searchBoxWrapper);
+        // ===== ここまで追加 =====
+
+        // 検索イベント（両inputで発火）
+        const handleSearch = () => {
+            const positiveRaw = positiveInput.value.trim();
+            const negativeRaw = negativeInput.value.trim();
+            const positiveKeywords = positiveRaw.split(/[\s,\r\n]+/).filter(Boolean);
+            const negativeKeywords = negativeRaw.split(/[\s,\r\n]+/).filter(Boolean);
+            const positiveLogic = positiveLogicSelect.value;
+            const negativeLogic = negativeLogicSelect.value;
+            let filteredData;
+            if (positiveKeywords.length === 0 && negativeKeywords.length === 0) {
+                filteredData = this._originalIntegratedData;
+            } else {
+                filteredData = this._originalIntegratedData.filter(row => {
+                    // 肯定系条件: 選択されたロジックに応じてOR/AND判定
+                    const positiveOk = positiveKeywords.length === 0 || (positiveLogic === 'or' ? 
+                        positiveKeywords.some(keyword => {
+                            if (keyword.includes(':')) {
+                                const [fieldName, searchValue] = keyword.split(':', 2);
+                                // フィールド名に部分一致するキーをすべて探す
+                                const matchingKeys = Object.keys(row).filter(key => {
+                                    const column = CONFIG.integratedTableConfig.columns.find(col => col.key === key);
+                                    return column && column.label.toLowerCase().includes(fieldName.toLowerCase());
+                                });
+                                // いずれかのフィールド値が部分一致すればOK
+                                return matchingKeys.some(matchingKey => {
+                                    const value = row[matchingKey];
+                                    // 空欄条件の判定
+                                    if (searchValue === '""' || searchValue === "''") {
+                                        return !value || value.toString().trim() === '';
+                                    }
+                                    // 通常の部分一致
+                                    return value && value.toString().toLowerCase().includes(searchValue.toLowerCase());
+                                });
+                            }
+                            // 通常の検索（部分一致）
+                            return Object.values(row).some(val => val && val.toString().toLowerCase().includes(keyword.toLowerCase()));
+                        }) : 
+                        positiveKeywords.every(keyword => {
+                            if (keyword.includes(':')) {
+                                const [fieldName, searchValue] = keyword.split(':', 2);
+                                // フィールド名に部分一致するキーをすべて探す
+                                const matchingKeys = Object.keys(row).filter(key => {
+                                    const column = CONFIG.integratedTableConfig.columns.find(col => col.key === key);
+                                    return column && column.label.toLowerCase().includes(fieldName.toLowerCase());
+                                });
+                                // いずれかのフィールド値が部分一致すればOK
+                                return matchingKeys.some(matchingKey => {
+                                    const value = row[matchingKey];
+                                    // 空欄条件の判定
+                                    if (searchValue === '""' || searchValue === "''") {
+                                        return !value || value.toString().trim() === '';
+                                    }
+                                    // 通常の部分一致
+                                    return value && value.toString().toLowerCase().includes(searchValue.toLowerCase());
+                                });
+                            }
+                            // 通常の検索（部分一致）
+                            return Object.values(row).some(val => val && val.toString().toLowerCase().includes(keyword.toLowerCase()));
+                        })
+                    );
+
+                    // 否定系条件: 選択されたロジックに応じてOR/AND判定
+                    const negativeOk = negativeKeywords.length === 0 || (negativeLogic === 'or' ? 
+                        negativeKeywords.every(keyword => {
+                            if (keyword.includes(':')) {
+                                const [fieldName, searchValue] = keyword.split(':', 2);
+                                // フィールド名に部分一致するキーをすべて探す
+                                const matchingKeys = Object.keys(row).filter(key => {
+                                    const column = CONFIG.integratedTableConfig.columns.find(col => col.key === key);
+                                    return column && column.label.toLowerCase().includes(fieldName.toLowerCase());
+                                });
+                                // いずれかのフィールド値が「含まれていない」ならOK
+                                return matchingKeys.every(matchingKey => {
+                                    const value = row[matchingKey];
+                                    // 空欄条件の判定
+                                    if (searchValue === '""' || searchValue === "''") {
+                                        return value && value.toString().trim() !== '';
+                                    }
+                                    // 通常の否定条件
+                                    return !(value && value.toString().toLowerCase().includes(searchValue.toLowerCase()));
+                                });
+                            }
+                            // 通常の否定条件（全フィールド）
+                            return !Object.values(row).some(val => val && val.toString().toLowerCase().includes(keyword.toLowerCase()));
+                        }) : 
+                        negativeKeywords.some(keyword => {
+                            if (keyword.includes(':')) {
+                                const [fieldName, searchValue] = keyword.split(':', 2);
+                                // フィールド名に部分一致するキーをすべて探す
+                                const matchingKeys = Object.keys(row).filter(key => {
+                                    const column = CONFIG.integratedTableConfig.columns.find(col => col.key === key);
+                                    return column && column.label.toLowerCase().includes(fieldName.toLowerCase());
+                                });
+                                // いずれかのフィールド値が「含まれていない」ならOK
+                                return matchingKeys.every(matchingKey => {
+                                    const value = row[matchingKey];
+                                    // 空欄条件の判定
+                                    if (searchValue === '""' || searchValue === "''") {
+                                        return value && value.toString().trim() !== '';
+                                    }
+                                    // 通常の否定条件
+                                    return !(value && value.toString().toLowerCase().includes(searchValue.toLowerCase()));
+                                });
+                            }
+                            // 通常の否定条件（全フィールド）
+                            return !Object.values(row).some(val => val && val.toString().toLowerCase().includes(keyword.toLowerCase()));
+                        })
+                    );
+
+                    return negativeOk && positiveOk;
+                });
+            }
+            // 仮想テーブル再描画
+            this.currentSearchResults = filteredData;
+            
+            // 既存のテーブルコンテナを取得
+            const oldTable = integratedResultsContainer.querySelector('.integrated-table-container');
+            
+            // 編集状態を保存（検索前の状態を保持）
+            let savedChangeFlags = null;
+            let savedChangedFields = null;
+            let savedOriginalValues = null;
+            let savedScrollTop = 0;
+            
+            if (window.virtualScroll && oldTable) {
+                // 変更フラグを保存
+                savedChangeFlags = new Map(window.virtualScroll.changeFlags);
+                savedChangedFields = new Map(window.virtualScroll.changedFields);
+                savedOriginalValues = new Map(window.virtualScroll.originalValues);
+                
+                // スクロール位置を保存
+                const scrollContainer = oldTable.querySelector('.virtual-scroll-container');
+                if (scrollContainer) {
+                    savedScrollTop = scrollContainer.scrollTop;
+                }
+            }
+            
+            // 新しいテーブルを作成
+            const newTable = this.virtualScroll.createVirtualScrollTable(filteredData);
+            
+            // 編集状態を復元
+            if (window.virtualScroll && savedChangeFlags) {
+                // 変更フラグを復元
+                window.virtualScroll.changeFlags = savedChangeFlags;
+                window.virtualScroll.changedFields = savedChangedFields;
+                window.virtualScroll.originalValues = savedOriginalValues;
+                
+                // 変更フラグUIを復元
+                window.virtualScroll.restoreChangeFlagsUI();
+                
+                // スクロール位置を復元
+                if (savedScrollTop > 0) {
+                    setTimeout(() => {
+                        const newScrollContainer = newTable.querySelector('.virtual-scroll-container');
+                        if (newScrollContainer) {
+                            newScrollContainer.scrollTop = savedScrollTop;
+                        }
+                    }, 100);
+                }
+            }
+            
+            if (oldTable && newTable) {
+                oldTable.parentNode.replaceChild(newTable, oldTable);
+            }
+        };
+        positiveInput.addEventListener('input', handleSearch.bind(this));
+        negativeInput.addEventListener('input', handleSearch.bind(this));
+        positiveLogicSelect.addEventListener('change', handleSearch.bind(this));
+        negativeLogicSelect.addEventListener('change', handleSearch.bind(this));
 
         integratedResultsContainer.appendChild(tableContainer);
         
@@ -395,8 +558,13 @@ class TableRenderer {
                 });
             }
             
+            // 成功メッセージをトーストで表示
+            this.showToast('変更が完了しました', 'success');
+            
         } catch (error) {
             console.error('❌ 保存エラー:', error);
+            // エラーメッセージをトーストで表示
+            this.showToast('変更が失敗しました', 'error');
             alert(`保存中にエラーが発生しました。\n詳細: ${error.message}`);
         } finally {
             if (saveButton) {
@@ -651,6 +819,43 @@ class TableRenderer {
         });
     }
 
+    /**
+     * トーストメッセージを表示
+     */
+    showToast(message, type = 'info') {
+        let toast = document.getElementById('save-toast');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'save-toast';
+            toast.style.position = 'fixed';
+            toast.style.bottom = '40px';
+            toast.style.left = '50%';
+            toast.style.transform = 'translateX(-50%)';
+            toast.style.padding = '8px 24px';
+            toast.style.borderRadius = '6px';
+            toast.style.zIndex = 9999;
+            toast.style.fontSize = '1.1em';
+            document.body.appendChild(toast);
+        }
+        
+        // タイプに応じてスタイルを変更
+        if (type === 'success') {
+            toast.style.background = 'rgba(40, 167, 69, 0.9)'; // 緑色
+            toast.style.color = '#fff';
+        } else if (type === 'error') {
+            toast.style.background = 'rgba(220, 53, 69, 0.9)'; // 赤色
+            toast.style.color = '#fff';
+        } else {
+            toast.style.background = 'rgba(0,0,0,0.8)'; // デフォルト
+            toast.style.color = '#fff';
+        }
+        
+        toast.textContent = message;
+        toast.style.display = 'block';
+        setTimeout(() => {
+            toast.style.display = 'none';
+        }, 2000); // 成功・エラーは2秒間表示
+    }
 
 }
 
