@@ -195,6 +195,63 @@ class DOMHelper {
     }
 }
 
+/**
+ * 権限チェック機能
+ */
+class PermissionChecker {
+    /**
+     * アプリの権限を取得
+     */
+    static async getAppPermissions() {
+        try {
+            const appPerm = await kintone.app.getPermissions();
+            console.log('権限情報:', appPerm);
+            return appPerm;
+        } catch (error) {
+            console.error('権限取得エラー:', error);
+            return { editApp: false };
+        }
+    }
+
+    /**
+     * editApp権限があるかチェック
+     */
+    static async hasEditAppPermission() {
+        const permissions = await this.getAppPermissions();
+        return permissions.editApp === true;
+    }
+
+    /**
+     * 権限エラーメッセージを表示
+     */
+    static showPermissionError() {
+        alert('実行できる権限がありません。\n管理者に権限の確認をお願いします。');
+    }
+
+    /**
+     * ボタンに権限チェック機能を追加
+     */
+    static async addPermissionCheckToButton(button, action) {
+        const originalClickHandler = button.onclick;
+        
+        button.onclick = async (event) => {
+            // 権限チェック
+            const hasPermission = await this.hasEditAppPermission();
+            if (!hasPermission) {
+                this.showPermissionError();
+                return;
+            }
+            
+            // 権限がある場合は元の処理を実行
+            if (originalClickHandler) {
+                originalClickHandler.call(button, event);
+            } else if (action) {
+                action();
+            }
+        };
+    }
+}
+
 // グローバルに公開
 window.DOMHelper = DOMHelper;
 
@@ -202,3 +259,6 @@ window.DOMHelper = DOMHelper;
 window.CSSGenerator = {
     generateTableWidthCSS: DOMHelper.generateTableWidthCSS
 }; 
+
+// グローバルに公開
+window.PermissionChecker = PermissionChecker; 

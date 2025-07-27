@@ -523,7 +523,7 @@ class TableRenderer {
             
             // 変更されたレコードのみから各台帳ごとにレコードをグループ化
             const recordsByApp = this.groupRecordsByApp(changedIndices);
-            
+            console.log(`🔄 変更されたレコードの台帳別グループ化:`, recordsByApp);
             // 各台帳のレコードを一括更新（レコードがある場合のみ）
             const updatePromises = [];
             for (const [appId, records] of Object.entries(recordsByApp)) {

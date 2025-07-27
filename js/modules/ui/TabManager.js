@@ -102,7 +102,23 @@ class TabManager {
         const exportBtn = DOMHelper.createElement('button', {}, 'export-all-btn');
         exportBtn.textContent = '全データ抽出';
         exportBtn.style.fontSize = '12px';
-        exportBtn.addEventListener('click', () => this.exportAllData());
+        // 権限チェック付きの全データ抽出ボタン
+        exportBtn.addEventListener('click', async () => {
+            // 権限チェック
+            if (!window.PermissionChecker) {
+                console.error('PermissionCheckerが見つかりません');
+                return;
+            }
+            
+            const hasPermission = await window.PermissionChecker.hasEditAppPermission();
+            if (!hasPermission) {
+                window.PermissionChecker.showPermissionError();
+                return;
+            }
+            
+            // 権限がある場合は全データ抽出実行
+            this.exportAllData();
+        });
         settingsContent.appendChild(exportBtn);
         const info = DOMHelper.createElement('div', {}, 'export-info');
         info.textContent = '※全台帳を無条件でCSVファイル出力します';
@@ -261,7 +277,21 @@ class TabManager {
         const searchButton = DOMHelper.createElement('button', {}, 'search-button');
         searchButton.textContent = '検索';
         searchButton.setAttribute('data-app-id', appId);
-        searchButton.addEventListener('click', () => {
+        // 権限チェック付きの検索ボタン
+        searchButton.addEventListener('click', async () => {
+            // 権限チェック
+            if (!window.PermissionChecker) {
+                console.error('PermissionCheckerが見つかりません');
+                return;
+            }
+            
+            const hasPermission = await window.PermissionChecker.hasEditAppPermission();
+            if (!hasPermission) {
+                window.PermissionChecker.showPermissionError();
+                return;
+            }
+            
+            // 権限がある場合は検索実行
             if (window.searchEngine) {
                 window.searchEngine.searchRecords(appId);
             }
@@ -270,7 +300,21 @@ class TabManager {
         const addSearchButton = DOMHelper.createElement('button', {}, 'add-search-button');
         addSearchButton.textContent = '追加検索';
         addSearchButton.setAttribute('data-app-id', appId);
-        addSearchButton.addEventListener('click', () => {
+        // 権限チェック付きの追加検索ボタン
+        addSearchButton.addEventListener('click', async () => {
+            // 権限チェック
+            if (!window.PermissionChecker) {
+                console.error('PermissionCheckerが見つかりません');
+                return;
+            }
+            
+            const hasPermission = await window.PermissionChecker.hasEditAppPermission();
+            if (!hasPermission) {
+                window.PermissionChecker.showPermissionError();
+                return;
+            }
+            
+            // 権限がある場合は追加検索実行
             if (window.searchEngine) {
                 window.searchEngine.addSearchRecords(appId);
             }
@@ -620,9 +664,10 @@ class TabManager {
             const day = String(date.getDate()).padStart(2, '0');
             const hour = String(date.getHours()).padStart(2, '0');
             const minute = String(date.getMinutes()).padStart(2, '0');
-            const second = String(date.getSeconds()).padStart(2, '0');
+            //const second = String(date.getSeconds()).padStart(2, '0');
             
-            return `${year}/${month}/${day} ${hour}:${minute}:${second}`;
+            //return `${year}/${month}/${day} ${hour}:${minute}:${second}`;
+            return `${year}/${month}/${day} ${hour}:${minute}`;
         } catch (error) {
             console.error('日時フォーマットエラー:', error);
             return iso8601String;
