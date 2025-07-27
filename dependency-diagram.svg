@@ -1,0 +1,257 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1200" height="800" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .node { fill: #f0f0f0; stroke: #333; stroke-width: 2; rx: 8; }
+      .main { fill: #e3f2fd; stroke: #1976d2; }
+      .config { fill: #f3e5f5; stroke: #7b1fa2; }
+      .api { fill: #e8f5e8; stroke: #388e3c; }
+      .ui { fill: #fff3e0; stroke: #f57c00; }
+      .search { fill: #fce4ec; stroke: #c2185b; }
+      .virtual { fill: #e0f2f1; stroke: #00695c; }
+      .global { fill: #f1f8e9; stroke: #689f38; }
+      .resource { fill: #fafafa; stroke: #757575; }
+      .arrow { stroke: #666; stroke-width: 2; marker-end: url(#arrowhead); }
+      .dashed-arrow { stroke: #999; stroke-width: 2; stroke-dasharray: 5,5; marker-end: url(#arrowhead); }
+      .text { font-family: Arial, sans-serif; font-size: 12px; text-anchor: middle; }
+      .title { font-family: Arial, sans-serif; font-size: 14px; font-weight: bold; text-anchor: middle; }
+    </style>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#666" />
+    </marker>
+  </defs>
+
+  <!-- 背景 -->
+  <rect width="1200" height="800" fill="#ffffff"/>
+
+  <!-- メインクラス -->
+  <g transform="translate(50,50)">
+    <rect x="0" y="0" width="200" height="40" class="node main"/>
+    <text x="100" y="25" class="title">main.js</text>
+  </g>
+
+  <!-- 設定・ユーティリティ層 -->
+  <g transform="translate(300,50)">
+    <rect x="0" y="0" width="200" height="40" class="node config"/>
+    <text x="100" y="25" class="title">config.js</text>
+  </g>
+  <g transform="translate(550,50)">
+    <rect x="0" y="0" width="200" height="40" class="node config"/>
+    <text x="100" y="25" class="title">DOMHelper.js</text>
+  </g>
+  <g transform="translate(800,50)">
+    <rect x="0" y="0" width="200" height="40" class="node config"/>
+    <text x="100" y="25" class="title">PermissionChecker</text>
+  </g>
+
+  <!-- API層 -->
+  <g transform="translate(50,150)">
+    <rect x="0" y="0" width="200" height="40" class="node api"/>
+    <text x="100" y="25" class="title">FieldInfoAPI.js</text>
+  </g>
+  <g transform="translate(300,150)">
+    <rect x="0" y="0" width="200" height="40" class="node api"/>
+    <text x="100" y="25" class="title">UserListAPI.js</text>
+  </g>
+
+  <!-- 検索・データ層 -->
+  <g transform="translate(550,150)">
+    <rect x="0" y="0" width="200" height="40" class="node search"/>
+    <text x="100" y="25" class="title">SearchEngine.js</text>
+  </g>
+  <g transform="translate(800,150)">
+    <rect x="0" y="0" width="200" height="40" class="node search"/>
+    <text x="100" y="25" class="title">DataIntegrator.js</text>
+  </g>
+
+  <!-- UI層 -->
+  <g transform="translate(50,250)">
+    <rect x="0" y="0" width="200" height="40" class="node ui"/>
+    <text x="100" y="25" class="title">FormBuilder.js</text>
+  </g>
+  <g transform="translate(300,250)">
+    <rect x="0" y="0" width="200" height="40" class="node ui"/>
+    <text x="100" y="25" class="title">TabManager.js</text>
+  </g>
+  <g transform="translate(550,250)">
+    <rect x="0" y="0" width="200" height="40" class="node ui"/>
+    <text x="100" y="25" class="title">TableRenderer.js</text>
+  </g>
+  <g transform="translate(800,250)">
+    <rect x="0" y="0" width="200" height="40" class="node ui"/>
+    <text x="100" y="25" class="title">CellSwapper.js</text>
+  </g>
+  <g transform="translate(1050,250)">
+    <rect x="0" y="0" width="200" height="40" class="node ui"/>
+    <text x="100" y="25" class="title">LedgerDetailsModal.js</text>
+  </g>
+
+  <!-- 仮想スクロール層 -->
+  <g transform="translate(550,350)">
+    <rect x="0" y="0" width="200" height="40" class="node virtual"/>
+    <text x="100" y="25" class="title">VirtualScroll.js</text>
+  </g>
+
+  <!-- グローバルオブジェクト -->
+  <g transform="translate(50,450)">
+    <rect x="0" y="0" width="200" height="40" class="node global"/>
+    <text x="100" y="25" class="title">window.fieldInfoAPI</text>
+  </g>
+  <g transform="translate(300,450)">
+    <rect x="0" y="0" width="200" height="40" class="node global"/>
+    <text x="100" y="25" class="title">window.tabManager</text>
+  </g>
+  <g transform="translate(550,450)">
+    <rect x="0" y="0" width="200" height="40" class="node global"/>
+    <text x="100" y="25" class="title">window.searchEngine</text>
+  </g>
+  <g transform="translate(800,450)">
+    <rect x="0" y="0" width="200" height="40" class="node global"/>
+    <text x="100" y="25" class="title">window.tableRenderer</text>
+  </g>
+  <g transform="translate(1050,450)">
+    <rect x="0" y="0" width="200" height="40" class="node global"/>
+    <text x="100" y="25" class="title">window.virtualScroll</text>
+  </g>
+
+  <!-- リソース -->
+  <g transform="translate(50,550)">
+    <rect x="0" y="0" width="200" height="40" class="node resource"/>
+    <text x="100" y="25" class="title">style.css</text>
+  </g>
+  <g transform="translate(300,550)">
+    <rect x="0" y="0" width="200" height="40" class="node resource"/>
+    <text x="100" y="25" class="title">customize-manifest.json</text>
+  </g>
+  <g transform="translate(550,550)">
+    <rect x="0" y="0" width="200" height="40" class="node resource"/>
+    <text x="100" y="25" class="title">index.html</text>
+  </g>
+
+  <!-- 依存関係の矢印 -->
+  
+  <!-- main.jsからの依存 -->
+  <line x1="150" y1="70" x2="400" y2="70" class="arrow"/>
+  <line x1="150" y1="70" x2="650" y2="70" class="arrow"/>
+  <line x1="150" y1="70" x2="150" y2="170" class="arrow"/>
+  <line x1="150" y1="70" x2="400" y2="170" class="arrow"/>
+  <line x1="150" y1="70" x2="650" y2="170" class="arrow"/>
+  <line x1="150" y1="70" x2="800" y2="170" class="arrow"/>
+  <line x1="150" y1="70" x2="150" y2="270" class="arrow"/>
+  <line x1="150" y1="70" x2="400" y2="270" class="arrow"/>
+  <line x1="150" y1="70" x2="650" y2="270" class="arrow"/>
+  <line x1="150" y1="70" x2="800" y2="270" class="arrow"/>
+  <line x1="150" y1="70" x2="1150" y2="270" class="arrow"/>
+  <line x1="150" y1="70" x2="650" y2="370" class="arrow"/>
+  <line x1="150" y1="70" x2="150" y2="470" class="arrow"/>
+  <line x1="150" y1="70" x2="400" y2="470" class="arrow"/>
+  <line x1="150" y1="70" x2="650" y2="470" class="arrow"/>
+  <line x1="150" y1="70" x2="800" y2="470" class="arrow"/>
+  <line x1="150" y1="70" x2="1150" y2="470" class="arrow"/>
+  <line x1="150" y1="70" x2="150" y2="570" class="arrow"/>
+  <line x1="150" y1="70" x2="400" y2="570" class="arrow"/>
+  <line x1="150" y1="70" x2="650" y2="570" class="arrow"/>
+
+  <!-- config.jsからの依存 -->
+  <line x1="400" y1="70" x2="150" y2="170" class="arrow"/>
+  <line x1="400" y1="70" x2="400" y2="170" class="arrow"/>
+
+  <!-- TabManagerからの依存 -->
+  <line x1="400" y1="290" x2="150" y2="290" class="arrow"/>
+  <line x1="400" y1="290" x2="900" y2="290" class="arrow"/>
+  <line x1="400" y1="290" x2="650" y2="170" class="arrow"/>
+  <line x1="400" y1="290" x2="800" y2="170" class="arrow"/>
+
+  <!-- TableRendererからの依存 -->
+  <line x1="650" y1="290" x2="650" y2="370" class="arrow"/>
+  <line x1="650" y1="290" x2="800" y2="290" class="arrow"/>
+  <line x1="650" y1="290" x2="1150" y2="290" class="arrow"/>
+
+  <!-- VirtualScrollからの依存 -->
+  <line x1="650" y1="390" x2="1150" y2="390" class="arrow"/>
+  <line x1="650" y1="390" x2="800" y2="390" class="arrow"/>
+  <line x1="650" y1="390" x2="650" y2="290" class="arrow"/>
+  <line x1="650" y1="390" x2="800" y2="170" class="arrow"/>
+  <line x1="650" y1="390" x2="150" y2="170" class="arrow"/>
+
+  <!-- SearchEngineからの依存 -->
+  <line x1="650" y1="190" x2="800" y2="190" class="arrow"/>
+  <line x1="650" y1="190" x2="150" y2="190" class="arrow"/>
+  <line x1="650" y1="190" x2="400" y2="190" class="arrow"/>
+
+  <!-- DataIntegratorからの依存 -->
+  <line x1="800" y1="190" x2="150" y2="190" class="arrow"/>
+  <line x1="800" y1="190" x2="400" y2="190" class="arrow"/>
+
+  <!-- 相互依存関係（点線） -->
+  <line x1="650" y1="390" x2="650" y2="290" class="dashed-arrow"/>
+  <line x1="650" y1="390" x2="800" y2="170" class="dashed-arrow"/>
+  <line x1="650" y1="390" x2="150" y2="170" class="dashed-arrow"/>
+  <line x1="650" y1="290" x2="650" y2="390" class="dashed-arrow"/>
+  <line x1="400" y1="290" x2="650" y2="190" class="dashed-arrow"/>
+  <line x1="400" y1="290" x2="800" y2="190" class="dashed-arrow"/>
+
+  <!-- グループラベル -->
+  <g transform="translate(50,30)">
+    <text x="0" y="0" class="title" fill="#1976d2">メインクラス</text>
+  </g>
+  <g transform="translate(300,30)">
+    <text x="0" y="0" class="title" fill="#7b1fa2">設定・ユーティリティ</text>
+  </g>
+  <g transform="translate(50,130)">
+    <text x="0" y="0" class="title" fill="#388e3c">API層</text>
+  </g>
+  <g transform="translate(550,130)">
+    <text x="0" y="0" class="title" fill="#c2185b">検索・データ層</text>
+  </g>
+  <g transform="translate(50,230)">
+    <text x="0" y="0" class="title" fill="#f57c00">UI層</text>
+  </g>
+  <g transform="translate(550,330)">
+    <text x="0" y="0" class="title" fill="#00695c">仮想スクロール層</text>
+  </g>
+  <g transform="translate(50,430)">
+    <text x="0" y="0" class="title" fill="#689f38">グローバルオブジェクト</text>
+  </g>
+  <g transform="translate(50,530)">
+    <text x="0" y="0" class="title" fill="#757575">リソース</text>
+  </g>
+
+  <!-- 凡例 -->
+  <g transform="translate(50,650)">
+    <rect x="0" y="0" width="15" height="15" class="node main"/>
+    <text x="25" y="12" class="text">メインクラス</text>
+    
+    <rect x="0" y="25" width="15" height="15" class="node config"/>
+    <text x="25" y="37" class="text">設定・ユーティリティ</text>
+    
+    <rect x="0" y="50" width="15" height="15" class="node api"/>
+    <text x="25" y="62" class="text">API層</text>
+    
+    <rect x="0" y="75" width="15" height="15" class="node search"/>
+    <text x="25" y="87" class="text">検索・データ層</text>
+    
+    <rect x="0" y="100" width="15" height="15" class="node ui"/>
+    <text x="25" y="112" class="text">UI層</text>
+    
+    <rect x="0" y="125" width="15" height="15" class="node virtual"/>
+    <text x="25" y="137" class="text">仮想スクロール層</text>
+    
+    <rect x="0" y="150" width="15" height="15" class="node global"/>
+    <text x="25" y="162" class="text">グローバルオブジェクト</text>
+    
+    <rect x="0" y="175" width="15" height="15" class="node resource"/>
+    <text x="25" y="187" class="text">リソース</text>
+  </g>
+
+  <g transform="translate(300,650)">
+    <line x1="0" y1="7" x2="30" y2="7" class="arrow"/>
+    <text x="35" y="12" class="text">直接依存</text>
+    
+    <line x1="0" y1="32" x2="30" y2="32" class="dashed-arrow"/>
+    <text x="35" y="37" class="text">相互依存（window経由）</text>
+  </g>
+
+  <!-- タイトル -->
+  <text x="600" y="20" class="title" font-size="18px">統合台帳検索システム - ファイル依存関係図</text>
+</svg> 
