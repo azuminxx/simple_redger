@@ -46,7 +46,9 @@ const CONFIG = {
             result: '結果',
             request: 'request',
             response: 'response',
-            error: 'error'
+            error: 'error',
+            updatedTime: '更新日時',
+            updater: '更新者'
         }
     },
 

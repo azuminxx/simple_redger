@@ -90,6 +90,12 @@ class TabManager {
             }
         }
 
+        // 更新履歴タブのタブコンテンツを追加
+        const historyContent = DOMHelper.createElement('div', { id: 'tab-history' }, 'tab-content');
+        const historyContainer = DOMHelper.createElement('div', {}, 'history-container');
+        historyContent.appendChild(historyContainer);
+        tabContainer.appendChild(historyContent);
+
         // 設定タブのタブコンテンツを追加
         const settingsContent = DOMHelper.createElement('div', { id: 'tab-settings' }, 'tab-content');
         // ボタンと説明文を追加
@@ -127,6 +133,13 @@ class TabManager {
             tabButton.addEventListener('click', () => this.switchTab(appId));
             tabMenu.appendChild(tabButton);
         });
+
+        // 更新履歴タブ（座席台帳のすぐ隣）
+        const historyTabButton = DOMHelper.createElement('button', {}, 'tab-button history-tab');
+        historyTabButton.setAttribute('data-app', 'history');
+        historyTabButton.textContent = '📋 更新履歴';
+        historyTabButton.addEventListener('click', () => this.switchTab('history'));
+        tabMenu.appendChild(historyTabButton);
 
         // 設定タブ（右寄せ）
         const settingsTabButton = DOMHelper.createElement('button', {}, 'tab-button settings-tab');
@@ -229,6 +242,11 @@ class TabManager {
         const activeContent = document.getElementById(`tab-${appId}`);
         if (activeContent) {
             activeContent.classList.add('active');
+        }
+
+        // 更新履歴タブが選択された場合、履歴データを読み込む
+        if (appId === 'history') {
+            this.loadHistoryData();
         }
 
         this.currentActiveTab = appId;
@@ -495,6 +513,223 @@ class TabManager {
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
         }, 100);
+    }
+
+    /**
+     * 更新履歴データを読み込んで表示
+     */
+    async loadHistoryData() {
+        const historyContainer = document.querySelector('#tab-history .history-container');
+        if (!historyContainer) return;
+
+        // ローディング表示
+        historyContainer.innerHTML = '<div class="loading-message">履歴データを読み込み中...</div>';
+
+        try {
+            // 履歴管理アプリからデータを取得
+            const historyRecords = await this.fetchHistoryRecords();
+            
+            if (historyRecords.length === 0) {
+                historyContainer.innerHTML = '<div class="no-results-message">更新履歴がありません</div>';
+                return;
+            }
+
+            // 履歴テーブルを作成
+            const historyTable = this.createHistoryTable(historyRecords);
+            historyContainer.innerHTML = '';
+            historyContainer.appendChild(historyTable);
+
+        } catch (error) {
+            console.error('履歴データ読み込みエラー:', error);
+            historyContainer.innerHTML = `<div class="error-message">履歴データの読み込みに失敗しました: ${error.message}</div>`;
+        }
+    }
+
+    /**
+     * 履歴管理アプリからデータを取得
+     */
+    async fetchHistoryRecords() {
+        const appId = CONFIG.historyApp.appId;
+        const query = 'order by $id desc limit 500'; // 最新500件を取得
+
+        try {
+            const response = await kintone.api(kintone.api.url('/k/v1/records', true), 'GET', {
+                app: appId,
+                query: query
+            });
+            console.log(`履歴データ取得:}`, response);
+            return response.records || [];
+        } catch (error) {
+            console.error('履歴データ取得エラー:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * 履歴テーブルを作成
+     */
+    createHistoryTable(records) {
+        const table = DOMHelper.createElement('table', {}, 'history-table');
+        
+        // テーブルヘッダー
+        const thead = DOMHelper.createElement('thead');
+        const headerRow = DOMHelper.createElement('tr');
+                            const headers = ['更新日時', '更新者 (code)', '更新者 (name)', 'バッチID', '台帳名', 'レコードID', '結果', '詳細'];
+        
+        headers.forEach(headerText => {
+            const th = DOMHelper.createElement('th');
+            th.textContent = headerText;
+            headerRow.appendChild(th);
+        });
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+
+        // テーブルボディ
+        const tbody = DOMHelper.createElement('tbody');
+        let currentBatchId = null;
+        let isAlternateRow = false;
+        
+        records.forEach(record => {
+            const batchId = record[CONFIG.historyApp.fields.batchId]?.value;
+            
+            // バッチIDが変わったら背景色を切り替え
+            if (batchId !== currentBatchId) {
+                isAlternateRow = !isAlternateRow;
+                currentBatchId = batchId;
+            }
+            
+            const row = this.createHistoryTableRow(record, isAlternateRow);
+            tbody.appendChild(row);
+        });
+        table.appendChild(tbody);
+
+        return table;
+    }
+
+    /**
+     * ISO8601形式の日時をJST（+9時間）に変換してYYYY/MM/DD HH:MM:SS形式で返す
+     */
+    formatUpdatedTime(iso8601String) {
+        if (!iso8601String) return '';
+        
+        try {
+            const date = new Date(iso8601String);
+            
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hour = String(date.getHours()).padStart(2, '0');
+            const minute = String(date.getMinutes()).padStart(2, '0');
+            const second = String(date.getSeconds()).padStart(2, '0');
+            
+            return `${year}/${month}/${day} ${hour}:${minute}:${second}`;
+        } catch (error) {
+            console.error('日時フォーマットエラー:', error);
+            return iso8601String;
+        }
+    }
+
+    /**
+     * 履歴テーブルの行を作成
+     */
+    createHistoryTableRow(record, isAlternateRow = false) {
+        const row = DOMHelper.createElement('tr');
+        
+        // バッチIDが同じ行は背景色を設定
+        if (isAlternateRow) {
+            row.style.backgroundColor = '#e6f3ff';
+        }
+        
+        // 更新日時
+        const updatedTimeCell = DOMHelper.createElement('td');
+        const updatedTime = record[CONFIG.historyApp.fields.updatedTime]?.value;
+        updatedTimeCell.textContent = this.formatUpdatedTime(updatedTime);
+        row.appendChild(updatedTimeCell);
+
+        // 更新者 (code)
+        const updaterCodeCell = DOMHelper.createElement('td');
+        const updater = record[CONFIG.historyApp.fields.updater]?.value;
+        updaterCodeCell.textContent = updater?.code || '';
+        row.appendChild(updaterCodeCell);
+
+                                // 更新者 (name)
+                        const updaterNameCell = DOMHelper.createElement('td');
+                        updaterNameCell.textContent = updater?.name || '';
+                        row.appendChild(updaterNameCell);
+   
+                        // バッチID
+                        const batchIdCell = DOMHelper.createElement('td');
+                        batchIdCell.textContent = record[CONFIG.historyApp.fields.batchId]?.value || '';
+                        row.appendChild(batchIdCell);
+   
+                        // 台帳名
+        const ledgerNameCell = DOMHelper.createElement('td');
+        ledgerNameCell.textContent = record[CONFIG.historyApp.fields.ledgerName]?.value || '';
+        row.appendChild(ledgerNameCell);
+
+        // レコードID（リンク）
+        const recordIdCell = DOMHelper.createElement('td');
+        const recordId = record[CONFIG.historyApp.fields.recordId]?.value;
+        const appId = record[CONFIG.historyApp.fields.appId]?.value;
+        
+        if (recordId && appId) {
+            const recordLink = DOMHelper.createElement('a');
+            recordLink.href = `${CONFIG.system.baseUrl}/${appId}/show#record=${recordId}`;
+            recordLink.textContent = recordId;
+            recordLink.target = '_blank';
+            recordLink.style.textDecoration = 'underline';
+            recordLink.style.color = '#0066cc';
+            recordIdCell.appendChild(recordLink);
+        } else {
+            recordIdCell.textContent = recordId || '';
+        }
+        row.appendChild(recordIdCell);
+
+        // 結果
+        const resultCell = DOMHelper.createElement('td');
+        const result = record[CONFIG.historyApp.fields.result]?.value || '';
+        resultCell.textContent = result;
+        resultCell.className = result === 'success' ? 'success' : 'failure';
+        row.appendChild(resultCell);
+
+        // 詳細ボタン
+        const detailCell = DOMHelper.createElement('td');
+        const detailBtn = DOMHelper.createElement('button', {}, 'detail-btn');
+        detailBtn.textContent = '詳細';
+        detailBtn.addEventListener('click', () => this.showHistoryDetail(record));
+        detailCell.appendChild(detailBtn);
+        row.appendChild(detailCell);
+
+        return row;
+    }
+
+    /**
+     * 履歴詳細を表示
+     */
+    showHistoryDetail(record) {
+        const updater = record[CONFIG.historyApp.fields.updater]?.value;
+        const detail = {
+            '更新日時': this.formatUpdatedTime(record[CONFIG.historyApp.fields.updatedTime]?.value),
+            '更新者 (code)': updater?.code || '',
+            '更新者 (name)': updater?.name || '',
+            'バッチID': record[CONFIG.historyApp.fields.batchId]?.value || '',
+            'レコードID': record[CONFIG.historyApp.fields.recordId]?.value || '',
+            'アプリID': record[CONFIG.historyApp.fields.appId]?.value || '',
+            '台帳名': record[CONFIG.historyApp.fields.ledgerName]?.value || '',
+            '結果': record[CONFIG.historyApp.fields.result]?.value || '',
+            'リクエスト': record[CONFIG.historyApp.fields.request]?.value || '',
+            'レスポンス': record[CONFIG.historyApp.fields.response]?.value || '',
+            'エラー': record[CONFIG.historyApp.fields.error]?.value || ''
+        };
+
+        let detailText = '';
+        Object.entries(detail).forEach(([key, value]) => {
+            if (value) {
+                detailText += `${key}: ${value}\n`;
+            }
+        });
+
+        alert(detailText || '詳細情報がありません');
     }
 }
 
