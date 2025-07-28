@@ -137,7 +137,7 @@ class VirtualScroll {
         function adjustTableHeight() {
             const windowHeight = window.innerHeight;
             
-            // 基本の高さ計算: calc(100vh - 40px)
+            // 基本の高さ計算: calc(100vh - 420px)
             let baseHeight = windowHeight - 420;
             
             // 検索メニューが閉じられているかチェック
