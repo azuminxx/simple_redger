@@ -669,8 +669,18 @@ class VirtualScroll {
                             valueSpan.textContent = value;
                             td.appendChild(valueSpan);
                             this.createCellWithSeparateButton(td, value, i, column, true); // true: appendOnlyButton
+                            
+                            // 主キーフィールドのツールチップを追加
+                            if (value && value !== '-') {
+                                td.title = value;
+                            }
                         } else {
                             td.textContent = value;
+                            
+                            // ツールチップを追加（値が存在する場合のみ）
+                            if (value && value !== '-') {
+                                td.title = value;
+                            }
                         }
                         td.className = 'readonly-cell';
                     }
@@ -792,6 +802,11 @@ class VirtualScroll {
             'data-field-key': column.key
         }, 'editable-cell-input');
 
+        // ツールチップを追加（値が存在する場合のみ）
+        if (value && value.trim() !== '') {
+            input.title = value;
+        }
+
         // フォーカス時に元の値を保存
         input.addEventListener('focus', (event) => {
             this.saveOriginalValueOnEdit(event.target);
@@ -813,6 +828,11 @@ class VirtualScroll {
             'data-record-index': recordIndex,
             'data-field-key': column.key
         }, 'editable-cell-select');
+
+        // ツールチップを追加（値が存在する場合のみ）
+        if (value && value.trim() !== '') {
+            select.title = value;
+        }
 
         // required:trueの場合のみ「値が空欄のときだけ空欄選択肢を表示」
         // required:falseなら常に空欄選択肢を表示
