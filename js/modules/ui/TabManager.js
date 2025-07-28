@@ -98,6 +98,25 @@ class TabManager {
 
         // 設定タブのタブコンテンツを追加
         const settingsContent = DOMHelper.createElement('div', { id: 'tab-settings' }, 'tab-content');
+        
+        // アプリの設定ボタンを追加
+        const appSettingsBtn = DOMHelper.createElement('button', {}, 'app-settings-btn');
+        appSettingsBtn.textContent = 'アプリの設定';
+        appSettingsBtn.style.fontSize = '12px';
+        appSettingsBtn.style.marginRight = '10px';
+        appSettingsBtn.style.marginBottom = '10px';
+        appSettingsBtn.addEventListener('click', () => {
+            // アプリIDを取得
+            const appId = kintone.app.getId();
+            // ベースURLを取得
+            const baseUrl = CONFIG.system.baseUrl;
+            // 設定ページのURLを構築
+            const settingsUrl = `${baseUrl}/admin/app/flow?app=${appId}#section=settings`;
+            // 新しいタブで開く
+            window.open(settingsUrl, '_blank');
+        });
+        settingsContent.appendChild(appSettingsBtn);
+        
         // ボタンと説明文を追加
         const exportBtn = DOMHelper.createElement('button', {}, 'export-all-btn');
         exportBtn.textContent = '全データ抽出';
@@ -121,7 +140,7 @@ class TabManager {
         });
         settingsContent.appendChild(exportBtn);
         const info = DOMHelper.createElement('div', {}, 'export-info');
-        info.textContent = '※全台帳を無条件でCSVファイル出力します';
+        info.textContent = '※「全データ抽出」ボタンを押すと、全台帳を無条件でCSVファイル出力します';
         info.style.fontSize = '12px';
         settingsContent.appendChild(info);
         tabContainer.appendChild(settingsContent);

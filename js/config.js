@@ -77,7 +77,7 @@ const CONFIG = {
                 fieldCode:  'PC番号',
                 primaryKey: true,
                 label:      'PC番号',
-                width:      '150px',
+                width:      '200px',
                 readOnly:   true,
                 required:   false,
                 searchMenu: true
@@ -89,7 +89,7 @@ const CONFIG = {
                 fieldCode:  'BSSID',
                 primaryKey: false,
                 label:      'BSSID',
-                width:      '100px',
+                width:      '150px',
                 readOnly:   false,
                 required:   false,
                 searchMenu: true
@@ -101,7 +101,7 @@ const CONFIG = {
                 fieldCode:  '氏名漢字',
                 primaryKey: false,
                 label:      '氏名漢字',
-                width:      '120px',
+                width:      '200px',
                 readOnly:   true,
                 isUserListDerived: true,
                 required:   false,
@@ -114,7 +114,7 @@ const CONFIG = {
                 fieldCode:  'ユーザー部署',
                 primaryKey: false,
                 label:      'ユーザー部署',
-                width:      '120px',
+                width:      '170px',
                 readOnly:   true,
                 isUserListDerived: true,
                 required:   false,
@@ -127,7 +127,7 @@ const CONFIG = {
                 fieldCode:  'PC用途',
                 primaryKey: false,
                 label:      'PC用途',
-                width:      '130px',
+                width:      '180px',
                 readOnly:   false,
                 required:   true,
                 searchMenu: true
@@ -139,7 +139,7 @@ const CONFIG = {
                 fieldCode:  'test1',
                 primaryKey: false,
                 label:      'test1',
-                width:      '100px',
+                width:      '150px',
                 readOnly:   false,
                 required:   false,
                 searchMenu: false
@@ -151,7 +151,7 @@ const CONFIG = {
                 fieldCode:  'sample',
                 primaryKey: false,
                 label:      'sample',
-                width:      '100px',
+                width:      '150px',
                 readOnly:   false,
                 required:   false,
                 searchMenu: true
@@ -165,7 +165,7 @@ const CONFIG = {
                 fieldCode:  '内線番号',
                 primaryKey: true,
                 label:      '内線番号',
-                width:      '120px',
+                width:      '150px',
                 readOnly:   true,
                 required:   false,
                 searchMenu: true
@@ -177,7 +177,7 @@ const CONFIG = {
                 fieldCode:  '電話機種別',
                 primaryKey: false,
                 label:      '電話機種別',
-                width:      '100px',
+                width:      '150px',
                 readOnly:   false,
                 required:   true,
                 searchMenu: true
@@ -191,7 +191,7 @@ const CONFIG = {
                 fieldCode:  '座席拠点',
                 primaryKey: false,
                 label:      '座席拠点',
-                width:      '80px',
+                width:      '180px',
                 readOnly:   false,
                 required:   true,
                 searchMenu: true
@@ -203,7 +203,7 @@ const CONFIG = {
                 fieldCode:  '階',
                 primaryKey: false,
                 label:      '階',
-                width:      '60px',
+                width:      '120px',
                 readOnly:   false,
                 required:   true,
                 searchMenu: false
@@ -215,7 +215,7 @@ const CONFIG = {
                 fieldCode:  '座席番号',
                 primaryKey: true,
                 label:      '座席番号',
-                width:      '150px',
+                width:      '180px',
                 readOnly:   true,
                 required:   false,
                 searchMenu: true
@@ -227,7 +227,7 @@ const CONFIG = {
                 fieldCode:  '座席部署',
                 primaryKey: false,
                 label:      '座席部署',
-                width:      '80px',
+                width:      '180px',
                 readOnly:   false,
                 required:   false,
                 searchMenu: true

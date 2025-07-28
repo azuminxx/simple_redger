@@ -8,6 +8,11 @@
     display: none;
 }
 
+/* kintoneのツールバーを非表示 */
+.gaia-argoui-app-index-toolbar {
+    display: none;
+}
+
 
 
 /* 検索メニューエリア */
@@ -273,6 +278,8 @@ table input {
     background-color: #545b62;
     transform: translateY(-1px);
 }
+
+
 
 /* 検索処理中のボタンスタイル */
 .search-button:disabled,

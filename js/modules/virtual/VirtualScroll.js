@@ -8,6 +8,7 @@ class VirtualScroll {
         this.changedFields = new Map(); // 統合キーで管理
         this.originalValues = new Map(); // 統合キーで管理
         this.savedScrollTop = 0; // スクロール位置を保存
+        this.savedScrollLeft = 0; // 横スクロール位置を保存
         this.ledgerModal = new LedgerDetailsModal(); // モーダルインスタンス
     }
     /**
@@ -105,12 +106,16 @@ class VirtualScroll {
         this.renderVirtualRows(virtualState);
         
         // スクロールイベント
-        scrollContainer.addEventListener('scroll', () => {
-            this.handleVirtualScroll(scrollContainer, virtualState);
+        scrollContainer.addEventListener('scroll', async () => {
+            // 横スクロール位置を先に保存
+            this.savedScrollLeft = scrollContainer.scrollLeft;
+            this.savedScrollTop = scrollContainer.scrollTop;
+            
+            // 仮想スクロール処理を実行（完了を待つ）
+            await this.handleVirtualScroll(scrollContainer, virtualState);
+            
             // ヘッダーの横スクロールを同期
             this.syncHeaderScroll(headerTable, scrollContainer);
-            // スクロール位置を保存
-            this.savedScrollTop = scrollContainer.scrollTop;
         });
         
         // 動的CSSを生成してテーブル幅を設定
@@ -121,27 +126,48 @@ class VirtualScroll {
         container.appendChild(scrollContainer);
         
         // 保存されたスクロール位置を復元
-        if (this.savedScrollTop > 0) {
+        if (this.savedScrollTop > 0 || this.savedScrollLeft > 0) {
             setTimeout(() => {
                 scrollContainer.scrollTop = this.savedScrollTop;
+                scrollContainer.scrollLeft = this.savedScrollLeft;
             }, 0);
         }
         
         // 高さ調整関数
         function adjustTableHeight() {
-            const selectors = [
-                '.contents-actionmenu-gaia',
-                '#search-menu'
-            ];
-            let totalHeight = 0;
-            selectors.forEach(sel => {
-                const el = document.querySelector(sel);
-                if (el) totalHeight += el.offsetHeight;
-            });
             const windowHeight = window.innerHeight;
-            // .results-title-containerと.integrated-tableは除外し、固定値-85pxを引く
-            const tableHeight = Math.max(200, windowHeight - totalHeight - 120);
+            
+            // 基本の高さ計算: calc(100vh - 40px)
+            let baseHeight = windowHeight - 420;
+            
+            // 検索メニューが閉じられているかチェック
+            const searchMenu = document.querySelector(`#${CONFIG.system.searchMenuId}`);
+            if (searchMenu) {
+                // タブコンテンツの状態をチェック
+                const tabContents = searchMenu.querySelectorAll('.tab-content');
+                const isSearchMenuClosed = Array.from(tabContents).every(tc => tc.style.height === '0px');
+                
+                if (isSearchMenuClosed) {
+                    // 検索メニューが閉じられている場合、+180px追加
+                    baseHeight += 180;
+                }
+            }
+            
+            // 横スクロールバーの高さを考慮（通常15-20px）
+            const horizontalScrollbarHeight = 20;
+            
+            // 動的に計算された高さを設定
+            const tableHeight = Math.max(200, baseHeight - horizontalScrollbarHeight);
             scrollContainer.style.height = tableHeight + 'px';
+            
+            // 横スクロールバーが実際に表示されている場合は、さらに調整
+            setTimeout(() => {
+                if (scrollContainer.scrollWidth > scrollContainer.clientWidth) {
+                    // 横スクロールバーが表示されている場合、さらに高さを調整
+                    const adjustedHeight = Math.max(200, tableHeight - 15);
+                    scrollContainer.style.height = adjustedHeight + 'px';
+                }
+            }, 100);
         }
         adjustTableHeight();
         window.addEventListener('resize', adjustTableHeight);
@@ -683,7 +709,7 @@ class VirtualScroll {
     /**
      * 仮想スクロールハンドラー
      */
-    handleVirtualScroll(scrollContainer, virtualState) {
+    async handleVirtualScroll(scrollContainer, virtualState) {
         const scrollTop = scrollContainer.scrollTop;
         const { rowHeight, visibleRows, bufferRows } = CONFIG.virtualScroll;
         
@@ -702,9 +728,12 @@ class VirtualScroll {
         if ((bufferStart !== virtualState.startIndex || bufferEnd !== virtualState.endIndex) && !isAtBottom) {
             virtualState.startIndex = bufferStart;
             virtualState.endIndex = bufferEnd;
-            this.renderVirtualRows(virtualState).catch(error => {
-                console.error('仮想スクロール再レンダリングエラー:', error);
-            });
+            await this.renderVirtualRows(virtualState);
+            
+            // レンダリング完了後に横スクロール位置を復元
+            if (this.savedScrollLeft > 0) {
+                scrollContainer.scrollLeft = this.savedScrollLeft;
+            }
         }
     }
 
