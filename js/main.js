@@ -124,7 +124,7 @@
                     fieldCode: 'change-flag',
                     appId: null,
                     isChangeFlag: true,
-                    width: '50px'
+                    width: '30px'
                 }, {
                     key: 'detail-link',
                     label: '📁',
@@ -132,15 +132,15 @@
                     fieldCode: 'detail-link',
                     appId: null,
                     isDetailLink: true,
-                    width: '50px'
+                    width: '40px'
                 }, {
                     key: 'consistency-check',
-                    label: '整合性',
+                    label: '整合',
                     ledger: '操作',
                     fieldCode: 'consistency-check',
                     appId: null,
                     isConsistencyCheck: true,
-                    width: '50px'
+                    width: '40px'
                 }, ...dynamicColumns];
                 CONFIG.integratedTableConfig.columns = columnsWithSpecialColumns;
                 console.log(`📋 統合テーブル設定完了 (${dynamicColumns.length}列)`);
