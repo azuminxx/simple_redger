@@ -584,23 +584,53 @@ class TableRenderer {
      * DOMから変更されたレコードを台帳ごとにグループ化（全台帳対応版）
      */
     groupRecordsByApp(changedIndices = null) {
-
         // 【重要】kintone更新用レコードオブジェクト作成
         // ■ 各台帳の交換されたデータを、kintone REST API形式に変換
         // ■ 形式：{id: レコードID, record: {フィールド名: {value: 値}}}
         const updateRecordsByApp = {};
         
         changedIndices.forEach(rowIndex => {
-            CONFIG.ledgerNames.forEach(ledgerName => {
+            // 変更されたフィールドを取得
+            const changedFields = window.virtualScroll.getChangedFields(rowIndex);
+            
+            // 変更されたフィールドから台帳を特定（主キー交換対応）
+            const affectedLedgers = new Set();
+            const primaryKeyChanges = new Set(); // 主キー変更を追跡
+            
+            changedFields.forEach(fieldKey => {
+                const fieldCode = DOMHelper.extractFieldCodeFromKey(fieldKey);
+                const ledgerName = DOMHelper.extractLedgerNameFromKey(fieldKey);
+                
+                if (ledgerName) {
+                    // 主キーフィールドかどうかをチェック
+                    const isPrimaryKey = CONFIG.integratedTableConfig.columns.some(col => 
+                        col.fieldCode === fieldCode && col.primaryKey
+                    );
+                    
+                    if (isPrimaryKey) {
+                        // 主キー変更の場合、更新ルールに基づいて対象台帳を決定
+                        const updateTargets = this.getUpdateTargetsForField(fieldKey);
+                        updateTargets.forEach(appId => {
+                            const targetLedgerName = CONFIG.apps[appId].name;
+                            affectedLedgers.add(targetLedgerName);
+                        });
+                        primaryKeyChanges.add(fieldCode);
+                    } else {
+                        // 通常フィールドの場合、元の台帳のみ
+                        affectedLedgers.add(ledgerName);
+                    }
+                }
+            });
+            
+            // 変更された台帳のみを処理
+            affectedLedgers.forEach(ledgerName => {
                 const recordIdKey = `${ledgerName}_$id`;
                 const recordId = this.currentSearchResults[rowIndex][recordIdKey];
                 
                 if (recordId) {
-                    // appIdを取得
                     const appId = this.getAppIdByLedgerName(ledgerName);
                     if (!appId) return;
                     
-                    // updateRecordsByAppに追加
                     if (!updateRecordsByApp[appId]) {
                         updateRecordsByApp[appId] = [];
                     }
@@ -610,10 +640,9 @@ class TableRenderer {
                         record: {}
                     };
                     
-                    // 【重要】CONFIG.jsから台帳の更新フィールド構成を動的取得
+                    // 更新フィールドを決定（主キー交換対応）
                     const updateFields = CONFIG.getLedgerUpdateFields(ledgerName);
                     
-                    // 各フィールドの値を設定
                     Object.entries(updateFields).forEach(([fieldCode, fieldConfig]) => {
                         const value = this.currentSearchResults[rowIndex][fieldConfig.sourceKey];
                         updateRecord.record[fieldCode] = { value: value };
@@ -641,7 +670,7 @@ class TableRenderer {
      * フィールドの更新対象台帳を取得（主キー交換対応版）
      */
     getUpdateTargetsForField(fieldKey) {
-        const fieldCode = this.extractFieldCodeFromKey(fieldKey);
+        const fieldCode = DOMHelper.extractFieldCodeFromKey(fieldKey);
         
         // 更新ルールに基づいて判定
         const rule = this.UPDATE_RULES[fieldCode] || this.UPDATE_RULES['*'];
@@ -653,7 +682,7 @@ class TableRenderer {
                 
             case 'exclude_origin':
                 // 元の台帳以外で更新（主キー交換用）
-                const originLedgerName = this.extractLedgerNameFromKey(fieldKey);
+                const originLedgerName = DOMHelper.extractLedgerNameFromKey(fieldKey);
                 const targetApps = Object.keys(CONFIG.apps).filter(appId => 
                     CONFIG.apps[appId].name !== originLedgerName
                 );
@@ -668,7 +697,7 @@ class TableRenderer {
             case 'origin':
             default:
                 // 元の台帳のみ更新
-                const ledgerName = this.extractLedgerNameFromKey(fieldKey);
+                const ledgerName = DOMHelper.extractLedgerNameFromKey(fieldKey);
                 return Object.keys(CONFIG.apps).filter(appId => CONFIG.apps[appId].name === ledgerName);
         }
     }
