@@ -282,9 +282,42 @@ class TabManager {
         // 更新履歴タブが選択された場合、履歴データを読み込む
         if (appId === 'history') {
             this.loadHistoryData();
+            
+            // 更新履歴タブが開かれた際、検索メニューが閉じられていた場合は開く
+            this.openSearchMenuIfClosed();
         }
 
         this.currentActiveTab = appId;
+    }
+
+    /**
+     * 検索メニューが閉じられている場合に開く
+     */
+    openSearchMenuIfClosed() {
+        const tabContainer = document.querySelector('.tab-container');
+        if (!tabContainer) return;
+
+        const tabContents = tabContainer.querySelectorAll('.tab-content');
+        const isSearchMenuClosed = Array.from(tabContents).every(tc => tc.style.height === '0px');
+        
+        if (isSearchMenuClosed) {
+            // 検索メニューを開く
+            tabContents.forEach(tabContent => {
+                tabContent.style.height = 'auto';
+                tabContent.style.overflow = 'visible';
+            });
+            
+            // トグルボタンのテキストを更新
+            const toggleBtn = document.getElementById('toggle-search-form');
+            if (toggleBtn) {
+                toggleBtn.textContent = '▲';
+            }
+            
+            // テーブル高さを調整
+            if (window.adjustTableHeight) {
+                window.adjustTableHeight();
+            }
+        }
     }
 
     /**
