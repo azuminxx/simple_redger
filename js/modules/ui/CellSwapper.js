@@ -285,6 +285,18 @@ class CellSwapper {
             }
         });
         
+        // 【重要】CONFIG.integratedTableConfig.columnsに含まれていないが、
+        // CONFIG.getLedgerUpdateFieldsで含まれる他台帳の主キーフィールドも交換する
+        CONFIG.ledgerNames.forEach(ledgerName => {
+            if (ledgerName !== sourceApp) {
+                // 他台帳の主キーフィールドで、primaryKeyFieldと一致するものを交換
+                const crossLedgerFieldKey = `${ledgerName}_${primaryKeyField}`;
+                if (sourceRecord[crossLedgerFieldKey] !== undefined || targetRecord[crossLedgerFieldKey] !== undefined) {
+                    this.swapFieldValues(sourceRecord, targetRecord, sourceRowIndex, targetRowIndex, crossLedgerFieldKey, swappedFields);
+                }
+            }
+        });
+        
         // $idフィールドは CONFIG.integratedTableConfig.columns に含まれていないため、
         // 明示的に処理する必要がある
         const recordIdKey = `${sourceApp}_$id`;

@@ -640,12 +640,38 @@ class TableRenderer {
                         record: {}
                     };
                     
-                    // 更新フィールドを決定（主キー交換対応）
-                    const updateFields = CONFIG.getLedgerUpdateFields(ledgerName);
+                    // 【重要】変更されたフィールドのみをリクエストボディに含める
+                    const changedFieldsForLedger = new Set();
                     
+                    changedFields.forEach(fieldKey => {
+                        const fieldCode = DOMHelper.extractFieldCodeFromKey(fieldKey);
+                        const fieldLedgerName = DOMHelper.extractLedgerNameFromKey(fieldKey);
+                        
+                        // この台帳に関連する変更フィールドを特定
+                        if (fieldLedgerName === ledgerName) {
+                            // 自台帳の変更フィールド
+                            changedFieldsForLedger.add(fieldCode);
+                        } else if (primaryKeyChanges.has(fieldCode)) {
+                            // 他台帳の主キー変更で、この台帳に影響するフィールド
+                            changedFieldsForLedger.add(fieldCode);
+                        }
+                    });
+                    
+                    // 主キー変更がある場合、関連フィールドも含める
+                    if (primaryKeyChanges.size > 0) {
+                        const relatedFields = this.getRelatedFieldsForPrimaryKeyChange(primaryKeyChanges, ledgerName);
+                        relatedFields.forEach(fieldCode => {
+                            changedFieldsForLedger.add(fieldCode);
+                        });
+                    }
+                    
+                    // 変更されたフィールドのみをリクエストボディに含める
+                    const updateFields = CONFIG.getLedgerUpdateFields(ledgerName);
                     Object.entries(updateFields).forEach(([fieldCode, fieldConfig]) => {
-                        const value = this.currentSearchResults[rowIndex][fieldConfig.sourceKey];
-                        updateRecord.record[fieldCode] = { value: value };
+                        if (changedFieldsForLedger.has(fieldCode)) {
+                            const value = this.currentSearchResults[rowIndex][fieldConfig.sourceKey];
+                            updateRecord.record[fieldCode] = { value: value };
+                        }
                     });
                     
                     updateRecordsByApp[appId].push(updateRecord);
@@ -700,6 +726,38 @@ class TableRenderer {
                 const ledgerName = DOMHelper.extractLedgerNameFromKey(fieldKey);
                 return Object.keys(CONFIG.apps).filter(appId => CONFIG.apps[appId].name === ledgerName);
         }
+    }
+
+    /**
+     * 主キー変更時の関連フィールドを取得
+     */
+    getRelatedFieldsForPrimaryKeyChange(primaryKeyChanges, ledgerName) {
+        const relatedFields = new Set();
+        
+        primaryKeyChanges.forEach(primaryKeyField => {
+            const sourceApp = this.getPrimaryKeySourceApp(primaryKeyField);
+            
+            if (ledgerName === sourceApp) {
+                // 起点台帳の場合、全フィールドを含める
+                const updateFields = CONFIG.getLedgerUpdateFields(ledgerName);
+                Object.keys(updateFields).forEach(fieldCode => {
+                    relatedFields.add(fieldCode);
+                });
+            } else {
+                // 他台帳の場合、該当主キーフィールドのみ
+                relatedFields.add(primaryKeyField);
+            }
+        });
+        
+        return relatedFields;
+    }
+
+    /**
+     * 主キーフィールドに対応するsourceAppを取得
+     */
+    getPrimaryKeySourceApp(primaryKeyField) {
+        const col = CONFIG.integratedTableConfig.columns.find(c => c.fieldCode === primaryKeyField && c.primaryKey);
+        return col ? col.ledger : null;
     }
 
     /**
