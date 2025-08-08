@@ -706,6 +706,11 @@ class VirtualScroll {
             tbody.appendChild(row);
         }
         
+        // バリデーションの赤ハイライトを再適用（仮想スクロール再描画後）
+        if (window.validation && typeof window.validation.restoreInvalidStylesUI === 'function') {
+            window.validation.restoreInvalidStylesUI();
+        }
+
         // オフセット設定（上部の空白を作る）
         const offsetTop = startIndex * CONFIG.virtualScroll.rowHeight;
         tbody.style.transform = `translateY(${offsetTop}px)`;
@@ -777,7 +782,10 @@ class VirtualScroll {
             // フィールド情報を取得してフィールドタイプを判定
             const fieldInfo = await this.getFieldInfo(column.appId, column.fieldCode);
             
-            if (fieldInfo && (fieldInfo.type === 'dropdown' || fieldInfo.type === 'radio')) {
+            if (fieldInfo && fieldInfo.type === 'checkbox') {
+                // チェックボックス（複数選択）
+                return this.createMultiSelectInput(column, displayValue, recordIndex, columnIndex, fieldInfo.options);
+            } else if (fieldInfo && (fieldInfo.type === 'dropdown' || fieldInfo.type === 'radio')) {
                 // ドロップダウン/ラジオボタンの場合
                 return this.createSelectInput(column, displayValue, recordIndex, columnIndex, fieldInfo.options);
             } else {
@@ -815,6 +823,15 @@ class VirtualScroll {
         // 値変更時のイベントリスナー
         input.addEventListener('change', (event) => {
             this.handleCellValueChange(event.target);
+        });
+
+        // 入力直後のバリデーション
+        input.addEventListener('blur', async (event) => {
+            const idx = parseInt(event.target.getAttribute('data-record-index'));
+            const key = event.target.getAttribute('data-field-key');
+            if (window.validation) {
+                await window.validation.validateField(idx, key);
+            }
         });
 
         return input;
@@ -867,6 +884,15 @@ class VirtualScroll {
         // 値変更時のイベントリスナー
         select.addEventListener('change', (event) => {
             this.handleCellValueChange(event.target);
+        });
+
+        // 入力直後のバリデーション
+        select.addEventListener('blur', async (event) => {
+            const idx = parseInt(event.target.getAttribute('data-record-index'));
+            const key = event.target.getAttribute('data-field-key');
+            if (window.validation) {
+                await window.validation.validateField(idx, key);
+            }
         });
 
         return select;
@@ -941,7 +967,13 @@ class VirtualScroll {
     handleCellValueChange(inputElement) {
         const recordIndex = parseInt(inputElement.getAttribute('data-record-index'));
         const fieldKey = inputElement.getAttribute('data-field-key');
-        const newValue = inputElement.value;
+        let newValue;
+        if (inputElement.tagName === 'SELECT' && inputElement.multiple) {
+            // 複数選択（チェックボックスタイプ）
+            newValue = Array.from(inputElement.selectedOptions).map(opt => opt.value);
+        } else {
+            newValue = inputElement.value;
+        }
 
         // TableRendererの現在のデータを更新
         if (window.tableRenderer && window.tableRenderer.currentSearchResults) {
@@ -956,8 +988,74 @@ class VirtualScroll {
                 // --- 追加: BSSIDフィールド変更時の処理 ---
                 this.handleUserIdChange(recordIndex, fieldKey, newValue);
                 // --- ここまで追加 ---
+
+                // 変更直後に行単位でバリデーションを実行（ドロップダウン含む）
+                if (window.validation && typeof window.validation.validateRow === 'function') {
+                    // 非同期でも待たずに投げる（UIブロック回避）
+                    window.validation.validateRow(recordIndex);
+                }
             }
         }
+    }
+
+    /**
+     * 複数選択用セレクト（チェックボックス相当）
+     */
+    createMultiSelectInput(column, value, recordIndex, columnIndex, options) {
+        const select = DOMHelper.createElement('select', {
+            'data-record-index': recordIndex,
+            'data-field-key': column.key,
+            multiple: 'multiple',
+            size: '4'
+        }, 'editable-cell-select');
+
+        // 値を配列に正規化
+        const toArray = (v) => {
+            if (Array.isArray(v)) return v.map(x => String(x));
+            if (v && typeof v === 'object' && 'value' in v) return toArray(v.value);
+            if (typeof v === 'string') return v.split(',').map(s => s.trim()).filter(Boolean);
+            if (v == null || v === undefined) return [];
+            return [String(v)];
+        };
+        const selectedValues = toArray(value);
+
+        // ツールチップ
+        if (selectedValues.length > 0) {
+            select.title = selectedValues.join(', ');
+        }
+
+        // 選択肢
+        if (options && options.length > 0) {
+            options.forEach(option => {
+                const optionElement = DOMHelper.createElement('option', { value: option });
+                optionElement.textContent = option;
+                if (selectedValues.includes(option)) {
+                    optionElement.selected = true;
+                }
+                select.appendChild(optionElement);
+            });
+        }
+
+        // フォーカス時に元の値を保存
+        select.addEventListener('focus', (event) => {
+            this.saveOriginalValueOnEdit(event.target);
+        });
+
+        // 値変更時
+        select.addEventListener('change', (event) => {
+            this.handleCellValueChange(event.target);
+        });
+
+        // 変更後のバリデーション（blur）
+        select.addEventListener('blur', async (event) => {
+            const idx = parseInt(event.target.getAttribute('data-record-index'));
+            const key = event.target.getAttribute('data-field-key');
+            if (window.validation) {
+                await window.validation.validateRow(idx);
+            }
+        });
+
+        return select;
     }
 
     /**

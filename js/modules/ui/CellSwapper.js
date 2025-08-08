@@ -133,7 +133,7 @@ class CellSwapper {
     /**
      * ドロップ処理
      */
-    handleDrop(e, targetCell, targetRowIndex, targetColumnKey, targetFieldCode) {
+    async handleDrop(e, targetCell, targetRowIndex, targetColumnKey, targetFieldCode) {
         e.preventDefault();
         targetCell.classList.remove('drop-target', 'drop-invalid');
         
@@ -158,7 +158,7 @@ class CellSwapper {
             }
             
             // 主キー値を交換
-            this.swapPrimaryKeyValues(sourceRowIndex, targetRowIndex, sourceFieldCode);
+            await this.swapPrimaryKeyValues(sourceRowIndex, targetRowIndex, sourceFieldCode);
             
             // 主キー交換の詳細ログは swapPrimaryKeyValues で出力
             
@@ -243,7 +243,7 @@ class CellSwapper {
      *   - 内線台帳：PC番号フィールドのみ交換（内線番号、電話機種別は交換しない）
      *   - 座席台帳：PC番号フィールドのみ交換（座席番号、座席拠点等は交換しない）
      */
-    swapPrimaryKeyValues(sourceRowIndex, targetRowIndex, primaryKeyField) {
+    async swapPrimaryKeyValues(sourceRowIndex, targetRowIndex, primaryKeyField) {
         const sourceRecord = this.tableRenderer.currentSearchResults[sourceRowIndex];
         const targetRecord = this.tableRenderer.currentSearchResults[targetRowIndex];
         
@@ -310,6 +310,17 @@ class CellSwapper {
         
         // セル交換後に空行をチェックして削除（スクロール位置を渡す）
         this.removeEmptyRowsAfterSwap(savedScrollTop);
+
+        // 交換後の行をバリデーション
+        try {
+            if (window.validation) {
+                await window.validation.validateRow(sourceRowIndex);
+                await window.validation.validateRow(targetRowIndex);
+            }
+        } catch (e) {
+            // バリデーション失敗は致命ではないためログのみ
+            console.warn('セル交換後のバリデーションでエラー:', e);
+        }
         
         return true;
     }
@@ -482,7 +493,7 @@ class CellSwapper {
     /**
      * 台帳分離処理
      */
-    separateLedger(recordIndex, fieldCode) {
+    async separateLedger(recordIndex, fieldCode) {
         const sourceRecord = this.tableRenderer.currentSearchResults[recordIndex];
         
         if (!sourceRecord) {
@@ -543,6 +554,16 @@ class CellSwapper {
         
         // 分離処理後はテーブル再描画が必要（データが変更されたため）
         this.tableRenderer.refreshVirtualScrollTable();
+
+        // 分離後の両行をバリデーション
+        try {
+            if (window.validation) {
+                await window.validation.validateRow(recordIndex);
+                await window.validation.validateRow(emptyRowIndex);
+            }
+        } catch (e) {
+            console.warn('分離後のバリデーションでエラー:', e);
+        }
         
         return true;
     }

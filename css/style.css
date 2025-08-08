@@ -631,6 +631,12 @@ table input {
     transition: background-color 0.3s ease;
 }
 
+/* バリデーション不正セルの簡易スタイル */
+.cell-invalid {
+    background-color: #ffcccc !important;
+    border-left: 3px solid #c0392b !important;
+}
+
 /* 分離ボタンのスタイル */
 .separate-button {
     display: none; /* 通常は非表示 */

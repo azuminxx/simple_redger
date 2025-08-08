@@ -508,6 +508,15 @@ class TableRenderer {
         }
 
         try {
+            // 保存前バリデーション
+            if (window.validation) {
+                const changedIndices = window.virtualScroll?.getChangedRecordIndices?.() || [];
+                const ok = await window.validation.validateBeforeSave(changedIndices);
+                if (!ok) {
+                    // 不正あり → 保存中断
+                    return;
+                }
+            }
             // 変更されたレコードのインデックスを取得
             if (!window.virtualScroll) {
                 throw new Error('VirtualScrollインスタンスが見つかりません');
@@ -1059,6 +1068,14 @@ class TableRenderer {
                 
                 // 変更フラグUIを復元
                 this.virtualScroll.restoreChangeFlagsUI();
+                // バリデーションハイライトも復元
+                if (window.validation && typeof window.validation.restoreInvalidStylesUI === 'function') {
+                    window.validation.restoreInvalidStylesUI();
+                }
+                // バリデーションハイライトも復元
+                if (window.validation) {
+                    window.validation.restoreInvalidStylesUI();
+                }
                 
                 console.log(`✅ VirtualScrollテーブル再描画完了 (${this.currentSearchResults.length}件)`);
             }
@@ -1100,6 +1117,10 @@ class TableRenderer {
                         newScrollContainer.scrollTop = savedScrollTop;
                     }
                 }, 150); // 十分な時間を確保
+            }
+            // バリデーションハイライトも復元
+            if (window.validation) {
+                window.validation.restoreInvalidStylesUI();
             }
             
         } catch (error) {

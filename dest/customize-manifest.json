@@ -5,6 +5,7 @@
         "js": [
           "js/config.js",
           "js/modules/utils/DOMHelper.js",
+          "js/modules/utils/Validation.js",
           "js/modules/api/UserListAPI.js",
           "js/modules/api/FieldInfoAPI.js",
           "js/modules/ui/FormBuilder.js",
