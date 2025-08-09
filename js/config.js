@@ -268,91 +268,89 @@ const CONFIG = {
     // デフォルトフィールドタイプ
     defaultFieldType: 'text',
 
-    // バリデーション設定（条件付き必須 など）
+    // バリデーション設定（統一ルール）
     validation: {
         // 列定義(required:true)の固定必須を適用するか
         enforceColumnRequired: false,
-        // 条件付き必須: 条件が満たされたときに targetKey が必須
-        // operator: 'notEmpty'（指定フィールドが未空であること）
-        conditionalRequired: [
-            { targetKey: '座席台帳_座席部署', when: [ { fieldKey: '座席台帳_座席番号', operator: 'notEmpty' } ]},
-            { targetKey: '座席台帳_座席拠点', when: [ { fieldKey: '座席台帳_座席番号', operator: 'notEmpty' } ]},
-            { targetKey: '内線台帳_電話機種別', when: [ { fieldKey: '内線台帳_内線番号', operator: 'notEmpty' } ]}
-        ],
-        // 値ルール: 特定値のとき他フィールドの状態（empty/notEmpty/any）を求める
-        valueRules: [
+        // 統一ルール: 条件 when を満たすとき、assert で各フィールドの状態・値を要求
+        // assert の各エントリの値は以下をサポート:
+        //   { state: 'empty' | 'notEmpty' } / { required: true } / { equals, notEquals, equalsAny:[], containsAll:[] }
+        rules: [
+            // 条件付き必須（座席番号が入ったら 部署/拠点 必須）
             {
-                // PC用途=在庫 → BSSID, 内線番号, 座席番号 は空欄
+                when: [ { fieldKey: '座席台帳_座席番号', operator: 'notEmpty' } ],
+                assert: {
+                    '座席台帳_座席部署': { state: 'notEmpty' },
+                    '座席台帳_座席拠点': { state: 'notEmpty' }
+                }
+            },
+            // 条件付き必須（内線番号が入ったら 電話機種別 必須）
+            {
+                when: [ { fieldKey: '内線台帳_内線番号', operator: 'notEmpty' } ],
+                assert: {
+                    '内線台帳_電話機種別': { state: 'notEmpty' }
+                }
+            },
+
+            // PC用途ごとの相互制約（旧 valueRules）
+            {
                 when: [ { fieldKey: 'PC台帳_PC用途', operator: 'equals', value: '在庫' } ],
-                expect: {
-                    'PC台帳_BSSID': 'empty',
-                    '内線台帳_内線番号': 'empty',
-                    '座席台帳_座席番号': 'empty'
+                assert: {
+                    'PC台帳_BSSID': { state: 'empty' },
+                    '内線台帳_内線番号': { state: 'empty' },
+                    '座席台帳_座席番号': { state: 'empty' }
                 }
             },
             {
-                // PC用途=個人専用 → BSSID空欄、内線番号は問わず、座席番号空欄
                 when: [ { fieldKey: 'PC台帳_PC用途', operator: 'equals', value: '個人専用' } ],
-                expect: {
-                    'PC台帳_BSSID': 'notEmpty',
-                    '内線台帳_内線番号': 'any',
-                    '座席台帳_座席番号': 'empty'
+                assert: {
+                    // 仕様に合わせ、現行設定を踏襲
+                    'PC台帳_BSSID': { state: 'notEmpty' },
+                    '座席台帳_座席番号': { state: 'empty' }
                 }
             },
             {
-                // PC用途=CO/TOブース用 → BSSID空欄、内線番号は問わず、座席番号あり
                 when: [ { fieldKey: 'PC台帳_PC用途', operator: 'equals', value: 'CO/TOブース' } ],
-                expect: {
-                    'PC台帳_BSSID': 'empty',
-                    '内線台帳_内線番号': 'any',
-                    '座席台帳_座席番号': 'notEmpty'
+                assert: {
+                    'PC台帳_BSSID': { state: 'empty' },
+                    '座席台帳_座席番号': { state: 'notEmpty' }
                 }
             },
             {
-                // PC用途=RPA用 → BSSID空欄、内線番号空欄、座席番号あり
                 when: [ { fieldKey: 'PC台帳_PC用途', operator: 'equals', value: 'RPA用' } ],
-                expect: {
-                    'PC台帳_BSSID': 'empty',
-                    '内線台帳_内線番号': 'empty',
-                    '座席台帳_座席番号': 'notEmpty'
+                assert: {
+                    'PC台帳_BSSID': { state: 'empty' },
+                    '内線台帳_内線番号': { state: 'empty' },
+                    '座席台帳_座席番号': { state: 'notEmpty' }
                 }
             },
             {
-                // PC用途=拠点設備用 → BSSID空欄、内線番号は問わず、座席番号あり
                 when: [ { fieldKey: 'PC台帳_PC用途', operator: 'equals', value: '拠点設備用' } ],
-                expect: {
-                    'PC台帳_BSSID': 'empty',
-                    '内線台帳_内線番号': 'any',
-                    '座席台帳_座席番号': 'notEmpty'
+                assert: {
+                    'PC台帳_BSSID': { state: 'empty' },
+                    '座席台帳_座席番号': { state: 'notEmpty' }
                 }
             },
             {
-                // PC用途=会議室用 → BSSID空欄、内線番号は問わず、座席番号あり
                 when: [ { fieldKey: 'PC台帳_PC用途', operator: 'equals', value: '会議室用' } ],
-                expect: {
-                    'PC台帳_BSSID': 'empty',
-                    '内線台帳_内線番号': 'any',
-                    '座席台帳_座席番号': 'notEmpty'
+                assert: {
+                    'PC台帳_BSSID': { state: 'empty' },
+                    '座席台帳_座席番号': { state: 'notEmpty' }
                 }
-            }
-        ]
-        ,
-        // 組み合わせルール: 特定条件のとき、指定フィールドに複数値の包含や、いずれか一致などを要求
-        // containsAll: すべて含む / equalsAny: いずれか一致（単一選択に有用）
-        combinationRules: [
+            },
+
+            // 組み合わせルール（旧 combinationRules）
             {
                 when: [ { fieldKey: 'PC台帳_PC用途', operator: 'equals', value: '拠点設備用' } ],
-                requires: [
-                    // 単一選択: sample2 または sample3 のいずれかでOK
-                    { fieldKey: 'PC台帳_test1', equalsAny: ['sample2', 'sample3'] }
-                ]
+                assert: {
+                    'PC台帳_test1': { equalsAny: ['sample2', 'sample3'] }
+                }
             },
             {
-                // 逆引き: test1 が sample2 または sample3 なら、PC用途 は 拠点設備用 である必要
                 when: [ { fieldKey: 'PC台帳_test1', operator: 'equalsAny', value: ['sample2', 'sample3'] } ],
-                requires: [
-                    { fieldKey: 'PC台帳_PC用途', equals: '拠点設備用' }
-                ]
+                assert: {
+                    'PC台帳_PC用途': { equals: '拠点設備用' }
+                }
             }
         ]
     },

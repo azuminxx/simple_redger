@@ -109,92 +109,50 @@ class ValidationEngine {
       // 型取得失敗時はスキップ
     }
 
-    // 3) 条件付き必須（CONFIG.validation.conditionalRequired）
+    // 3) 統一ルール（CONFIG.validation.rules）
     try {
-      if (row && Array.isArray(CONFIG?.validation?.conditionalRequired)) {
-        const targetKey = column.key; // 台帳_フィールド 形式
-        const rules = CONFIG.validation.conditionalRequired.filter(r => r.targetKey === targetKey);
-        for (const rule of rules) {
-          const allConditionsMet = (rule.when || []).every(cond => {
-            const val = row[cond.fieldKey];
-            switch (cond.operator) {
-              case 'notEmpty':
-                return !this.isEmpty(val);
-              case 'empty':
-                return this.isEmpty(val);
-              case 'equals':
-                return String(val ?? '') === String(cond.value ?? '');
-              case 'notEquals':
-                return String(val ?? '') !== String(cond.value ?? '');
-              default:
-                return false;
-            }
-          });
-          if (allConditionsMet && this.isEmpty(value)) {
-            errors.push('必須（条件付き）');
-            break;
-          }
-        }
-      }
-    } catch (e) {
-      // 無視
-    }
-
-    // 4) 値ルール（CONFIG.validation.valueRules）
-    try {
-      if (row && Array.isArray(CONFIG?.validation?.valueRules)) {
-        // どのルールにも一致しない場合はスキップ。一致したルールのexpectに従って評価
-        for (const rule of CONFIG.validation.valueRules) {
-          const match = (rule.when || []).every(cond => this.evaluateCondition(row, cond));
-          if (!match) continue;
-
-          // 期待状態を評価
-          const expect = rule.expect || {};
-          if (Object.prototype.hasOwnProperty.call(expect, column.key)) {
-            const expectedState = expect[column.key]; // 'empty' | 'notEmpty' | 'any'
-            if (expectedState === 'empty' && !this.isEmpty(value)) {
-              errors.push('空欄である必要があります');
-            } else if (expectedState === 'notEmpty' && this.isEmpty(value)) {
-              errors.push('値が必要です');
-            } // 'any' は制約なし
-          }
-        }
-      }
-    } catch (e) {
-      // 無視
-    }
-
-    // 5) 組み合わせルール（CONFIG.validation.combinationRules）
-    try {
-      if (row && Array.isArray(CONFIG?.validation?.combinationRules)) {
-        for (const rule of CONFIG.validation.combinationRules) {
-          if (!rule.requires) continue;
-          // このカラムに関係する要件のみ評価
-          const req = rule.requires.find(r => r.fieldKey === column.key);
-          if (!req) continue;
-
-          // 正引きのみ評価（whenが成立した場合に限り要件をチェック）
+      if (row && Array.isArray(CONFIG?.validation?.rules)) {
+        for (const rule of CONFIG.validation.rules) {
+          // when 条件があれば評価
           const whenMatched = (rule.when || []).every(cond => this.evaluateCondition(row, cond));
           if (!whenMatched) continue;
 
+          const assertions = rule.assert || {};
+          if (!Object.prototype.hasOwnProperty.call(assertions, column.key)) continue;
+
+          const requirement = assertions[column.key] || {};
           const current = value;
           const curArr = this.toArrayValue(current);
 
-          if (Array.isArray(req.containsAll)) {
-            const missing = req.containsAll.filter(x => !curArr.includes(String(x)));
-            if (missing.length > 0) {
-              errors.push(`次をすべて選択してください: ${req.containsAll.join(', ')}`);
+          // 状態系（empty / notEmpty / any / required）
+          const state = requirement.state || (requirement.required ? 'notEmpty' : undefined);
+          if (state === 'empty' && !this.isEmpty(current)) {
+            errors.push('空欄である必要があります');
+          } else if (state === 'notEmpty' && this.isEmpty(current)) {
+            errors.push('値が必要です');
+          }
+
+          // 値比較系（equals / notEquals / equalsAny / containsAll）
+          if (Object.prototype.hasOwnProperty.call(requirement, 'equals')) {
+            if (String(current ?? '') !== String(requirement.equals ?? '')) {
+              errors.push(`値は「${requirement.equals}」である必要があります`);
             }
           }
-          if (Array.isArray(req.equalsAny)) {
-            const ok = req.equalsAny.some(x => curArr.includes(String(x)));
+          if (Object.prototype.hasOwnProperty.call(requirement, 'notEquals')) {
+            if (String(current ?? '') === String(requirement.notEquals ?? '')) {
+              errors.push(`値は「${requirement.notEquals}」以外である必要があります`);
+            }
+          }
+          if (Array.isArray(requirement.equalsAny)) {
+            const ok = requirement.equalsAny.some(x => curArr.includes(String(x)));
             if (!ok) {
-              errors.push(`次のいずれかを選択してください: ${req.equalsAny.join(', ')}`);
+              errors.push(`次のいずれかを選択してください: ${requirement.equalsAny.join(', ')}`);
             }
           }
-          if (Object.prototype.hasOwnProperty.call(req, 'equals')) {
-            if (String(current ?? '') !== String(req.equals ?? '')) {
-              errors.push(`値は「${req.equals}」である必要があります`);
+          if (Array.isArray(requirement.containsAll)) {
+            const missing = requirement.containsAll.filter(x => !curArr.includes(String(x)));
+            if (missing.length > 0) {
+              errors.push(`次をすべて選択してください: ${requirement.containsAll.join(', ')}`);
             }
           }
         }
