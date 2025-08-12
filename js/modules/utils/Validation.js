@@ -7,6 +7,8 @@ class ValidationEngine {
   constructor() {
     // レコードID（統合キー）→ 不正フィールドSet
     this.invalidFields = new Map();
+    // レコードID（統合キー）→ { fieldKey: errorMessage(joined) }
+    this.invalidFieldMessages = new Map();
   }
 
   // ===== 公開API =====
@@ -26,7 +28,7 @@ class ValidationEngine {
       const errors = await this.runFieldRules(column, value, row);
 
       if (errors.length > 0) {
-        this.markInvalid(recordIndex, fieldKey);
+        this.markInvalid(recordIndex, fieldKey, errors);
         return false;
       } else {
         this.clearInvalid(recordIndex, fieldKey);
@@ -51,7 +53,7 @@ class ValidationEngine {
         const value = row[column.key];
         const errors = await this.runFieldRules(column, value, row);
         if (errors.length > 0) {
-          this.markInvalid(recordIndex, column.key);
+          this.markInvalid(recordIndex, column.key, errors);
           return false;
         } else {
           this.clearInvalid(recordIndex, column.key);
@@ -77,7 +79,31 @@ class ValidationEngine {
     }
 
     if (!allValid) {
-      this.showToast('未入力または不正な値があります。ハイライトされたセルを修正してください。', 'error');
+      try {
+        // 不正箇所の要約（最大3件の例示）を作成
+        const examples = [];
+        let totalErrors = 0;
+        for (const idx of changedIndices) {
+          const recordId = window.virtualScroll?.getRecordId(idx);
+          if (!recordId) continue;
+          const fieldSet = this.invalidFields.get(recordId);
+          if (!fieldSet || fieldSet.size === 0) continue;
+          fieldSet.forEach(fieldKey => {
+            totalErrors++;
+            if (examples.length < 3) {
+              const col = CONFIG.integratedTableConfig.columns.find(c => c.key === fieldKey);
+              const label = col ? col.label : fieldKey;
+              const msgMap = this.invalidFieldMessages.get(recordId);
+              const msg = msgMap && msgMap[fieldKey] ? msgMap[fieldKey] : '不正な値です';
+              examples.push(`行${idx + 1}「${label}」: ${msg}`);
+            }
+          });
+        }
+        const exampleText = examples.length > 0 ? `（例: ${examples.join(' / ')}${totalErrors > examples.length ? ` 他${totalErrors - examples.length}件` : ''}）` : '';
+        this.showToast(`未入力または不正な値が見つかりました。赤いセルを修正してください ${exampleText}`.trim(), 'error');
+      } catch (e) {
+        this.showToast('未入力または不正な値があります。ハイライトされたセルを修正してください。', 'error');
+      }
     }
     return allValid;
   }
@@ -127,32 +153,32 @@ class ValidationEngine {
           // 状態系（empty / notEmpty / any / required）
           const state = requirement.state || (requirement.required ? 'notEmpty' : undefined);
           if (state === 'empty' && !this.isEmpty(current)) {
-            errors.push('空欄である必要があります');
+            errors.push(this.buildRuleMessage(column, 'stateEmpty', { }, rule.when, row));
           } else if (state === 'notEmpty' && this.isEmpty(current)) {
-            errors.push('値が必要です');
+            errors.push(this.buildRuleMessage(column, 'stateNotEmpty', { }, rule.when, row));
           }
 
           // 値比較系（equals / notEquals / equalsAny / containsAll）
           if (Object.prototype.hasOwnProperty.call(requirement, 'equals')) {
             if (String(current ?? '') !== String(requirement.equals ?? '')) {
-              errors.push(`値は「${requirement.equals}」である必要があります`);
+              errors.push(this.buildRuleMessage(column, 'equals', { equals: requirement.equals }, rule.when, row));
             }
           }
           if (Object.prototype.hasOwnProperty.call(requirement, 'notEquals')) {
             if (String(current ?? '') === String(requirement.notEquals ?? '')) {
-              errors.push(`値は「${requirement.notEquals}」以外である必要があります`);
+              errors.push(this.buildRuleMessage(column, 'notEquals', { notEquals: requirement.notEquals }, rule.when, row));
             }
           }
           if (Array.isArray(requirement.equalsAny)) {
             const ok = requirement.equalsAny.some(x => curArr.includes(String(x)));
             if (!ok) {
-              errors.push(`次のいずれかを選択してください: ${requirement.equalsAny.join(', ')}`);
+              errors.push(this.buildRuleMessage(column, 'equalsAny', { equalsAny: requirement.equalsAny }, rule.when, row));
             }
           }
           if (Array.isArray(requirement.containsAll)) {
             const missing = requirement.containsAll.filter(x => !curArr.includes(String(x)));
             if (missing.length > 0) {
-              errors.push(`次をすべて選択してください: ${requirement.containsAll.join(', ')}`);
+              errors.push(this.buildRuleMessage(column, 'containsAll', { containsAll: requirement.containsAll }, rule.when, row));
             }
           }
         }
@@ -193,9 +219,69 @@ class ValidationEngine {
     return [String(v)];
   }
 
+  // ルールに基づく説明的なエラーメッセージを構築
+  buildRuleMessage(column, kind, payload = {}, when = [], row = {}) {
+    const label = this.getFieldLabelByKey(column.key);
+    const reason = this.formatWhenReason(when, row);
+    let tail;
+    switch (kind) {
+      case 'stateEmpty':
+        tail = `（${label}）が空欄である必要があります`;
+        break;
+      case 'stateNotEmpty':
+        tail = `（${label}）に値が必要です`;
+        break;
+      case 'equals':
+        tail = `（${label}）は「${payload.equals}」である必要があります`;
+        break;
+      case 'notEquals':
+        tail = `（${label}）は「${payload.notEquals}」以外である必要があります`;
+        break;
+      case 'equalsAny':
+        tail = `（${label}）で次のいずれかを選択してください: ${payload.equalsAny.join(', ')}`;
+        break;
+      case 'containsAll':
+        tail = `（${label}）で次をすべて選択してください: ${payload.containsAll.join(', ')}`;
+        break;
+      default:
+        tail = `（${label}）が不正です`;
+    }
+    return reason ? `${reason}、${tail}` : tail;
+  }
+
+  // when配列から理由文を生成
+  formatWhenReason(when = [], row = {}) {
+    if (!Array.isArray(when) || when.length === 0) return '';
+    const parts = when.map(cond => {
+      const label = this.getFieldLabelByKey(cond.fieldKey);
+      const v = cond.value;
+      switch (cond.operator) {
+        case 'notEmpty':
+          return `${label}が入力されているため`;
+        case 'empty':
+          return `${label}が空欄のため`;
+        case 'equals':
+          return `${label}が「${v}」のため`;
+        case 'notEquals':
+          return `${label}が「${v}」以外のため`;
+        case 'equalsAny':
+          return `${label}が「${Array.isArray(v) ? v.join(' / ') : v}」のいずれかのため`;
+        default:
+          return `${label}の条件に合致したため`;
+      }
+    });
+    return parts.join('かつ');
+  }
+
+  // キーからカラムラベルを取得
+  getFieldLabelByKey(fieldKey) {
+    const col = CONFIG?.integratedTableConfig?.columns?.find(c => c.key === fieldKey);
+    return col?.label || fieldKey;
+  }
+
   // ===== 内部: UI反映 =====
 
-  markInvalid(recordIndex, fieldKey) {
+  markInvalid(recordIndex, fieldKey, errors = []) {
     const recordId = window.virtualScroll?.getRecordId(recordIndex);
     if (!recordId) return;
 
@@ -204,10 +290,26 @@ class ValidationEngine {
     }
     this.invalidFields.get(recordId).add(fieldKey);
 
+    // メッセージを保存
+    const message = Array.isArray(errors) && errors.length > 0 ? errors.join('、') : '不正な値です';
+    if (!this.invalidFieldMessages.has(recordId)) {
+      this.invalidFieldMessages.set(recordId, {});
+    }
+    const msgMap = this.invalidFieldMessages.get(recordId);
+    msgMap[fieldKey] = message;
+
     // セルにスタイル適用
     const cell = document.querySelector(`td[data-record-index="${recordIndex}"][data-column="${fieldKey}"]`)
       || window.virtualScroll?.findCellElementByRecordId(recordId, fieldKey);
-    if (cell) cell.classList.add('cell-invalid');
+    if (cell) {
+      cell.classList.add('cell-invalid');
+      const col = CONFIG.integratedTableConfig.columns.find(c => c.key === fieldKey);
+      const label = col ? col.label : fieldKey;
+      const tooltip = `エラー（${label}）: ${message}`;
+      cell.setAttribute('title', tooltip);
+      const input = cell.querySelector('input, select');
+      if (input) input.setAttribute('title', tooltip);
+    }
   }
 
   clearInvalid(recordIndex, fieldKey) {
@@ -216,9 +318,30 @@ class ValidationEngine {
     if (this.invalidFields.has(recordId)) {
       this.invalidFields.get(recordId).delete(fieldKey);
     }
+    if (this.invalidFieldMessages.has(recordId)) {
+      const msgMap = this.invalidFieldMessages.get(recordId);
+      delete msgMap[fieldKey];
+      // 空になったら削除
+      if (Object.keys(msgMap).length === 0) {
+        this.invalidFieldMessages.delete(recordId);
+      }
+    }
     const cell = document.querySelector(`td[data-record-index="${recordIndex}"][data-column="${fieldKey}"]`)
       || window.virtualScroll?.findCellElementByRecordId(recordId, fieldKey);
-    if (cell) cell.classList.remove('cell-invalid');
+    if (cell) {
+      cell.classList.remove('cell-invalid');
+      // 既に自動付与したtitleをクリア（他用途のtitleは残す）
+      const col = CONFIG.integratedTableConfig.columns.find(c => c.key === fieldKey);
+      const label = col ? col.label : fieldKey;
+      const prefix = `エラー（${label}）:`;
+      if ((cell.getAttribute('title') || '').startsWith(prefix)) {
+        cell.removeAttribute('title');
+      }
+      const input = cell.querySelector('input, select');
+      if (input && (input.getAttribute('title') || '').startsWith(prefix)) {
+        input.removeAttribute('title');
+      }
+    }
   }
 
   /**
@@ -229,7 +352,20 @@ class ValidationEngine {
       this.invalidFields.forEach((fieldSet, recordId) => {
         fieldSet.forEach(fieldKey => {
           const cell = window.virtualScroll?.findCellElementByRecordId(recordId, fieldKey);
-          if (cell) cell.classList.add('cell-invalid');
+          if (cell) {
+            cell.classList.add('cell-invalid');
+            // メッセージの復元（title）
+            const msgMap = this.invalidFieldMessages.get(recordId);
+            const message = msgMap && msgMap[fieldKey] ? msgMap[fieldKey] : null;
+            if (message) {
+              const col = CONFIG.integratedTableConfig.columns.find(c => c.key === fieldKey);
+              const label = col ? col.label : fieldKey;
+              const tooltip = `エラー（${label}）: ${message}`;
+              cell.setAttribute('title', tooltip);
+              const input = cell.querySelector('input, select');
+              if (input) input.setAttribute('title', tooltip);
+            }
+          }
         });
       });
     }, 80);
