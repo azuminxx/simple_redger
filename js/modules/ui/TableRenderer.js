@@ -101,6 +101,15 @@ class TableRenderer {
         title.textContent = `統合検索結果：${integratedData.length}件（` +
             `正常：${normalCount}件／不整合：${inconsistentCount}件）`;
         titleContainer.appendChild(title);
+
+        // テーブル内検索結果件数表示用
+        const searchResultTitle = DOMHelper.createElement('span', {}, 'table-search-result-count');
+        searchResultTitle.textContent = `テーブル内検索結果：${integratedData.length}件`;
+        searchResultTitle.style.marginLeft = '20px';
+        searchResultTitle.style.fontSize = '14px';
+        searchResultTitle.style.color = '#007bff';
+        searchResultTitle.style.fontWeight = '600';
+        titleContainer.appendChild(searchResultTitle);
         
         // 保存ボタンを作成
         const saveButton = DOMHelper.createElement('button', {}, 'save-changes-button');
@@ -315,6 +324,9 @@ class TableRenderer {
             }
             // 仮想テーブル再描画
             this.currentSearchResults = filteredData;
+            
+            // テーブル内検索結果件数を更新
+            this.updateSearchResultCount(filteredData.length);
             
             // 既存のテーブルコンテナを取得
             const oldTable = integratedResultsContainer.querySelector('.integrated-table-container');
@@ -1383,6 +1395,16 @@ class TableRenderer {
         });
         
         return groups;
+    }
+
+    /**
+     * テーブル内検索結果件数を更新
+     */
+    updateSearchResultCount(count) {
+        const searchResultTitle = document.querySelector('.table-search-result-count');
+        if (searchResultTitle) {
+            searchResultTitle.textContent = `テーブル内検索結果：${count}件`;
+        }
     }
 
 }
