@@ -286,6 +286,11 @@ class TabManager {
             // 更新履歴タブが開かれた際、検索メニューが閉じられていた場合は開く
             this.openSearchMenuIfClosed();
         }
+        
+        // 設定タブが選択された場合、検索メニューが閉じられていた場合は開く
+        if (appId === 'settings') {
+            this.openSearchMenuIfClosed();
+        }
 
         // search-results要素の表示・非表示を切り替え
         this.toggleSearchResultsVisibility(appId);
