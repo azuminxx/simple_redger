@@ -883,3 +883,92 @@ td.editable-cell select,
     background: #fff0f0;
 }  */
 
+/* チェックボックスヘッダーのスタイル */
+.checkbox-header {
+    text-align: center;
+    font-weight: bold;
+    background-color: #f8f9fa;
+    padding: 4px;
+}
+
+/* フィルターボタンコンテナ */
+.filter-button-container {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ヘッダー内のトグルボタン共通スタイル */
+.header-toggle-button {
+    color: white;
+    border: none;
+    padding: 3px 6px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 10px;
+    font-weight: bold;
+    transition: background-color 0.2s ease;
+    min-width: 30px;
+}
+
+/* ヘッダー内の絞り込みボタン（青色） */
+.header-filter-button {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    padding: 3px 6px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 10px;
+    font-weight: bold;
+    transition: background-color 0.2s ease;
+    min-width: 30px;
+}
+
+.header-filter-button:hover {
+    background-color: #0056b3;
+}
+
+.header-filter-button:active {
+    background-color: #004085;
+}
+
+/* ヘッダー内の解除ボタン（赤色） */
+.header-clear-button {
+    background-color: #dc3545;
+    color: white;
+    border: none;
+    padding: 3px 6px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 10px;
+    font-weight: bold;
+    transition: background-color 0.2s ease;
+    min-width: 30px;
+}
+
+.header-clear-button:hover {
+    background-color: #c82333;
+}
+
+.header-clear-button:active {
+    background-color: #bd2130;
+}
+
+/* チェックボックスセルのスタイル */
+.checkbox-cell {
+    text-align: center;
+    vertical-align: middle;
+    padding: 8px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.row-checkbox {
+    cursor: pointer;
+    transform: scale(1.2);
+}
+

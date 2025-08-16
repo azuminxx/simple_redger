@@ -544,6 +544,12 @@ class VirtualScroll {
     createColgroup() {
         const colgroup = DOMHelper.createElement('colgroup');
         
+        // チェックボックスカラム用のcol要素を追加
+        const checkboxCol = DOMHelper.createElement('col');
+        checkboxCol.className = 'col-checkbox';
+        checkboxCol.style.width = '50px';
+        colgroup.appendChild(checkboxCol);
+        
         CONFIG.integratedTableConfig.columns.forEach((column, index) => {
             const col = DOMHelper.createElement('col');
             // インラインCSSを避け、クラス名で幅を制御
@@ -575,6 +581,40 @@ class VirtualScroll {
             const record = data[i];
             const row = DOMHelper.createElement('tr');
             row.setAttribute('data-record-index', i);
+            
+            // チェックボックスセルを先頭に追加
+            const checkboxTd = DOMHelper.createElement('td');
+            checkboxTd.className = 'checkbox-cell';
+            const checkbox = DOMHelper.createElement('input', { type: 'checkbox' });
+            checkbox.className = 'row-checkbox';
+            checkbox.setAttribute('data-row-index', i);
+            
+            // チェック状態を復元
+            if (window.tableRenderer && window.tableRenderer.checkedRows.has(i)) {
+                checkbox.checked = true;
+                // チェック済みの場合、フラグを埋め込む
+                row.setAttribute('data-filter-flag', window.tableRenderer.filterFlag);
+            }
+            
+            // チェックボックスのイベントリスナーを追加
+            checkbox.addEventListener('change', (e) => {
+                if (window.tableRenderer) {
+                    if (e.target.checked) {
+                        window.tableRenderer.checkedRows.add(i);
+                        // チェック時にフラグを埋め込む
+                        row.setAttribute('data-filter-flag', window.tableRenderer.filterFlag);
+                        console.log(`行 ${i} にフラグを埋め込み: ${window.tableRenderer.filterFlag}`);
+                    } else {
+                        window.tableRenderer.checkedRows.delete(i);
+                        // チェック解除時にフラグを削除
+                        row.removeAttribute('data-filter-flag');
+                        console.log(`行 ${i} からフラグを削除`);
+                    }
+                }
+            });
+            
+            checkboxTd.appendChild(checkbox);
+            row.appendChild(checkboxTd);
             
             // 各カラムのセルを作成
             for (let columnIndex = 0; columnIndex < CONFIG.integratedTableConfig.columns.length; columnIndex++) {

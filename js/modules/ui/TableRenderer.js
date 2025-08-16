@@ -17,6 +17,11 @@ class TableRenderer {
         
         // 更新履歴データを台帳別に保存するMap
         this.updateHistoryMap = new Map(); // 台帳別のMapを格納するMap
+        
+        // 新しい絞り込み機能の状態管理
+        this.checkedRows = new Set(); // チェックされた行のインデックスを保存
+        this.filterFlag = 'FILTER_SELECTED_ROW'; // DOM側に埋め込むフラグ文字列
+        this.isFiltered = false; // 絞り込み状態を管理
     }
 
     /**
@@ -203,6 +208,10 @@ class TableRenderer {
         clearButton.addEventListener('click', () => {
             positiveInput.value = '';
             negativeInput.value = '';
+            
+            // 絞り込み状態をリセット
+            this.resetFilterState();
+            
             handleSearch();
         });
 
@@ -222,7 +231,7 @@ class TableRenderer {
             if (positiveKeywords.length === 0 && negativeKeywords.length === 0) {
                 filteredData = this._originalIntegratedData;
             } else {
-                filteredData = this._originalIntegratedData.filter(row => {
+                filteredData = this._originalIntegratedData.filter((row, rowIndex) => {
                     // 肯定系条件: 選択されたロジックに応じてOR/AND判定
                     const positiveOk = positiveKeywords.length === 0 || (positiveLogic === 'or' ? 
                         positiveKeywords.some(keyword => {
@@ -251,12 +260,17 @@ class TableRenderer {
                                     return value && value.toString().toLowerCase().includes(searchValue.toLowerCase());
                                 });
                             }
-                            // 通常の検索（部分一致） - DOM属性由来のプロパティを除外 + 整合性チェック結果を含む
+                            // 通常の検索（部分一致） - DOM属性由来のプロパティを除外 + 整合性チェック結果を含む + DOM属性を含む
                             const searchableValues = this.getSearchableValues(row);
                             const consistencyResult = this.getConsistencyResult(row);
                             if (consistencyResult) {
                                 searchableValues.push(consistencyResult);
                             }
+                            
+                            // DOM属性からフラグを取得して検索対象に追加
+                            const domFlags = this.getDOMFlagsForRow(rowIndex);
+                            searchableValues.push(...domFlags);
+                            
                             return searchableValues.some(val => val && val.toString().toLowerCase().includes(keyword.toLowerCase()));
                         }) : 
                         positiveKeywords.every(keyword => {
@@ -285,12 +299,17 @@ class TableRenderer {
                                     return value && value.toString().toLowerCase().includes(searchValue.toLowerCase());
                                 });
                             }
-                            // 通常の検索（部分一致） - 整合性チェック結果を含む
+                            // 通常の検索（部分一致） - 整合性チェック結果を含む + DOM属性を含む
                             const searchableValues = this.getSearchableValues(row);
                             const consistencyResult = this.getConsistencyResult(row);
                             if (consistencyResult) {
                                 searchableValues.push(consistencyResult);
                             }
+                            
+                            // DOM属性からフラグを取得して検索対象に追加
+                            const domFlags = this.getDOMFlagsForRow(rowIndex);
+                            searchableValues.push(...domFlags);
+                            
                             return searchableValues.some(val => val && val.toString().toLowerCase().includes(keyword.toLowerCase()));
                         })
                     );
@@ -323,12 +342,17 @@ class TableRenderer {
                                     return !(value && value.toString().toLowerCase().includes(searchValue.toLowerCase()));
                                 });
                             }
-                            // 通常の否定条件（全フィールド） - DOM属性由来のプロパティを除外 + 整合性チェック結果を含む
+                            // 通常の否定条件（全フィールド） - DOM属性由来のプロパティを除外 + 整合性チェック結果を含む + DOM属性を含む
                             const searchableValues = this.getSearchableValues(row);
                             const consistencyResult = this.getConsistencyResult(row);
                             if (consistencyResult) {
                                 searchableValues.push(consistencyResult);
                             }
+                            
+                            // DOM属性からフラグを取得して検索対象に追加
+                            const domFlags = this.getDOMFlagsForRow(rowIndex);
+                            searchableValues.push(...domFlags);
+                            
                             return !searchableValues.some(val => val && val.toString().toLowerCase().includes(keyword.toLowerCase()));
                         }) : 
                         negativeKeywords.some(keyword => {
@@ -357,12 +381,17 @@ class TableRenderer {
                                     return !(value && value.toString().toLowerCase().includes(searchValue.toLowerCase()));
                                 });
                             }
-                            // 通常の否定条件（全フィールド） - DOM属性由来のプロパティを除外 + 整合性チェック結果を含む
+                            // 通常の否定条件（全フィールド） - DOM属性由来のプロパティを除外 + 整合性チェック結果を含む + DOM属性を含む
                             const searchableValues = this.getSearchableValues(row);
                             const consistencyResult = this.getConsistencyResult(row);
                             if (consistencyResult) {
                                 searchableValues.push(consistencyResult);
                             }
+                            
+                            // DOM属性からフラグを取得して検索対象に追加
+                            const domFlags = this.getDOMFlagsForRow(rowIndex);
+                            searchableValues.push(...domFlags);
+                            
                             return !searchableValues.some(val => val && val.toString().toLowerCase().includes(keyword.toLowerCase()));
                         })
                     );
@@ -470,6 +499,25 @@ class TableRenderer {
     createLedgerHeaderRow() {
         const row = DOMHelper.createElement('tr');
         
+        // チェックボックスカラム用のヘッダー（絞り込み・解除ボタン付き）
+        const checkboxTh = DOMHelper.createElement('th');
+        checkboxTh.className = 'header-ledger-cell checkbox-header';
+        checkboxTh.rowSpan = 2; // 2行分を結合
+        
+        // ボタンコンテナを作成
+        const buttonContainer = DOMHelper.createElement('div', {}, 'filter-button-container');
+        
+        // トグルボタンを作成
+        const toggleButton = DOMHelper.createElement('button', {}, 'header-toggle-button');
+        this.updateToggleButtonState(toggleButton); // 初期状態を設定
+        toggleButton.addEventListener('click', () => {
+            this.toggleFilter(toggleButton);
+        });
+        
+        buttonContainer.appendChild(toggleButton);
+        checkboxTh.appendChild(buttonContainer);
+        row.appendChild(checkboxTh);
+        
         // 台帳名ごとにグループ化
         const ledgerGroups = this.groupColumnsByLedger();
         
@@ -490,6 +538,8 @@ class TableRenderer {
      */
     createFieldHeaderRow() {
         const row = DOMHelper.createElement('tr');
+        
+        // チェックボックスカラムは1行目で2行分結合済みなのでスキップ
         
         CONFIG.integratedTableConfig.columns.forEach(column => {
             const th = DOMHelper.createElement('th');
@@ -1475,6 +1525,27 @@ class TableRenderer {
     }
 
     /**
+     * 指定行のDOM要素からフラグ属性を取得
+     * @param {number} rowIndex - 行インデックス
+     * @returns {Array} フラグの配列
+     */
+    getDOMFlagsForRow(rowIndex) {
+        const flags = [];
+        
+        // DOM要素から該当行を検索
+        const rowElement = document.querySelector(`tr[data-record-index="${rowIndex}"]`);
+        if (rowElement) {
+            // data-filter-flag属性を取得
+            const filterFlag = rowElement.getAttribute('data-filter-flag');
+            if (filterFlag) {
+                flags.push(filterFlag);
+            }
+        }
+        
+        return flags;
+    }
+
+    /**
      * 行の整合性チェック結果を取得
      */
     getConsistencyResult(row) {
@@ -1511,6 +1582,185 @@ class TableRenderer {
             return isConsistent ? '整合' : '不整合';
         }
         return '';
+    }
+
+    /**
+     * テーブル内検索を活用した絞り込み実行
+     */
+    executeFilterBySearch() {
+        if (this.checkedRows.size === 0) {
+            console.warn('絞り込み対象の行が選択されていません');
+            return;
+        }
+
+        console.log(`🔍 テーブル内検索による絞り込み実行: ${this.checkedRows.size}行を対象`);
+        
+        // テーブル内検索のinputボックスにフラグ文字列を入力
+        const positiveInput = document.querySelector('#positive-search-input');
+        if (positiveInput) {
+            positiveInput.value = this.filterFlag;
+            console.log(`テーブル内検索に設定: "${this.filterFlag}"`);
+            
+            // 検索を実行（既存のhandleSearch関数をトリガー）
+            const searchEvent = new Event('input', { bubbles: true });
+            positiveInput.dispatchEvent(searchEvent);
+            
+            console.log('✅ テーブル内検索による絞り込み完了');
+            
+            // 絞り込み状態を更新
+            this.isFiltered = true;
+            
+            // 絞り込み成功後、全てのチェックボックスをクリア
+            this.clearAllCheckboxes();
+            
+            // すべてのトグルボタンの状態を更新
+            this.updateAllToggleButtons();
+        } else {
+            console.error('❌ テーブル内検索のinputボックスが見つかりません');
+            console.error('利用可能なinput要素:', document.querySelectorAll('input[type="text"]'));
+        }
+    }
+
+    /**
+     * テーブル内検索による絞り込み解除
+     */
+    clearFilterBySearch() {
+        console.log('🔄 テーブル内検索による絞り込み解除開始');
+        
+        // テーブル内検索のinputボックスをクリア
+        const positiveInput = document.querySelector('#positive-search-input');
+        if (positiveInput) {
+            positiveInput.value = '';
+            console.log('テーブル内検索をクリア');
+            
+            // 検索を実行（空文字で全件表示に戻す）
+            const searchEvent = new Event('input', { bubbles: true });
+            positiveInput.dispatchEvent(searchEvent);
+        }
+        
+        // DOM側のフラグを削除
+        const flaggedRows = document.querySelectorAll(`[data-filter-flag="${this.filterFlag}"]`);
+        flaggedRows.forEach(row => {
+            row.removeAttribute('data-filter-flag');
+        });
+        console.log(`${flaggedRows.length}行からフラグを削除`);
+        
+        // チェック状態をクリア
+        this.checkedRows.clear();
+        
+        // UI上のチェックボックスもクリア
+        const checkboxes = document.querySelectorAll('.row-checkbox');
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = false;
+        });
+        
+        console.log('✅ 絞り込み解除完了: チェック状態とフラグをクリア');
+        
+        // 絞り込み状態を更新
+        this.isFiltered = false;
+        
+        // すべてのトグルボタンの状態を更新
+        this.updateAllToggleButtons();
+    }
+
+    /**
+     * トグルボタンの状態を更新
+     */
+    updateToggleButtonState(button) {
+        console.log(`🔄 ボタン状態更新: isFiltered=${this.isFiltered}, button=`, button);
+        
+        if (this.isFiltered) {
+            button.textContent = '解除';
+            button.className = 'header-clear-button';
+            console.log('✅ ボタンを解除モードに変更');
+        } else {
+            button.textContent = '絞込';
+            button.className = 'header-filter-button';
+            console.log('✅ ボタンを絞込モードに変更');
+        }
+        
+        // 実際のDOM要素の状態も確認
+        console.log(`📋 ボタンDOM状態: text="${button.textContent}", class="${button.className}"`);
+    }
+
+    /**
+     * フィルターのトグル処理
+     */
+    toggleFilter(button) {
+        console.log(`🎯 トグル開始: 現在のisFiltered=${this.isFiltered}`);
+        
+        if (this.isFiltered) {
+            this.clearFilterBySearch();
+        } else {
+            this.executeFilterBySearch();
+        }
+        
+        console.log(`🎯 トグル後: isFiltered=${this.isFiltered}`);
+        
+        // ボタン状態を更新
+        this.updateToggleButtonState(button);
+        
+        // さらに、現在のページ上のすべてのトグルボタンを更新
+        this.updateAllToggleButtons();
+    }
+
+    /**
+     * ページ上のすべてのトグルボタンの状態を更新
+     */
+    updateAllToggleButtons() {
+        const toggleButtons = document.querySelectorAll('.header-toggle-button, .header-filter-button, .header-clear-button');
+        console.log(`🔄 全トグルボタン更新: ${toggleButtons.length}個のボタンを発見`);
+        
+        toggleButtons.forEach((btn, index) => {
+            console.log(`ボタン${index + 1}: ${btn.textContent} (${btn.className})`);
+            this.updateToggleButtonState(btn);
+        });
+    }
+
+    /**
+     * 全てのチェックボックスをクリアする
+     */
+    clearAllCheckboxes() {
+        console.log('🧹 全チェックボックスクリア開始');
+        
+        // UI上のチェックボックスをクリア
+        const checkboxes = document.querySelectorAll('.row-checkbox');
+        checkboxes.forEach((checkbox, index) => {
+            if (checkbox.checked) {
+                console.log(`チェックボックス ${index} をクリア`);
+            }
+            checkbox.checked = false;
+        });
+        
+        // チェック状態の管理データもクリア
+        this.checkedRows.clear();
+        
+        console.log(`✅ 全チェックボックスクリア完了: ${checkboxes.length}個のチェックボックスを処理`);
+    }
+
+    /**
+     * 絞り込み状態をリセットする（テーブル検索クリア時用）
+     */
+    resetFilterState() {
+        console.log('🔄 絞り込み状態リセット開始');
+        
+        // 絞り込み状態をfalseに設定
+        this.isFiltered = false;
+        
+        // チェック状態をクリア
+        this.clearAllCheckboxes();
+        
+        // DOM側のフラグを削除
+        const flaggedRows = document.querySelectorAll(`[data-filter-flag="${this.filterFlag}"]`);
+        flaggedRows.forEach(row => {
+            row.removeAttribute('data-filter-flag');
+        });
+        console.log(`${flaggedRows.length}行からフラグを削除`);
+        
+        // すべてのトグルボタンの状態を更新
+        this.updateAllToggleButtons();
+        
+        console.log('✅ 絞り込み状態リセット完了');
     }
 
 }
