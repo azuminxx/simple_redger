@@ -228,6 +228,13 @@ class TableRenderer {
                         positiveKeywords.some(keyword => {
                             if (keyword.includes(':')) {
                                 const [fieldName, searchValue] = keyword.split(':', 2);
+                                
+                                // 整合性チェック検索の特別処理
+                                if (fieldName.toLowerCase() === '整合' || fieldName.toLowerCase() === 'consistency') {
+                                    const consistencyResult = this.getConsistencyResult(row);
+                                    return consistencyResult && consistencyResult.toLowerCase().includes(searchValue.toLowerCase());
+                                }
+                                
                                 // フィールド名に部分一致するキーをすべて探す
                                 const matchingKeys = Object.keys(row).filter(key => {
                                     const column = CONFIG.integratedTableConfig.columns.find(col => col.key === key);
@@ -244,12 +251,24 @@ class TableRenderer {
                                     return value && value.toString().toLowerCase().includes(searchValue.toLowerCase());
                                 });
                             }
-                            // 通常の検索（部分一致） - DOM属性由来のプロパティを除外
-                            return this.getSearchableValues(row).some(val => val && val.toString().toLowerCase().includes(keyword.toLowerCase()));
+                            // 通常の検索（部分一致） - DOM属性由来のプロパティを除外 + 整合性チェック結果を含む
+                            const searchableValues = this.getSearchableValues(row);
+                            const consistencyResult = this.getConsistencyResult(row);
+                            if (consistencyResult) {
+                                searchableValues.push(consistencyResult);
+                            }
+                            return searchableValues.some(val => val && val.toString().toLowerCase().includes(keyword.toLowerCase()));
                         }) : 
                         positiveKeywords.every(keyword => {
                             if (keyword.includes(':')) {
                                 const [fieldName, searchValue] = keyword.split(':', 2);
+                                
+                                // 整合性チェック検索の特別処理
+                                if (fieldName.toLowerCase() === '整合' || fieldName.toLowerCase() === 'consistency') {
+                                    const consistencyResult = this.getConsistencyResult(row);
+                                    return consistencyResult && consistencyResult.toLowerCase().includes(searchValue.toLowerCase());
+                                }
+                                
                                 // フィールド名に部分一致するキーをすべて探す
                                 const matchingKeys = Object.keys(row).filter(key => {
                                     const column = CONFIG.integratedTableConfig.columns.find(col => col.key === key);
@@ -266,8 +285,13 @@ class TableRenderer {
                                     return value && value.toString().toLowerCase().includes(searchValue.toLowerCase());
                                 });
                             }
-                            // 通常の検索（部分一致）
-                            return Object.values(row).some(val => val && val.toString().toLowerCase().includes(keyword.toLowerCase()));
+                            // 通常の検索（部分一致） - 整合性チェック結果を含む
+                            const searchableValues = this.getSearchableValues(row);
+                            const consistencyResult = this.getConsistencyResult(row);
+                            if (consistencyResult) {
+                                searchableValues.push(consistencyResult);
+                            }
+                            return searchableValues.some(val => val && val.toString().toLowerCase().includes(keyword.toLowerCase()));
                         })
                     );
 
@@ -276,6 +300,13 @@ class TableRenderer {
                         negativeKeywords.every(keyword => {
                             if (keyword.includes(':')) {
                                 const [fieldName, searchValue] = keyword.split(':', 2);
+                                
+                                // 整合性チェック検索の特別処理
+                                if (fieldName.toLowerCase() === '整合' || fieldName.toLowerCase() === 'consistency') {
+                                    const consistencyResult = this.getConsistencyResult(row);
+                                    return !(consistencyResult && consistencyResult.toLowerCase().includes(searchValue.toLowerCase()));
+                                }
+                                
                                 // フィールド名に部分一致するキーをすべて探す
                                 const matchingKeys = Object.keys(row).filter(key => {
                                     const column = CONFIG.integratedTableConfig.columns.find(col => col.key === key);
@@ -292,12 +323,24 @@ class TableRenderer {
                                     return !(value && value.toString().toLowerCase().includes(searchValue.toLowerCase()));
                                 });
                             }
-                            // 通常の否定条件（全フィールド） - DOM属性由来のプロパティを除外
-                            return !this.getSearchableValues(row).some(val => val && val.toString().toLowerCase().includes(keyword.toLowerCase()));
+                            // 通常の否定条件（全フィールド） - DOM属性由来のプロパティを除外 + 整合性チェック結果を含む
+                            const searchableValues = this.getSearchableValues(row);
+                            const consistencyResult = this.getConsistencyResult(row);
+                            if (consistencyResult) {
+                                searchableValues.push(consistencyResult);
+                            }
+                            return !searchableValues.some(val => val && val.toString().toLowerCase().includes(keyword.toLowerCase()));
                         }) : 
                         negativeKeywords.some(keyword => {
                             if (keyword.includes(':')) {
                                 const [fieldName, searchValue] = keyword.split(':', 2);
+                                
+                                // 整合性チェック検索の特別処理
+                                if (fieldName.toLowerCase() === '整合' || fieldName.toLowerCase() === 'consistency') {
+                                    const consistencyResult = this.getConsistencyResult(row);
+                                    return !(consistencyResult && consistencyResult.toLowerCase().includes(searchValue.toLowerCase()));
+                                }
+                                
                                 // フィールド名に部分一致するキーをすべて探す
                                 const matchingKeys = Object.keys(row).filter(key => {
                                     const column = CONFIG.integratedTableConfig.columns.find(col => col.key === key);
@@ -314,8 +357,13 @@ class TableRenderer {
                                     return !(value && value.toString().toLowerCase().includes(searchValue.toLowerCase()));
                                 });
                             }
-                            // 通常の否定条件（全フィールド） - DOM属性由来のプロパティを除外
-                            return !this.getSearchableValues(row).some(val => val && val.toString().toLowerCase().includes(keyword.toLowerCase()));
+                            // 通常の否定条件（全フィールド） - DOM属性由来のプロパティを除外 + 整合性チェック結果を含む
+                            const searchableValues = this.getSearchableValues(row);
+                            const consistencyResult = this.getConsistencyResult(row);
+                            if (consistencyResult) {
+                                searchableValues.push(consistencyResult);
+                            }
+                            return !searchableValues.some(val => val && val.toString().toLowerCase().includes(keyword.toLowerCase()));
                         })
                     );
 
@@ -1424,6 +1472,45 @@ class TableRenderer {
             })
             .map(key => row[key])
             .filter(value => value !== null && value !== undefined);
+    }
+
+    /**
+     * 行の整合性チェック結果を取得
+     */
+    getConsistencyResult(row) {
+        // 統合キー取得
+        let integrationKey = null;
+        for (const appId in CONFIG.apps) {
+            const ledgerName = CONFIG.apps[appId].name;
+            const key = `${ledgerName}_${CONFIG.integrationKey}`;
+            if (row[key]) {
+                integrationKey = row[key];
+                break;
+            }
+        }
+
+        if (integrationKey) {
+            const DataIntegratorClass = window.DataIntegrator;
+            const dataIntegrator = new DataIntegratorClass();
+            const parsed = dataIntegrator.parseIntegrationKey(integrationKey);
+            const pc = row['PC台帳_PC番号'] || '';
+            const ext = row['内線台帳_内線番号'] || '';
+            const seat = row['座席台帳_座席番号'] || '';
+            
+            function isFieldConsistent(a, b) {
+                const isEmpty = v => v === null || v === undefined || v === '';
+                if (isEmpty(a) && isEmpty(b)) return true;
+                return a === b;
+            }
+            
+            const isConsistent =
+                isFieldConsistent(parsed.PC, pc) &&
+                isFieldConsistent(parsed.EXT, ext) &&
+                isFieldConsistent(parsed.SEAT, seat);
+            
+            return isConsistent ? '整合' : '不整合';
+        }
+        return '';
     }
 
 }
