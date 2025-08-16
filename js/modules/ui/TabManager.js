@@ -129,7 +129,7 @@ class TabManager {
                 return;
             }
             
-            const hasPermission = await window.PermissionChecker.hasEditAppPermission();
+            const hasPermission = await window.PermissionChecker.hasAddRecordPermission();
             if (!hasPermission) {
                 window.PermissionChecker.showPermissionError();
                 return;
@@ -287,6 +287,9 @@ class TabManager {
             this.openSearchMenuIfClosed();
         }
 
+        // search-results要素の表示・非表示を切り替え
+        this.toggleSearchResultsVisibility(appId);
+
         this.currentActiveTab = appId;
     }
 
@@ -337,7 +340,7 @@ class TabManager {
                 return;
             }
             
-            const hasPermission = await window.PermissionChecker.hasEditAppPermission();
+            const hasPermission = await window.PermissionChecker.hasAddRecordPermission();
             if (!hasPermission) {
                 window.PermissionChecker.showPermissionError();
                 return;
@@ -360,7 +363,7 @@ class TabManager {
                 return;
             }
             
-            const hasPermission = await window.PermissionChecker.hasEditAppPermission();
+            const hasPermission = await window.PermissionChecker.hasAddRecordPermission();
             if (!hasPermission) {
                 window.PermissionChecker.showPermissionError();
                 return;
@@ -827,6 +830,27 @@ class TabManager {
         });
 
         alert(detailText || '詳細情報がありません');
+    }
+
+    /**
+     * search-results要素の表示・非表示を切り替え
+     */
+    toggleSearchResultsVisibility(appId) {
+        const searchResultsElement = document.getElementById(CONFIG.system.resultsContainerId);
+        if (!searchResultsElement) {
+            console.warn('search-results要素が見つかりません');
+            return;
+        }
+
+        // 設定タブまたは更新履歴タブの場合は非表示
+        if (appId === 'settings' || appId === 'history') {
+            searchResultsElement.style.display = 'none';
+            console.log(`📋 ${appId}タブ: search-results要素を非表示`);
+        } else {
+            // その他のタブ（台帳タブ）の場合は表示
+            searchResultsElement.style.display = 'block';
+            console.log(`📋 ${CONFIG.apps[appId]?.name || appId}タブ: search-results要素を表示`);
+        }
     }
 }
 

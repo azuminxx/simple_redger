@@ -209,23 +209,23 @@ class PermissionChecker {
             return appPerm;
         } catch (error) {
             console.error('権限取得エラー:', error);
-            return { editApp: false };
+            return { addRecord: false };
         }
     }
 
     /**
-     * editApp権限があるかチェック
+     * addRecord権限があるかチェック
      */
-    static async hasEditAppPermission() {
+    static async hasAddRecordPermission() {
         const permissions = await this.getAppPermissions();
-        return permissions.editApp === true;
+        return permissions.addRecord === true;
     }
 
     /**
      * 権限エラーメッセージを表示
      */
     static showPermissionError() {
-        alert('実行できる権限がありません。\n管理者に権限の確認をお願いします。');
+        alert('検索を実行する権限がありません。\nレコード追加権限が必要です。管理者に権限の確認をお願いします。');
     }
 
     /**
@@ -236,7 +236,7 @@ class PermissionChecker {
         
         button.onclick = async (event) => {
             // 権限チェック
-            const hasPermission = await this.hasEditAppPermission();
+            const hasPermission = await this.hasAddRecordPermission();
             if (!hasPermission) {
                 this.showPermissionError();
                 return;
