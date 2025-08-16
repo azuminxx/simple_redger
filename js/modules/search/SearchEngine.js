@@ -91,6 +91,9 @@ class SearchEngine {
         } finally {
             this.isSearching = false;
             this.updateSearchButtonState(appId, false);
+            
+            // 検索実行後に検索フォームをクリア
+            this.clearSearchForm(appId);
         }
     }
 
@@ -460,6 +463,9 @@ class SearchEngine {
         } finally {
             this.isSearching = false;
             this.updateSearchButtonState(appId, false);
+            
+            // 追加検索実行後に検索フォームをクリア
+            this.clearSearchForm(appId);
         }
     }
 
@@ -488,6 +494,63 @@ class SearchEngine {
      */
     logError(operation, error) {
         console.error(`❌ ${operation}エラー:`, error);
+    }
+
+    /**
+     * 検索フォームをクリア
+     */
+    clearSearchForm(appId) {
+        try {
+            console.log(`🧹 ${CONFIG.apps[appId].name}の検索フォームをクリア中...`);
+            
+            // 該当するタブのコンテンツ内の入力要素を取得
+            const tabContent = document.getElementById(`tab-${appId}`);
+            if (!tabContent) {
+                console.warn(`タブコンテンツが見つかりません: appId=${appId}`);
+                return;
+            }
+
+            // 各種入力要素をクリア
+            // テキスト入力
+            const textInputs = tabContent.querySelectorAll('input[type="text"], input[type="number"], input[type="date"], textarea');
+            console.log(`📝 テキスト入力要素: ${textInputs.length}個`);
+            textInputs.forEach(input => {
+                input.value = '';
+            });
+
+            // チェックボックス
+            const checkboxes = tabContent.querySelectorAll('input[type="checkbox"]');
+            console.log(`☑️ チェックボックス: ${checkboxes.length}個`);
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = false;
+            });
+
+            // ラジオボタン
+            const radios = tabContent.querySelectorAll('input[type="radio"]');
+            console.log(`🔘 ラジオボタン: ${radios.length}個`);
+            radios.forEach(radio => {
+                radio.checked = false;
+            });
+
+            // セレクトボックス
+            const selects = tabContent.querySelectorAll('select');
+            console.log(`📋 セレクトボックス: ${selects.length}個`);
+            selects.forEach(select => {
+                if (select.multiple) {
+                    // 複数選択の場合は全て選択解除
+                    Array.from(select.options).forEach(option => {
+                        option.selected = false;
+                    });
+                } else {
+                    // 単一選択の場合は最初のオプション（通常は空値）を選択
+                    select.selectedIndex = 0;
+                }
+            });
+
+            console.log(`✅ ${CONFIG.apps[appId].name}の検索フォームクリア完了`);
+        } catch (error) {
+            console.error(`検索フォームクリアエラー (appId=${appId}):`, error);
+        }
     }
 }
 

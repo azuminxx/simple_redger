@@ -377,6 +377,8 @@ class TableRenderer {
             if (oldTable && newTable) {
                 oldTable.parentNode.replaceChild(newTable, oldTable);
             }
+            
+
         };
         positiveInput.addEventListener('input', handleSearch.bind(this));
         negativeInput.addEventListener('input', handleSearch.bind(this));
