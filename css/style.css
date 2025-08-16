@@ -592,6 +592,31 @@ table input {
     transform: none;
 }
 
+/* エクスポートボタン */
+.export-data-button {
+    padding: 6px 14px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 3px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 12px;
+    margin-left: 8px;
+}
+
+.export-data-button:hover {
+    background-color: #0056b3;
+    transform: translateY(-1px);
+}
+
+.export-data-button:disabled {
+    background-color: #6c757d;
+    cursor: not-allowed;
+    transform: none;
+}
+
 /* ドラッグアンドドロップ用スタイル */
 .draggable-primary-key {
     cursor: grab;

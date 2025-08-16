@@ -110,6 +110,14 @@ class TableRenderer {
         });
         titleContainer.appendChild(saveButton);
 
+        // エクスポートボタンを作成
+        const exportButton = DOMHelper.createElement('button', {}, 'export-data-button');
+        exportButton.textContent = 'Excel出力';
+        exportButton.addEventListener('click', () => {
+            this.exportToExcel();
+        });
+        titleContainer.appendChild(exportButton);
+
         integratedResultsContainer.appendChild(titleContainer);
 
         // ===== 検索ボックス追加（肯定系・否定系分離） =====
@@ -1179,6 +1187,202 @@ class TableRenderer {
         setTimeout(() => {
             toast.style.display = 'none';
         }, 2000); // 成功・エラーは2秒間表示
+    }
+
+    /**
+     * 検索結果をExcelファイルにエクスポート
+     */
+    exportToExcel() {
+        if (!this.currentSearchResults || this.currentSearchResults.length === 0) {
+            alert('エクスポートするデータがありません。');
+            return;
+        }
+
+        try {
+            // エクスポートボタンを無効化
+            const exportButton = document.querySelector('.export-data-button');
+            if (exportButton) {
+                exportButton.disabled = true;
+                exportButton.textContent = 'エクスポート中...';
+            }
+
+            // 統合キーを先頭に追加、整合性チェック結果を追加したカラム設定を作成
+            const exportColumns = [
+                { key: '統合キー', label: '統合キー', ledger: '統合' },
+                { key: 'consistency-check', label: '整合', ledger: '操作' },
+                ...CONFIG.integratedTableConfig.columns.filter(col => 
+                    !col.isChangeFlag && !col.isDetailLink && !col.isConsistencyCheck
+                )
+            ];
+
+            // 台帳グループ化（統合キーと整合性チェックを含む）
+            const ledgerGroups = this.groupExportColumnsByLedger(exportColumns);
+
+            // 1行目：台帳名ヘッダー
+            const ledgerHeaderRow = ledgerGroups.map(group => {
+                const cells = new Array(group.columns.length).fill(group.ledgerName);
+                cells[0] = group.ledgerName; // 最初のセルのみ台帳名、残りは空
+                for (let i = 1; i < cells.length; i++) {
+                    cells[i] = ''; // 結合セルの残りは空文字
+                }
+                return cells;
+            }).flat();
+
+            // 2行目：フィールド名ヘッダー
+            const fieldHeaderRow = exportColumns.map(col => col.label);
+
+            // データ行を作成（統合キーと整合性チェック結果を含む）
+            const data = this.currentSearchResults.map((record, recordIndex) => {
+                return exportColumns.map(col => {
+                    // 統合キーの処理
+                    if (col.key === '統合キー') {
+                        // 各台帳から統合キーを取得
+                        let integrationKey = null;
+                        for (const appId in CONFIG.apps) {
+                            const ledgerName = CONFIG.apps[appId].name;
+                            const key = `${ledgerName}_${CONFIG.integrationKey}`;
+                            if (record[key]) {
+                                integrationKey = record[key];
+                                break;
+                            }
+                        }
+                        return integrationKey || '';
+                    }
+
+                    // 整合性チェック結果の処理
+                    if (col.key === 'consistency-check') {
+                        // 整合性チェックロジック（VirtualScroll.jsと同じロジック）
+                        let integrationKey = null;
+                        for (const appId in CONFIG.apps) {
+                            const ledgerName = CONFIG.apps[appId].name;
+                            const key = `${ledgerName}_${CONFIG.integrationKey}`;
+                            if (record[key]) {
+                                integrationKey = record[key];
+                                break;
+                            }
+                        }
+
+                        if (integrationKey) {
+                            const DataIntegratorClass = window.DataIntegrator;
+                            const dataIntegrator = new DataIntegratorClass();
+                            const parsed = dataIntegrator.parseIntegrationKey(integrationKey);
+                            const pc = record['PC台帳_PC番号'] || '';
+                            const ext = record['内線台帳_内線番号'] || '';
+                            const seat = record['座席台帳_座席番号'] || '';
+                            
+                            function isFieldConsistent(a, b) {
+                                const isEmpty = v => v === null || v === undefined || v === '';
+                                if (isEmpty(a) && isEmpty(b)) return true;
+                                return a === b;
+                            }
+                            
+                            const isConsistent =
+                                isFieldConsistent(parsed.PC, pc) &&
+                                isFieldConsistent(parsed.EXT, ext) &&
+                                isFieldConsistent(parsed.SEAT, seat);
+                            
+                            return isConsistent ? '整合' : '不整合';
+                        }
+                        return '';
+                    }
+
+                    // 通常のフィールドの処理
+                    const value = record[col.key];
+                    // null/undefinedの場合は空文字を返す
+                    if (value === null || value === undefined) {
+                        return '';
+                    }
+                    // 配列の場合は文字列として結合
+                    if (Array.isArray(value)) {
+                        return value.join(', ');
+                    }
+                    // オブジェクトの場合はvalueプロパティを使用
+                    if (typeof value === 'object' && value.value !== undefined) {
+                        return value.value || '';
+                    }
+                    return String(value);
+                });
+            });
+
+            // CSVデータを作成（2行ヘッダー + データ）
+            const csvContent = [ledgerHeaderRow, fieldHeaderRow, ...data]
+                .map(row => row.map(cell => {
+                    // セル内の改行やカンマをエスケープ
+                    const cellStr = String(cell);
+                    if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
+                        return `"${cellStr.replace(/"/g, '""')}"`;
+                    }
+                    return cellStr;
+                }).join(','))
+                .join('\n');
+
+            // BOMを追加してUTF-8で保存（Excelで文字化けを防ぐ）
+            const bom = '\uFEFF';
+            const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' });
+            
+            // ファイル名を生成（現在日時を含む）
+            const now = new Date();
+            const timestamp = now.getFullYear() + 
+                String(now.getMonth() + 1).padStart(2, '0') + 
+                String(now.getDate()).padStart(2, '0') + '_' +
+                String(now.getHours()).padStart(2, '0') + 
+                String(now.getMinutes()).padStart(2, '0');
+            const filename = `統合台帳検索結果_${timestamp}.csv`;
+
+            // ダウンロードを実行
+            const link = document.createElement('a');
+            if (link.download !== undefined) {
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', filename);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                // 成功メッセージを表示
+                this.showToast(`${this.currentSearchResults.length}件のデータをエクスポートしました`, 'success');
+            } else {
+                throw new Error('お使いのブラウザはファイルダウンロードをサポートしていません。');
+            }
+
+        } catch (error) {
+            console.error('エクスポートエラー:', error);
+            this.showToast('エクスポートに失敗しました', 'error');
+            alert(`エクスポート中にエラーが発生しました。\n詳細: ${error.message}`);
+        } finally {
+            // エクスポートボタンを元に戻す
+            const exportButton = document.querySelector('.export-data-button');
+            if (exportButton) {
+                exportButton.disabled = false;
+                exportButton.textContent = 'Excel出力';
+            }
+        }
+    }
+
+    /**
+     * エクスポート用カラムを台帳ごとにグループ化
+     */
+    groupExportColumnsByLedger(columns) {
+        const groups = [];
+        let currentGroup = null;
+        
+        columns.forEach(column => {
+            const ledgerName = column.ledger || DOMHelper.getLedgerNameFromKey(column.key);
+            
+            if (!currentGroup || currentGroup.ledgerName !== ledgerName) {
+                // 新しいグループを開始
+                currentGroup = {
+                    ledgerName: ledgerName,
+                    columns: []
+                };
+                groups.push(currentGroup);
+            }
+            
+            currentGroup.columns.push(column);
+        });
+        
+        return groups;
     }
 
 }
