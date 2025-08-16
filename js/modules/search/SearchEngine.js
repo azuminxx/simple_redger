@@ -58,6 +58,11 @@ class SearchEngine {
                 window.tableRenderer.clearSearchResults();
             }
             
+            // バリデーション状態をクリア
+            if (window.validation) {
+                window.validation.clearValidationState();
+            }
+            
             // メインの台帳を検索
             const records = await this.searchRecordsWithQuery(appId, query);
             console.log(`✓ ${CONFIG.apps[appId].name}の検索結果: ${records.length}件`);
@@ -414,6 +419,11 @@ class SearchEngine {
             this.isSearching = true;
             this.updateSearchButtonState(appId, true);
             this.retryCount = 0; // 追加検索開始時に再試行回数をリセット
+            
+            // 追加検索でもバリデーション状態をクリア
+            if (window.validation) {
+                window.validation.clearValidationState();
+            }
             
             const searchConditions = await this.getSearchConditions(appId);
             

@@ -389,6 +389,42 @@ class ValidationEngine {
       alert(message);
     }
   }
+
+  /**
+   * バリデーション状態をクリア（新しい検索実行時に使用）
+   */
+  clearValidationState() {
+    console.log('🧹 バリデーション状態をクリア中...');
+    
+    // エラーフィールドMapをクリア
+    const invalidFieldsCount = this.invalidFields.size;
+    const invalidMessagesCount = this.invalidFieldMessages.size;
+    
+    this.invalidFields.clear();
+    this.invalidFieldMessages.clear();
+    
+    // UIからエラーハイライトを削除
+    this.clearAllErrorHighlights();
+    
+    console.log(`✅ バリデーション状態クリア完了 (エラーフィールド: ${invalidFieldsCount}件, エラーメッセージ: ${invalidMessagesCount}件)`);
+  }
+
+  /**
+   * 全てのエラーハイライトをUIから削除
+   */
+  clearAllErrorHighlights() {
+    try {
+      // cell-invalidクラスを持つ全ての要素からクラスを削除
+      const invalidCells = document.querySelectorAll('.cell-invalid');
+      invalidCells.forEach(cell => {
+        cell.classList.remove('cell-invalid');
+      });
+      
+      console.log(`🎨 エラーハイライト削除: ${invalidCells.length}個のセル`);
+    } catch (error) {
+      console.error('エラーハイライトクリア中にエラー:', error);
+    }
+  }
 }
 
 // グローバル公開

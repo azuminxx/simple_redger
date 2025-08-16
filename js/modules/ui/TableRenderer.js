@@ -244,8 +244,8 @@ class TableRenderer {
                                     return value && value.toString().toLowerCase().includes(searchValue.toLowerCase());
                                 });
                             }
-                            // 通常の検索（部分一致）
-                            return Object.values(row).some(val => val && val.toString().toLowerCase().includes(keyword.toLowerCase()));
+                            // 通常の検索（部分一致） - DOM属性由来のプロパティを除外
+                            return this.getSearchableValues(row).some(val => val && val.toString().toLowerCase().includes(keyword.toLowerCase()));
                         }) : 
                         positiveKeywords.every(keyword => {
                             if (keyword.includes(':')) {
@@ -292,8 +292,8 @@ class TableRenderer {
                                     return !(value && value.toString().toLowerCase().includes(searchValue.toLowerCase()));
                                 });
                             }
-                            // 通常の否定条件（全フィールド）
-                            return !Object.values(row).some(val => val && val.toString().toLowerCase().includes(keyword.toLowerCase()));
+                            // 通常の否定条件（全フィールド） - DOM属性由来のプロパティを除外
+                            return !this.getSearchableValues(row).some(val => val && val.toString().toLowerCase().includes(keyword.toLowerCase()));
                         }) : 
                         negativeKeywords.some(keyword => {
                             if (keyword.includes(':')) {
@@ -314,8 +314,8 @@ class TableRenderer {
                                     return !(value && value.toString().toLowerCase().includes(searchValue.toLowerCase()));
                                 });
                             }
-                            // 通常の否定条件（全フィールド）
-                            return !Object.values(row).some(val => val && val.toString().toLowerCase().includes(keyword.toLowerCase()));
+                            // 通常の否定条件（全フィールド） - DOM属性由来のプロパティを除外
+                            return !this.getSearchableValues(row).some(val => val && val.toString().toLowerCase().includes(keyword.toLowerCase()));
                         })
                     );
 
@@ -1407,6 +1407,23 @@ class TableRenderer {
         if (searchResultTitle) {
             searchResultTitle.textContent = `テーブル内検索結果：${count}件`;
         }
+    }
+
+    /**
+     * 検索対象となる値のみを取得（DOM属性由来のプロパティを除外）
+     */
+    getSearchableValues(row) {
+        return Object.keys(row)
+            .filter(key => {
+                // 除外するプロパティパターン
+                // - レコードID: *_$id
+                // - リビジョン: *_$revision  
+                // 統合キーは検索対象として残す
+                return !key.endsWith('_$id') && 
+                       !key.endsWith('_$revision');
+            })
+            .map(key => row[key])
+            .filter(value => value !== null && value !== undefined);
     }
 
 }
