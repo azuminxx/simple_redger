@@ -560,18 +560,22 @@ class CellSwapper {
 
         // テーブル内検索のベースデータ（_originalIntegratedData）にも同期
         if (Array.isArray(this.tableRenderer._originalIntegratedData)) {
-            const oriIdx = this.tableRenderer._originalIntegratedData.findIndex(r => {
-                return (window.virtualScroll?.getRecordIdFromRow?.(r) || null) === oldSourceKey;
-            });
-            if (oriIdx !== -1) {
-                // 元行を最新値で上書き
-                this.tableRenderer._originalIntegratedData[oriIdx] = { ...updatedSourceRecord };
-                // 新規行を直後に挿入
-                this.tableRenderer._originalIntegratedData.splice(oriIdx + 1, 0, { ...emptyRecord });
-            } else {
-                // 見つからない場合は末尾に追加（保険）
-                this.tableRenderer._originalIntegratedData.push({ ...updatedSourceRecord });
-                this.tableRenderer._originalIntegratedData.push({ ...emptyRecord });
+            try {
+                const oriIdx = this.tableRenderer._originalIntegratedData.findIndex(r => {
+                    return (window.virtualScroll?.getRecordIdFromRow?.(r) || null) === oldSourceKey;
+                });
+                if (oriIdx !== -1) {
+                    // 元行を最新値で上書き
+                    this.tableRenderer._originalIntegratedData[oriIdx] = { ...updatedSourceRecord };
+                    // 新規行を直後に挿入
+                    this.tableRenderer._originalIntegratedData.splice(oriIdx + 1, 0, { ...emptyRecord });
+                } else {
+                    // 見つからない場合は末尾に追加（保険）
+                    this.tableRenderer._originalIntegratedData.push({ ...updatedSourceRecord });
+                    this.tableRenderer._originalIntegratedData.push({ ...emptyRecord });
+                }
+            } catch (e) {
+                console.warn('separateLedger: sync _originalIntegratedData failed', e);
             }
         }
 

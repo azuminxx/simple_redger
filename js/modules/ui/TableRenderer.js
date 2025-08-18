@@ -24,6 +24,54 @@ class TableRenderer {
         this.isFiltered = false; // 絞り込み状態を管理
     }
 
+    // 内部ヘルパー: _originalIntegratedData を統合キーで同期
+    syncOriginalDataRowByKeys(oldKey, newKey, newRow) {
+        try {
+            if (!Array.isArray(this._originalIntegratedData)) return;
+            let idx = this._originalIntegratedData.findIndex(r => window.virtualScroll.getRecordIdFromRow(r) === oldKey);
+            if (idx === -1) {
+                idx = this._originalIntegratedData.findIndex(r => window.virtualScroll.getRecordIdFromRow(r) === newKey);
+            }
+            if (idx !== -1) {
+                this._originalIntegratedData[idx] = { ...newRow };
+            }
+        } catch (e) {
+            console.warn('syncOriginalDataRowByKeys error:', e);
+        }
+    }
+
+    // 内部ヘルパー: 整合性マップ更新と表示セル反映
+    updateConsistencyForIndices(indices) {
+        if (!indices || indices.length === 0) return;
+        if (!window.consistencyMap) window.consistencyMap = new Map();
+        const colIdx = CONFIG.integratedTableConfig.columns.findIndex(col => col.isConsistencyCheck);
+        const tdIndex = colIdx >= 0 ? (1 + colIdx) : -1; // 先頭のチェックボックス列ぶん+1
+        indices.forEach(index => {
+            const row = this.currentSearchResults[index];
+            const recordId = window.virtualScroll.getRecordIdFromRow(row);
+            const label = this.getConsistencyResult(row);
+            const isConsistent = label === '整合' ? true : (label === '不整合' ? false : null);
+            window.consistencyMap.set(recordId, isConsistent);
+            if (tdIndex >= 0) {
+                const tr = document.querySelector(`tr[data-record-index="${index}"]`);
+                if (tr && tr.children && tr.children[tdIndex]) {
+                    const td = tr.children[tdIndex];
+                    let text = '-';
+                    if (isConsistent === true) {
+                        text = '✅';
+                        td.className = 'consistency-ok readonly-cell';
+                    } else if (isConsistent === false) {
+                        text = '❌';
+                        td.className = 'consistency-ng readonly-cell';
+                    } else {
+                        td.className = 'null-value readonly-cell';
+                    }
+                    td.textContent = text;
+                }
+            }
+        });
+    }
+
     /**
      * 更新ルールを動的に生成
      */
@@ -675,17 +723,8 @@ class TableRenderer {
                     const newKey = window.virtualScroll.generateIntegrationKeyFromRow(row);
                     // currentSearchResultsの統合キーも更新
                     row[CONFIG.integrationKey] = newKey;
-                    // _originalIntegratedData も同内容に同期（古い値が検索に残らないようにする）
-                    if (Array.isArray(this._originalIntegratedData)) {
-                        // 旧キー一致で検索 → 無ければ新キーでも検索
-                        let oriIdx = this._originalIntegratedData.findIndex(r => window.virtualScroll.getRecordIdFromRow(r) === oldKey);
-                        if (oriIdx === -1) {
-                            oriIdx = this._originalIntegratedData.findIndex(r => window.virtualScroll.getRecordIdFromRow(r) === newKey);
-                        }
-                        if (oriIdx !== -1) {
-                            this._originalIntegratedData[oriIdx] = { ...row };
-                        }
-                    }
+                    // _originalIntegratedData も同期（古い値が検索に残らないようにする）
+                    this.syncOriginalDataRowByKeys(oldKey, newKey, row);
                     // MAPのキーも新しい統合キーに移し替え
                     if (oldKey !== newKey) {
                         if (window.virtualScroll.changeFlags.has(oldKey)) {
@@ -704,35 +743,7 @@ class TableRenderer {
                 });
 
                 // 保存後に整合性マップを最新化し、表示も更新
-                if (!window.consistencyMap) window.consistencyMap = new Map();
-                const consistencyColIdxInConfig = CONFIG.integratedTableConfig.columns.findIndex(col => col.isConsistencyCheck);
-                const consistencyTdIndex = consistencyColIdxInConfig >= 0 ? (1 + consistencyColIdxInConfig) : -1; // 先頭にチェックボックス列があるため+1
-                changedIndices.forEach(index => {
-                    const row = this.currentSearchResults[index];
-                    const recordId = window.virtualScroll.getRecordIdFromRow(row);
-                    const label = this.getConsistencyResult(row); // '整合' | '不整合' | ''
-                    const isConsistent = label === '整合' ? true : (label === '不整合' ? false : null);
-                    window.consistencyMap.set(recordId, isConsistent);
-
-                    // 可視範囲に行がある場合はセルも即時更新
-                    if (consistencyTdIndex >= 0) {
-                        const tr = document.querySelector(`tr[data-record-index="${index}"]`);
-                        if (tr && tr.children && tr.children[consistencyTdIndex]) {
-                            const td = tr.children[consistencyTdIndex];
-                            let text = '-';
-                            if (isConsistent === true) {
-                                text = '✅';
-                                td.className = 'consistency-ok readonly-cell';
-                            } else if (isConsistent === false) {
-                                text = '❌';
-                                td.className = 'consistency-ng readonly-cell';
-                            } else {
-                                td.className = 'null-value readonly-cell';
-                            }
-                            td.textContent = text;
-                        }
-                    }
-                });
+                this.updateConsistencyForIndices(changedIndices);
             }
             
             // 成功メッセージをトーストで表示
