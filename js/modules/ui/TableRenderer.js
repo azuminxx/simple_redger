@@ -182,333 +182,13 @@ class TableRenderer {
 
         integratedResultsContainer.appendChild(titleContainer);
 
-        // ===== 検索ボックス追加（肯定系・否定系分離） =====
-        const searchBoxWrapper = DOMHelper.createElement('div', {}, 'search-box-wrapper');
-        searchBoxWrapper.style.fontSize = '12px';
-
-        // 肯定系検索
-        const positiveInput = DOMHelper.createElement('input', { type: 'text', id: 'positive-search-input', placeholder: 'カンマ、スペース、改行で複数指定可（列名は 列名:検索値 で指定可）', autocomplete: 'off' }, 'positive-search-input');
-        positiveInput.style.marginRight = '1em';
-        positiveInput.style.fontSize = '12px';
-        positiveInput.style.height = '32px';
-        positiveInput.style.width = '500px';
-        positiveInput.style.border = '1px solid #ced4da';
-
-        // 否定系検索
-        const negativeInput = DOMHelper.createElement('input', { type: 'text', id: 'negative-search-input', placeholder: 'カンマ、スペース、改行で複数指定可（列名は 列名:検索値 で指定可）', autocomplete: 'off' }, 'negative-search-input');
-        negativeInput.style.fontSize = '12px';
-        negativeInput.style.height = '32px';
-        negativeInput.style.width = '500px';
-        negativeInput.style.border = '1px solid #ced4da';
-
-        // 条件結合方法選択
-        const positiveLogicLabel = DOMHelper.createElement('label');
-        positiveLogicLabel.textContent = '➕検索条件:';
-        positiveLogicLabel.setAttribute('for', 'positive-logic-select');
-
-        // 条件結合方法選択
-        const positiveLogicSelect = DOMHelper.createElement('select', { id: 'positive-logic-select' }, 'positive-logic-select');
-        const positiveOrOption = DOMHelper.createElement('option', { value: 'or' }, 'positive-or-option');
-        positiveOrOption.textContent = 'OR';
-        const positiveAndOption = DOMHelper.createElement('option', { value: 'and' }, 'positive-and-option');
-        positiveAndOption.textContent = 'AND';
-        positiveLogicSelect.style.fontSize = '12px';
-        positiveLogicSelect.style.height = '37.2px';
-        positiveLogicSelect.style.border = '1px solid #ced4da';
-        positiveLogicSelect.appendChild(positiveOrOption);
-        positiveLogicSelect.appendChild(positiveAndOption);
-
-        // 条件結合方法選択
-        const negativeLogicLabel = DOMHelper.createElement('label');
-        negativeLogicLabel.textContent = '➖除外条件:';
-        negativeLogicLabel.setAttribute('for', 'negative-logic-select');
-
-        // 条件結合方法選択
-        const negativeLogicSelect = DOMHelper.createElement('select', { id: 'negative-logic-select' }, 'negative-logic-select');
-        const negativeOrOption = DOMHelper.createElement('option', { value: 'or' }, 'negative-or-option');
-        negativeOrOption.textContent = 'OR';
-        const negativeAndOption = DOMHelper.createElement('option', { value: 'and' }, 'negative-and-option');
-        negativeAndOption.textContent = 'AND';
-        negativeLogicSelect.style.fontSize = '12px';
-        negativeLogicSelect.style.height = '37.2px';
-        negativeLogicSelect.style.border = '1px solid #ced4da';
-        negativeLogicSelect.appendChild(negativeOrOption);
-        negativeLogicSelect.appendChild(negativeAndOption);
-
-        searchBoxWrapper.appendChild(positiveLogicLabel);
-        searchBoxWrapper.appendChild(positiveLogicSelect);
-        //searchBoxWrapper.appendChild(positiveLabel);
-        searchBoxWrapper.appendChild(positiveInput);
-        searchBoxWrapper.appendChild(negativeLogicLabel);
-        searchBoxWrapper.appendChild(negativeLogicSelect);
-        //searchBoxWrapper.appendChild(negativeLabel);
-        searchBoxWrapper.appendChild(negativeInput);
-
-        // クリアボタンを作成
-        const clearButton = DOMHelper.createElement('button', { type: 'button' }, 'clear-search-button');
-        clearButton.textContent = '条件をクリアする';
-        clearButton.style.fontSize = '12px';
-        clearButton.style.height = '32px';
-        clearButton.style.border = '1px solid #ced4da';
-        clearButton.style.backgroundColor = '#f8f9fa';
-        clearButton.style.cursor = 'pointer';
-        clearButton.style.marginLeft = '0.5em';
-        clearButton.addEventListener('click', () => {
-            positiveInput.value = '';
-            negativeInput.value = '';
-            
-            // 絞り込み状態をリセット
-            this.resetFilterState();
-            
-            handleSearch();
-        });
-
-        searchBoxWrapper.appendChild(clearButton);
-        integratedResultsContainer.appendChild(searchBoxWrapper);
-        // ===== ここまで追加 =====
-
-        // 検索イベント（両inputで発火）
-        const handleSearch = () => {
-            const positiveRaw = positiveInput.value.trim();
-            const negativeRaw = negativeInput.value.trim();
-            const positiveKeywords = positiveRaw.split(/[\s,\r\n]+/).filter(Boolean);
-            const negativeKeywords = negativeRaw.split(/[\s,\r\n]+/).filter(Boolean);
-            const positiveLogic = positiveLogicSelect.value;
-            const negativeLogic = negativeLogicSelect.value;
-            let filteredData;
-            if (positiveKeywords.length === 0 && negativeKeywords.length === 0) {
-                filteredData = this._originalIntegratedData;
-            } else {
-                filteredData = this._originalIntegratedData.filter((row, rowIndex) => {
-                    // 肯定系条件: 選択されたロジックに応じてOR/AND判定
-                    const positiveOk = positiveKeywords.length === 0 || (positiveLogic === 'or' ? 
-                        positiveKeywords.some(keyword => {
-                            if (keyword.includes(':')) {
-                                const [fieldName, searchValue] = keyword.split(':', 2);
-                                
-                                // 整合性チェック検索の特別処理
-                                if (fieldName.toLowerCase() === '整合' || fieldName.toLowerCase() === 'consistency') {
-                                    const consistencyResult = this.getConsistencyResult(row);
-                                    return consistencyResult && consistencyResult.toLowerCase().includes(searchValue.toLowerCase());
-                                }
-                                
-                                // フィールド名に部分一致するキーをすべて探す
-                                const matchingKeys = Object.keys(row).filter(key => {
-                                    const column = CONFIG.integratedTableConfig.columns.find(col => col.key === key);
-                                    return column && column.label.toLowerCase().includes(fieldName.toLowerCase());
-                                });
-                                // いずれかのフィールド値が部分一致すればOK
-                                return matchingKeys.some(matchingKey => {
-                                    const value = row[matchingKey];
-                                    // 空欄条件の判定
-                                    if (searchValue === '""' || searchValue === "''") {
-                                        return !value || value.toString().trim() === '';
-                                    }
-                                    // 通常の部分一致
-                                    return value && value.toString().toLowerCase().includes(searchValue.toLowerCase());
-                                });
-                            }
-                            // 通常の検索（部分一致） - DOM属性由来のプロパティを除外 + 整合性チェック結果を含む + DOM属性を含む
-                            const searchableValues = this.getSearchableValues(row);
-                            const consistencyResult = this.getConsistencyResult(row);
-                            if (consistencyResult) {
-                                searchableValues.push(consistencyResult);
-                            }
-                            
-                            // DOM属性からフラグを取得して検索対象に追加
-                            const domFlags = this.getDOMFlagsForRow(rowIndex);
-                            searchableValues.push(...domFlags);
-                            
-                            return searchableValues.some(val => val && val.toString().toLowerCase().includes(keyword.toLowerCase()));
-                        }) : 
-                        positiveKeywords.every(keyword => {
-                            if (keyword.includes(':')) {
-                                const [fieldName, searchValue] = keyword.split(':', 2);
-                                
-                                // 整合性チェック検索の特別処理
-                                if (fieldName.toLowerCase() === '整合' || fieldName.toLowerCase() === 'consistency') {
-                                    const consistencyResult = this.getConsistencyResult(row);
-                                    return consistencyResult && consistencyResult.toLowerCase().includes(searchValue.toLowerCase());
-                                }
-                                
-                                // フィールド名に部分一致するキーをすべて探す
-                                const matchingKeys = Object.keys(row).filter(key => {
-                                    const column = CONFIG.integratedTableConfig.columns.find(col => col.key === key);
-                                    return column && column.label.toLowerCase().includes(fieldName.toLowerCase());
-                                });
-                                // いずれかのフィールド値が部分一致すればOK
-                                return matchingKeys.some(matchingKey => {
-                                    const value = row[matchingKey];
-                                    // 空欄条件の判定
-                                    if (searchValue === '""' || searchValue === "''") {
-                                        return !value || value.toString().trim() === '';
-                                    }
-                                    // 通常の部分一致
-                                    return value && value.toString().toLowerCase().includes(searchValue.toLowerCase());
-                                });
-                            }
-                            // 通常の検索（部分一致） - 整合性チェック結果を含む + DOM属性を含む
-                            const searchableValues = this.getSearchableValues(row);
-                            const consistencyResult = this.getConsistencyResult(row);
-                            if (consistencyResult) {
-                                searchableValues.push(consistencyResult);
-                            }
-                            
-                            // DOM属性からフラグを取得して検索対象に追加
-                            const domFlags = this.getDOMFlagsForRow(rowIndex);
-                            searchableValues.push(...domFlags);
-                            
-                            return searchableValues.some(val => val && val.toString().toLowerCase().includes(keyword.toLowerCase()));
-                        })
-                    );
-
-                    // 否定系条件: 選択されたロジックに応じてOR/AND判定
-                    const negativeOk = negativeKeywords.length === 0 || (negativeLogic === 'or' ? 
-                        negativeKeywords.every(keyword => {
-                            if (keyword.includes(':')) {
-                                const [fieldName, searchValue] = keyword.split(':', 2);
-                                
-                                // 整合性チェック検索の特別処理
-                                if (fieldName.toLowerCase() === '整合' || fieldName.toLowerCase() === 'consistency') {
-                                    const consistencyResult = this.getConsistencyResult(row);
-                                    return !(consistencyResult && consistencyResult.toLowerCase().includes(searchValue.toLowerCase()));
-                                }
-                                
-                                // フィールド名に部分一致するキーをすべて探す
-                                const matchingKeys = Object.keys(row).filter(key => {
-                                    const column = CONFIG.integratedTableConfig.columns.find(col => col.key === key);
-                                    return column && column.label.toLowerCase().includes(fieldName.toLowerCase());
-                                });
-                                // いずれかのフィールド値が「含まれていない」ならOK
-                                return matchingKeys.every(matchingKey => {
-                                    const value = row[matchingKey];
-                                    // 空欄条件の判定
-                                    if (searchValue === '""' || searchValue === "''") {
-                                        return value && value.toString().trim() !== '';
-                                    }
-                                    // 通常の否定条件
-                                    return !(value && value.toString().toLowerCase().includes(searchValue.toLowerCase()));
-                                });
-                            }
-                            // 通常の否定条件（全フィールド） - DOM属性由来のプロパティを除外 + 整合性チェック結果を含む + DOM属性を含む
-                            const searchableValues = this.getSearchableValues(row);
-                            const consistencyResult = this.getConsistencyResult(row);
-                            if (consistencyResult) {
-                                searchableValues.push(consistencyResult);
-                            }
-                            
-                            // DOM属性からフラグを取得して検索対象に追加
-                            const domFlags = this.getDOMFlagsForRow(rowIndex);
-                            searchableValues.push(...domFlags);
-                            
-                            return !searchableValues.some(val => val && val.toString().toLowerCase().includes(keyword.toLowerCase()));
-                        }) : 
-                        negativeKeywords.some(keyword => {
-                            if (keyword.includes(':')) {
-                                const [fieldName, searchValue] = keyword.split(':', 2);
-                                
-                                // 整合性チェック検索の特別処理
-                                if (fieldName.toLowerCase() === '整合' || fieldName.toLowerCase() === 'consistency') {
-                                    const consistencyResult = this.getConsistencyResult(row);
-                                    return !(consistencyResult && consistencyResult.toLowerCase().includes(searchValue.toLowerCase()));
-                                }
-                                
-                                // フィールド名に部分一致するキーをすべて探す
-                                const matchingKeys = Object.keys(row).filter(key => {
-                                    const column = CONFIG.integratedTableConfig.columns.find(col => col.key === key);
-                                    return column && column.label.toLowerCase().includes(fieldName.toLowerCase());
-                                });
-                                // いずれかのフィールド値が「含まれていない」ならOK
-                                return matchingKeys.every(matchingKey => {
-                                    const value = row[matchingKey];
-                                    // 空欄条件の判定
-                                    if (searchValue === '""' || searchValue === "''") {
-                                        return value && value.toString().trim() !== '';
-                                    }
-                                    // 通常の否定条件
-                                    return !(value && value.toString().toLowerCase().includes(searchValue.toLowerCase()));
-                                });
-                            }
-                            // 通常の否定条件（全フィールド） - DOM属性由来のプロパティを除外 + 整合性チェック結果を含む + DOM属性を含む
-                            const searchableValues = this.getSearchableValues(row);
-                            const consistencyResult = this.getConsistencyResult(row);
-                            if (consistencyResult) {
-                                searchableValues.push(consistencyResult);
-                            }
-                            
-                            // DOM属性からフラグを取得して検索対象に追加
-                            const domFlags = this.getDOMFlagsForRow(rowIndex);
-                            searchableValues.push(...domFlags);
-                            
-                            return !searchableValues.some(val => val && val.toString().toLowerCase().includes(keyword.toLowerCase()));
-                        })
-                    );
-
-                    return negativeOk && positiveOk;
-                });
-            }
-            // 仮想テーブル再描画
-            this.currentSearchResults = filteredData;
-            
-            // テーブル内検索結果件数を更新
-            this.updateSearchResultCount(filteredData.length);
-            
-            // 既存のテーブルコンテナを取得
-            const oldTable = integratedResultsContainer.querySelector('.integrated-table-container');
-            
-            // 編集状態を保存（検索前の状態を保持）
-            let savedChangeFlags = null;
-            let savedChangedFields = null;
-            let savedOriginalValues = null;
-            let savedScrollTop = 0;
-            
-            if (window.virtualScroll && oldTable) {
-                // 変更フラグを保存
-                savedChangeFlags = new Map(window.virtualScroll.changeFlags);
-                savedChangedFields = new Map(window.virtualScroll.changedFields);
-                savedOriginalValues = new Map(window.virtualScroll.originalValues);
-                
-                // スクロール位置を保存
-                const scrollContainer = oldTable.querySelector('.virtual-scroll-container');
-                if (scrollContainer) {
-                    savedScrollTop = scrollContainer.scrollTop;
-                }
-            }
-            
-            // 新しいテーブルを作成
-            const newTable = this.virtualScroll.createVirtualScrollTable(filteredData);
-            
-            // 編集状態を復元
-            if (window.virtualScroll && savedChangeFlags) {
-                // 変更フラグを復元
-                window.virtualScroll.changeFlags = savedChangeFlags;
-                window.virtualScroll.changedFields = savedChangedFields;
-                window.virtualScroll.originalValues = savedOriginalValues;
-                
-                // 変更フラグUIを復元
-                window.virtualScroll.restoreChangeFlagsUI();
-                
-                // スクロール位置を復元
-                if (savedScrollTop > 0) {
-                    setTimeout(() => {
-                        const newScrollContainer = newTable.querySelector('.virtual-scroll-container');
-                        if (newScrollContainer) {
-                            newScrollContainer.scrollTop = savedScrollTop;
-                        }
-                    }, 100);
-                }
-            }
-            
-            if (oldTable && newTable) {
-                oldTable.parentNode.replaceChild(newTable, oldTable);
-            }
-            
-
-        };
-        positiveInput.addEventListener('input', handleSearch.bind(this));
-        negativeInput.addEventListener('input', handleSearch.bind(this));
-        positiveLogicSelect.addEventListener('change', handleSearch.bind(this));
-        negativeLogicSelect.addEventListener('change', handleSearch.bind(this));
+        // 検索・絞込 UI を分離クラスで構築
+        if (!window.SearchAndFilter) {
+            console.error('SearchAndFilter が読み込まれていません');
+        } else {
+            if (!this.searchAndFilter) this.searchAndFilter = new window.SearchAndFilter(this);
+            this.searchAndFilter.build(integratedResultsContainer);
+        }
 
         integratedResultsContainer.appendChild(tableContainer);
         
@@ -1585,24 +1265,10 @@ class TableRenderer {
      * @returns {Array} フラグの配列
      */
     getDOMFlagsForRow(rowIndex) {
-        const flags = [];
-
-        // 1) 仮想スクロールでDOMが破棄されても保持できるよう、メモリ上の選択状態を優先
-        if (this.checkedRows && this.checkedRows.has(rowIndex)) {
-            flags.push(this.filterFlag);
-            return flags;
+        if (this.searchAndFilter && typeof this.searchAndFilter.getDOMFlagsForRow === 'function') {
+            return this.searchAndFilter.getDOMFlagsForRow(rowIndex);
         }
-
-        // 2) 互換性のため、表示中のDOMに埋め込まれた属性も参照（表示範囲内のみ）
-        const rowElement = document.querySelector(`tr[data-record-index="${rowIndex}"]`);
-        if (rowElement) {
-            const filterFlag = rowElement.getAttribute('data-filter-flag');
-            if (filterFlag) {
-                flags.push(filterFlag);
-            }
-        }
-
-        return flags;
+        return [];
     }
 
     /**
@@ -1653,36 +1319,8 @@ class TableRenderer {
      * テーブル内検索を活用した絞り込み実行
      */
     executeFilterBySearch() {
-        if (this.checkedRows.size === 0) {
-            console.warn('絞り込み対象の行が選択されていません');
-            return;
-        }
-
-        console.log(`🔍 テーブル内検索による絞り込み実行: ${this.checkedRows.size}行を対象`);
-        
-        // テーブル内検索のinputボックスにフラグ文字列を入力
-        const positiveInput = document.querySelector('#positive-search-input');
-        if (positiveInput) {
-            positiveInput.value = this.filterFlag;
-            console.log(`テーブル内検索に設定: "${this.filterFlag}"`);
-            
-            // 検索を実行（既存のhandleSearch関数をトリガー）
-            const searchEvent = new Event('input', { bubbles: true });
-            positiveInput.dispatchEvent(searchEvent);
-            
-            console.log('✅ テーブル内検索による絞り込み完了');
-            
-            // 絞り込み状態を更新
-            this.isFiltered = true;
-            
-            // 絞り込み成功後、全てのチェックボックスをクリア
-            this.clearAllCheckboxes();
-            
-            // すべてのトグルボタンの状態を更新
-            this.updateAllToggleButtons();
-        } else {
-            console.error('❌ テーブル内検索のinputボックスが見つかりません');
-            console.error('利用可能なinput要素:', document.querySelectorAll('input[type="text"]'));
+        if (this.searchAndFilter && typeof this.searchAndFilter.executeFilterBySearch === 'function') {
+            return this.searchAndFilter.executeFilterBySearch();
         }
     }
 
@@ -1690,62 +1328,18 @@ class TableRenderer {
      * テーブル内検索による絞り込み解除
      */
     clearFilterBySearch() {
-        console.log('🔄 テーブル内検索による絞り込み解除開始');
-        
-        // テーブル内検索のinputボックスをクリア
-        const positiveInput = document.querySelector('#positive-search-input');
-        if (positiveInput) {
-            positiveInput.value = '';
-            console.log('テーブル内検索をクリア');
-            
-            // 検索を実行（空文字で全件表示に戻す）
-            const searchEvent = new Event('input', { bubbles: true });
-            positiveInput.dispatchEvent(searchEvent);
+        if (this.searchAndFilter && typeof this.searchAndFilter.clearFilterBySearch === 'function') {
+            return this.searchAndFilter.clearFilterBySearch();
         }
-        
-        // DOM側のフラグを削除
-        const flaggedRows = document.querySelectorAll(`[data-filter-flag="${this.filterFlag}"]`);
-        flaggedRows.forEach(row => {
-            row.removeAttribute('data-filter-flag');
-        });
-        console.log(`${flaggedRows.length}行からフラグを削除`);
-        
-        // チェック状態をクリア
-        this.checkedRows.clear();
-        
-        // UI上のチェックボックスもクリア
-        const checkboxes = document.querySelectorAll('.row-checkbox');
-        checkboxes.forEach(checkbox => {
-            checkbox.checked = false;
-        });
-        
-        console.log('✅ 絞り込み解除完了: チェック状態とフラグをクリア');
-        
-        // 絞り込み状態を更新
-        this.isFiltered = false;
-        
-        // すべてのトグルボタンの状態を更新
-        this.updateAllToggleButtons();
     }
 
     /**
      * トグルボタンの状態を更新
      */
     updateToggleButtonState(button) {
-        console.log(`🔄 ボタン状態更新: isFiltered=${this.isFiltered}, button=`, button);
-        
-        if (this.isFiltered) {
-            button.textContent = '解除';
-            button.className = 'header-clear-button';
-            console.log('✅ ボタンを解除モードに変更');
-        } else {
-            button.textContent = '絞込';
-            button.className = 'header-filter-button';
-            console.log('✅ ボタンを絞込モードに変更');
+        if (this.searchAndFilter && typeof this.searchAndFilter.updateToggleButtonState === 'function') {
+            return this.searchAndFilter.updateToggleButtonState(button);
         }
-        
-        // 実際のDOM要素の状態も確認
-        console.log(`📋 ボタンDOM状態: text="${button.textContent}", class="${button.className}"`);
     }
 
     /**
@@ -1773,59 +1367,27 @@ class TableRenderer {
      * ページ上のすべてのトグルボタンの状態を更新
      */
     updateAllToggleButtons() {
-        const toggleButtons = document.querySelectorAll('.header-toggle-button, .header-filter-button, .header-clear-button');
-        console.log(`🔄 全トグルボタン更新: ${toggleButtons.length}個のボタンを発見`);
-        
-        toggleButtons.forEach((btn, index) => {
-            console.log(`ボタン${index + 1}: ${btn.textContent} (${btn.className})`);
-            this.updateToggleButtonState(btn);
-        });
+        if (this.searchAndFilter && typeof this.searchAndFilter.updateAllToggleButtons === 'function') {
+            return this.searchAndFilter.updateAllToggleButtons();
+        }
     }
 
     /**
      * 全てのチェックボックスをクリアする
      */
     clearAllCheckboxes() {
-        console.log('🧹 全チェックボックスクリア開始');
-        
-        // UI上のチェックボックスをクリア
-        const checkboxes = document.querySelectorAll('.row-checkbox');
-        checkboxes.forEach((checkbox, index) => {
-            if (checkbox.checked) {
-                console.log(`チェックボックス ${index} をクリア`);
-            }
-            checkbox.checked = false;
-        });
-        
-        // チェック状態の管理データもクリア
-        this.checkedRows.clear();
-        
-        console.log(`✅ 全チェックボックスクリア完了: ${checkboxes.length}個のチェックボックスを処理`);
+        if (this.searchAndFilter && typeof this.searchAndFilter.clearAllCheckboxes === 'function') {
+            return this.searchAndFilter.clearAllCheckboxes();
+        }
     }
 
     /**
      * 絞り込み状態をリセットする（テーブル検索クリア時用）
      */
     resetFilterState() {
-        console.log('🔄 絞り込み状態リセット開始');
-        
-        // 絞り込み状態をfalseに設定
-        this.isFiltered = false;
-        
-        // チェック状態をクリア
-        this.clearAllCheckboxes();
-        
-        // DOM側のフラグを削除
-        const flaggedRows = document.querySelectorAll(`[data-filter-flag="${this.filterFlag}"]`);
-        flaggedRows.forEach(row => {
-            row.removeAttribute('data-filter-flag');
-        });
-        console.log(`${flaggedRows.length}行からフラグを削除`);
-        
-        // すべてのトグルボタンの状態を更新
-        this.updateAllToggleButtons();
-        
-        console.log('✅ 絞り込み状態リセット完了');
+        if (this.searchAndFilter && typeof this.searchAndFilter.resetFilterState === 'function') {
+            return this.searchAndFilter.resetFilterState();
+        }
     }
 
 }
