@@ -509,6 +509,8 @@ class CellSwapper {
         }
 
         // 空行を分離元の行の直下に作成
+        // 元の統合キーを保持（_originalIntegratedData 同期のため）
+        const oldSourceKey = window.virtualScroll?.getRecordIdFromRow?.(sourceRecord) || null;
         const emptyRowIndex = this.createEmptyRow(recordIndex);
         
         // 台帳の全フィールドを取得
@@ -548,6 +550,43 @@ class CellSwapper {
             }
         });
         
+        // 分離後、両行の統合キーを現在値から再生成して設定
+        if (window.virtualScroll && typeof window.virtualScroll.generateIntegrationKeyFromRow === 'function') {
+            const newSourceKey = window.virtualScroll.generateIntegrationKeyFromRow(updatedSourceRecord);
+            const newEmptyKey = window.virtualScroll.generateIntegrationKeyFromRow(emptyRecord);
+            updatedSourceRecord[CONFIG.integrationKey] = newSourceKey;
+            emptyRecord[CONFIG.integrationKey] = newEmptyKey;
+        }
+
+        // テーブル内検索のベースデータ（_originalIntegratedData）にも同期
+        if (Array.isArray(this.tableRenderer._originalIntegratedData)) {
+            const oriIdx = this.tableRenderer._originalIntegratedData.findIndex(r => {
+                return (window.virtualScroll?.getRecordIdFromRow?.(r) || null) === oldSourceKey;
+            });
+            if (oriIdx !== -1) {
+                // 元行を最新値で上書き
+                this.tableRenderer._originalIntegratedData[oriIdx] = { ...updatedSourceRecord };
+                // 新規行を直後に挿入
+                this.tableRenderer._originalIntegratedData.splice(oriIdx + 1, 0, { ...emptyRecord });
+            } else {
+                // 見つからない場合は末尾に追加（保険）
+                this.tableRenderer._originalIntegratedData.push({ ...updatedSourceRecord });
+                this.tableRenderer._originalIntegratedData.push({ ...emptyRecord });
+            }
+        }
+
+        // 整合性マップを更新（表示と検索の整合を担保）
+        if (window.virtualScroll && window.tableRenderer) {
+            if (!window.consistencyMap) window.consistencyMap = new Map();
+            [recordIndex, emptyRowIndex].forEach(idx => {
+                const row = this.tableRenderer.currentSearchResults[idx];
+                const recordId = window.virtualScroll.getRecordIdFromRow(row);
+                const label = this.tableRenderer.getConsistencyResult(row);
+                const isConsistent = label === '整合' ? true : (label === '不整合' ? false : null);
+                window.consistencyMap.set(recordId, isConsistent);
+            });
+        }
+
         // 変更フラグを設定
         window.virtualScroll.setChangeFlag(recordIndex, true);
         window.virtualScroll.setChangeFlag(emptyRowIndex, true);

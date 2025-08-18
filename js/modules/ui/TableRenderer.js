@@ -1575,17 +1575,22 @@ class TableRenderer {
      */
     getDOMFlagsForRow(rowIndex) {
         const flags = [];
-        
-        // DOM要素から該当行を検索
+
+        // 1) 仮想スクロールでDOMが破棄されても保持できるよう、メモリ上の選択状態を優先
+        if (this.checkedRows && this.checkedRows.has(rowIndex)) {
+            flags.push(this.filterFlag);
+            return flags;
+        }
+
+        // 2) 互換性のため、表示中のDOMに埋め込まれた属性も参照（表示範囲内のみ）
         const rowElement = document.querySelector(`tr[data-record-index="${rowIndex}"]`);
         if (rowElement) {
-            // data-filter-flag属性を取得
             const filterFlag = rowElement.getAttribute('data-filter-flag');
             if (filterFlag) {
                 flags.push(filterFlag);
             }
         }
-        
+
         return flags;
     }
 
