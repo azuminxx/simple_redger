@@ -230,7 +230,7 @@ class SearchAndFilter {
     // 絞り込み実行
     executeFilterBySearch() {
         if (this.tableRenderer.checkedRows.size === 0) {
-            console.warn('絞り込み対象の行が選択されていません');
+            // no target
             return;
         }
         const positiveInput = document.querySelector('#positive-search-input');
@@ -242,7 +242,7 @@ class SearchAndFilter {
             this.clearAllCheckboxes();
             this.updateAllToggleButtons();
         } else {
-            console.error('❌ テーブル内検索のinputボックスが見つかりません');
+            // input missing
         }
     }
 

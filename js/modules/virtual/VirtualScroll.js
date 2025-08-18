@@ -418,7 +418,7 @@ class VirtualScroll {
         }
         const originalValuesMap = this.originalValues.get(recordId);
         if (!originalValuesMap.has(fieldKey)) {
-            console.warn(`⚠️ 元の値が見つかりません: 行${recordIndex} ${fieldKey} - 変更フラグ追加`);
+            // original value missing, mark changed
             this.setChangedField(recordIndex, fieldKey);
             return;
         }
@@ -595,12 +595,12 @@ class VirtualScroll {
                         window.tableRenderer.checkedRows.add(i);
                         // チェック時にフラグを埋め込む
                         row.setAttribute('data-filter-flag', window.tableRenderer.filterFlag);
-                        console.log(`行 ${i} にフラグを埋め込み: ${window.tableRenderer.filterFlag}`);
+                        // flag embed
                     } else {
                         window.tableRenderer.checkedRows.delete(i);
                         // チェック解除時にフラグを削除
                         row.removeAttribute('data-filter-flag');
-                        console.log(`行 ${i} からフラグを削除`);
+                        // flag removed
                     }
                 }
             });
@@ -825,7 +825,7 @@ class VirtualScroll {
                 return this.createTextInput(column, displayValue, recordIndex, columnIndex);
             }
         } catch (error) {
-            console.warn(`フィールド情報取得エラー (${column.fieldCode}):`, error);
+            // field info error
             // エラー時はテキストボックスにフォールバック
             return this.createTextInput(column, displayValue, recordIndex, columnIndex);
         }
@@ -947,7 +947,7 @@ class VirtualScroll {
 
             // グローバルのFieldInfoAPIインスタンスを使用
             if (!window.fieldInfoAPI) {
-                console.error('FieldInfoAPIインスタンスが見つかりません');
+                // missing FieldInfoAPI
                 return { type: 'text' };
             }
             
@@ -968,7 +968,7 @@ class VirtualScroll {
      * エラーログを統一フォーマットで出力
      */
     logError(operation, error) {
-        console.error(`❌ ${operation}エラー:`, error);
+        // minimal
     }
 
     /**
@@ -1117,7 +1117,7 @@ class VirtualScroll {
                 await this.updateUserMapFields(recordIndex, newUserId);
             }
         } catch (error) {
-            console.error('BSSID変更処理エラー:', error);
+            // minimal
         }
     }
 
@@ -1193,7 +1193,7 @@ class VirtualScroll {
                 this.updateCellDisplay(recordIndex, fieldKey, value);
             });
         } catch (error) {
-            console.error('ユーザー情報取得エラー:', error);
+            // minimal
             alert('ユーザー情報の取得中にエラーが発生しました。');
         }
     }
@@ -1314,7 +1314,7 @@ class VirtualScroll {
             if (window.tableRenderer && window.tableRenderer.cellSwapper) {
                 window.tableRenderer.cellSwapper.separateLedger(recordIndex, fieldCode);
             } else {
-                console.error('❌ CellSwapperが見つかりません');
+                // missing CellSwapper
             }
         });
         // ボタンをセルに追加

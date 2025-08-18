@@ -16,6 +16,7 @@
           "js/modules/ui/LedgerDetailsModal.js",
           "js/modules/ui/CellSwapper.js",
           "js/modules/ui/SearchAndFilter.js",
+          "js/modules/ui/ExportAndHistory.js",
           "js/modules/ui/TableRenderer.js",
           "js/main.js"
         ],

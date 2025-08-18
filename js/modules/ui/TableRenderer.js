@@ -184,7 +184,7 @@ class TableRenderer {
 
         // 検索・絞込 UI を分離クラスで構築
         if (!window.SearchAndFilter) {
-            console.error('SearchAndFilter が読み込まれていません');
+            // minimal: fail silent
         } else {
             if (!this.searchAndFilter) this.searchAndFilter = new window.SearchAndFilter(this);
             this.searchAndFilter.build(integratedResultsContainer);
@@ -689,7 +689,7 @@ class TableRenderer {
                 ledgerHistoryMap.set(historyKey, historyData);
             });
             
-            console.log(`✅ ${ledgerName} 更新完了 (${records.length}件)`);
+            // info log removed
             
             // 更新されたレコードのURLリンクをログ出力
             //this.logUpdatedRecordLinks(appId, records);
@@ -762,131 +762,19 @@ class TableRenderer {
      * 履歴管理アプリに台帳別に投入
      */
     async uploadHistoryToApp(appId = null) {
-        try {
-            // appIdが指定されている場合はその台帳のデータのみ処理
-            if (appId) {
-                const ledgerHistoryMap = this.updateHistoryMap.get(appId);
-                if (!ledgerHistoryMap || ledgerHistoryMap.size === 0) {
-                    console.log(`📝 台帳 ${appId} の履歴データがありません`);
-                    return;
-                }
-
-                // 指定された台帳の履歴データを収集
-                const ledgerHistoryData = [];
-                for (const [historyKey, historyData] of ledgerHistoryMap) {
-                    ledgerHistoryData.push(historyData);
-                }
-
-                if (ledgerHistoryData.length === 0) {
-                    console.log(`📝 台帳 ${appId} の履歴データがありません`);
-                    return;
-                }
-
-                // 履歴データをレコード形式に変換
-                const records = ledgerHistoryData.map(historyData => {
-                    const record = {
-                        [CONFIG.historyApp.fields.batchId]: { value: historyData.batchId },
-                        [CONFIG.historyApp.fields.recordId]: { value: historyData.recordId },
-                        [CONFIG.historyApp.fields.appId]: { value: historyData.appId },
-                        [CONFIG.historyApp.fields.ledgerName]: { value: historyData.ledgerName },
-                        [CONFIG.historyApp.fields.result]: { value: historyData.updateResult }
-                    };
-
-                    // request, response, errorはオブジェクト形式で投入
-                    if (historyData.request) {
-                        record[CONFIG.historyApp.fields.request] = { value: JSON.stringify(historyData.request) };
-                    }
-                    if (historyData.response) {
-                        record[CONFIG.historyApp.fields.response] = { value: JSON.stringify(historyData.response) };
-                    }
-                    if (historyData.error) {
-                        record[CONFIG.historyApp.fields.error] = { value: JSON.stringify(historyData.error) };
-                    }
-
-                    return record;
-                });
-
-                // kintone REST API で台帳別に登録
-                const response = await kintone.api(kintone.api.url('/k/v1/records', true), 'POST', {
-                    app: CONFIG.historyApp.appId,
-                    records: records
-                });
-
-                console.log(`✅ 台帳 ${appId} の履歴管理アプリへの投入完了 (${records.length}件)`);
-                console.log('📊 投入された履歴データ:', response.ids);
-
-                // 該当台帳の履歴データをクリア
-                this.updateHistoryMap.delete(appId);
-
-            } else {
-                // appIdが指定されていない場合は全台帳のデータを処理（従来の動作）
-                if (this.updateHistoryMap.size === 0) {
-                    console.log('📝 履歴データがありません');
-                    return;
-                }
-
-                // 全台帳の履歴データを収集
-                const allHistoryData = [];
-                for (const [appId, ledgerHistoryMap] of this.updateHistoryMap) {
-                    for (const [historyKey, historyData] of ledgerHistoryMap) {
-                        allHistoryData.push(historyData);
-                    }
-                }
-
-                if (allHistoryData.length === 0) {
-                    console.log('📝 履歴データがありません');
-                    return;
-                }
-
-                // 履歴データをレコード形式に変換
-                const records = allHistoryData.map(historyData => {
-                    const record = {
-                        [CONFIG.historyApp.fields.batchId]: { value: historyData.batchId },
-                        [CONFIG.historyApp.fields.recordId]: { value: historyData.recordId },
-                        [CONFIG.historyApp.fields.appId]: { value: historyData.appId },
-                        [CONFIG.historyApp.fields.ledgerName]: { value: historyData.ledgerName },
-                        [CONFIG.historyApp.fields.result]: { value: historyData.updateResult }
-                    };
-
-                    // request, response, errorはオブジェクト形式で投入
-                    if (historyData.request) {
-                        record[CONFIG.historyApp.fields.request] = { value: JSON.stringify(historyData.request) };
-                    }
-                    if (historyData.response) {
-                        record[CONFIG.historyApp.fields.response] = { value: JSON.stringify(historyData.response) };
-                    }
-                    if (historyData.error) {
-                        record[CONFIG.historyApp.fields.error] = { value: JSON.stringify(historyData.error) };
-                    }
-
-                    return record;
-                });
-
-                // kintone REST API で一括登録
-                const response = await kintone.api(kintone.api.url('/k/v1/records', true), 'POST', {
-                    app: CONFIG.historyApp.appId,
-                    records: records
-                });
-
-                console.log(`✅ 履歴管理アプリへの投入完了 (${records.length}件)`);
-                console.log('📊 投入された履歴データ:', response.ids);
-
-                // 履歴データをクリア
-                this.updateHistoryMap.clear();
-            }
-
-        } catch (error) {
-            console.error('❌ 履歴管理アプリへの投入エラー:', error);
-            // エラーが発生しても処理を継続（履歴データは保持）
+        if (!this.exportAndHistory && window.ExportAndHistory) {
+            this.exportAndHistory = new window.ExportAndHistory(this);
         }
+        if (this.exportAndHistory && typeof this.exportAndHistory.uploadHistoryToApp === 'function') {
+            return this.exportAndHistory.uploadHistoryToApp(appId);
+        }
+        // controller missing: no-op
     }
 
     /**
      * エラーログを統一フォーマットで出力
      */
-    logError(operation, error) {
-        console.error(`❌ ${operation}エラー:`, error);
-    }
+    logError(operation, error) { /* minimal */ }
 
     /**
      * VirtualScrollテーブルを再描画
@@ -1038,196 +926,26 @@ class TableRenderer {
      * 検索結果をExcelファイルにエクスポート
      */
     exportToExcel() {
-        if (!this.currentSearchResults || this.currentSearchResults.length === 0) {
-            alert('エクスポートするデータがありません。');
-            return;
+        if (!this.exportAndHistory && window.ExportAndHistory) {
+            this.exportAndHistory = new window.ExportAndHistory(this);
         }
-
-        try {
-            // エクスポートボタンを無効化
-            const exportButton = document.querySelector('.export-data-button');
-            if (exportButton) {
-                exportButton.disabled = true;
-                exportButton.textContent = 'エクスポート中...';
-            }
-
-            // 統合キーを先頭に追加、整合性チェック結果を追加したカラム設定を作成
-            const exportColumns = [
-                { key: '統合キー', label: '統合キー', ledger: '統合' },
-                { key: 'consistency-check', label: '整合', ledger: '操作' },
-                ...CONFIG.integratedTableConfig.columns.filter(col => 
-                    !col.isChangeFlag && !col.isDetailLink && !col.isConsistencyCheck
-                )
-            ];
-
-            // 台帳グループ化（統合キーと整合性チェックを含む）
-            const ledgerGroups = this.groupExportColumnsByLedger(exportColumns);
-
-            // 1行目：台帳名ヘッダー
-            const ledgerHeaderRow = ledgerGroups.map(group => {
-                const cells = new Array(group.columns.length).fill(group.ledgerName);
-                cells[0] = group.ledgerName; // 最初のセルのみ台帳名、残りは空
-                for (let i = 1; i < cells.length; i++) {
-                    cells[i] = ''; // 結合セルの残りは空文字
-                }
-                return cells;
-            }).flat();
-
-            // 2行目：フィールド名ヘッダー
-            const fieldHeaderRow = exportColumns.map(col => col.label);
-
-            // データ行を作成（統合キーと整合性チェック結果を含む）
-            const data = this.currentSearchResults.map((record, recordIndex) => {
-                return exportColumns.map(col => {
-                    // 統合キーの処理
-                    if (col.key === '統合キー') {
-                        // 各台帳から統合キーを取得
-                        let integrationKey = null;
-                        for (const appId in CONFIG.apps) {
-                            const ledgerName = CONFIG.apps[appId].name;
-                            const key = `${ledgerName}_${CONFIG.integrationKey}`;
-                            if (record[key]) {
-                                integrationKey = record[key];
-                                break;
-                            }
-                        }
-                        return integrationKey || '';
-                    }
-
-                    // 整合性チェック結果の処理
-                    if (col.key === 'consistency-check') {
-                        // 整合性チェックロジック（VirtualScroll.jsと同じロジック）
-                        let integrationKey = null;
-                        for (const appId in CONFIG.apps) {
-                            const ledgerName = CONFIG.apps[appId].name;
-                            const key = `${ledgerName}_${CONFIG.integrationKey}`;
-                            if (record[key]) {
-                                integrationKey = record[key];
-                                break;
-                            }
-                        }
-
-                        if (integrationKey) {
-                            const DataIntegratorClass = window.DataIntegrator;
-                            const dataIntegrator = new DataIntegratorClass();
-                            const parsed = dataIntegrator.parseIntegrationKey(integrationKey);
-                            const pc = record['PC台帳_PC番号'] || '';
-                            const ext = record['内線台帳_内線番号'] || '';
-                            const seat = record['座席台帳_座席番号'] || '';
-                            
-                            function isFieldConsistent(a, b) {
-                                const isEmpty = v => v === null || v === undefined || v === '';
-                                if (isEmpty(a) && isEmpty(b)) return true;
-                                return a === b;
-                            }
-                            
-                            const isConsistent =
-                                isFieldConsistent(parsed.PC, pc) &&
-                                isFieldConsistent(parsed.EXT, ext) &&
-                                isFieldConsistent(parsed.SEAT, seat);
-                            
-                            return isConsistent ? '整合' : '不整合';
-                        }
-                        return '';
-                    }
-
-                    // 通常のフィールドの処理
-                    const value = record[col.key];
-                    // null/undefinedの場合は空文字を返す
-                    if (value === null || value === undefined) {
-                        return '';
-                    }
-                    // 配列の場合は文字列として結合
-                    if (Array.isArray(value)) {
-                        return value.join(', ');
-                    }
-                    // オブジェクトの場合はvalueプロパティを使用
-                    if (typeof value === 'object' && value.value !== undefined) {
-                        return value.value || '';
-                    }
-                    return String(value);
-                });
-            });
-
-            // CSVデータを作成（2行ヘッダー + データ）
-            const csvContent = [ledgerHeaderRow, fieldHeaderRow, ...data]
-                .map(row => row.map(cell => {
-                    // セル内の改行やカンマをエスケープ
-                    const cellStr = String(cell);
-                    if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
-                        return `"${cellStr.replace(/"/g, '""')}"`;
-                    }
-                    return cellStr;
-                }).join(','))
-                .join('\n');
-
-            // BOMを追加してUTF-8で保存（Excelで文字化けを防ぐ）
-            const bom = '\uFEFF';
-            const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' });
-            
-            // ファイル名を生成（現在日時を含む）
-            const now = new Date();
-            const timestamp = now.getFullYear() + 
-                String(now.getMonth() + 1).padStart(2, '0') + 
-                String(now.getDate()).padStart(2, '0') + '_' +
-                String(now.getHours()).padStart(2, '0') + 
-                String(now.getMinutes()).padStart(2, '0');
-            const filename = `統合台帳検索結果_${timestamp}.csv`;
-
-            // ダウンロードを実行
-            const link = document.createElement('a');
-            if (link.download !== undefined) {
-                const url = URL.createObjectURL(blob);
-                link.setAttribute('href', url);
-                link.setAttribute('download', filename);
-                link.style.visibility = 'hidden';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                
-                // 成功メッセージを表示
-                this.showToast(`${this.currentSearchResults.length}件のデータをエクスポートしました`, 'success');
-            } else {
-                throw new Error('お使いのブラウザはファイルダウンロードをサポートしていません。');
-            }
-
-        } catch (error) {
-            console.error('エクスポートエラー:', error);
-            this.showToast('エクスポートに失敗しました', 'error');
-            alert(`エクスポート中にエラーが発生しました。\n詳細: ${error.message}`);
-        } finally {
-            // エクスポートボタンを元に戻す
-            const exportButton = document.querySelector('.export-data-button');
-            if (exportButton) {
-                exportButton.disabled = false;
-                exportButton.textContent = 'Excel出力';
-            }
+        if (this.exportAndHistory && typeof this.exportAndHistory.exportToExcel === 'function') {
+            return this.exportAndHistory.exportToExcel();
         }
+        console.error('ExportAndHistory が利用できず、exportToExcel を実行できません');
     }
 
     /**
      * エクスポート用カラムを台帳ごとにグループ化
      */
     groupExportColumnsByLedger(columns) {
-        const groups = [];
-        let currentGroup = null;
-        
-        columns.forEach(column => {
-            const ledgerName = column.ledger || DOMHelper.getLedgerNameFromKey(column.key);
-            
-            if (!currentGroup || currentGroup.ledgerName !== ledgerName) {
-                // 新しいグループを開始
-                currentGroup = {
-                    ledgerName: ledgerName,
-                    columns: []
-                };
-                groups.push(currentGroup);
-            }
-            
-            currentGroup.columns.push(column);
-        });
-        
-        return groups;
+        if (!this.exportAndHistory && window.ExportAndHistory) {
+            this.exportAndHistory = new window.ExportAndHistory(this);
+        }
+        if (this.exportAndHistory && typeof this.exportAndHistory.groupExportColumnsByLedger === 'function') {
+            return this.exportAndHistory.groupExportColumnsByLedger(columns);
+        }
+        return [];
     }
 
     /**

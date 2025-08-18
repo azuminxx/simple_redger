@@ -108,7 +108,7 @@ class CellSwapper {
         const sourceFieldCode = this.dragState.sourceFieldCode;
         
         if (!sourceFieldCode) {
-            console.warn('⚠️ ソースフィールドコードが取得できません');
+            // skip: source field code missing
             return;
         }
         
@@ -126,7 +126,7 @@ class CellSwapper {
             
             // 無効なドロップのヒント表示
             this.showDropHint(e.currentTarget, `${sourceFieldCode}同士のみ交換可能`);
-            console.log(`❌ ドロップ不可: ${sourceFieldCode} → ${targetFieldCode}`);
+            // invalid drop
         }
     }
 
@@ -147,13 +147,13 @@ class CellSwapper {
             
             // 同じセルの場合は何もしない
             if (sourceRowIndex === targetRowIndex && sourceColumnKey === targetColumnKey) {
-                console.log('⚠️ 同じセルへのドロップのためスキップ');
+                // same cell, skip
                 return;
             }
             
             // 同じ主キータイプのみ交換可能
             if (!this.isSamePrimaryKeyType(sourceFieldCode, targetFieldCode)) {
-                console.warn(`❌ 異なる主キータイプは交換できません: ${sourceFieldCode} ⇄ ${targetFieldCode}`);
+                // incompatible primary key type
                 return;
             }
             
@@ -248,7 +248,7 @@ class CellSwapper {
         const targetRecord = this.tableRenderer.currentSearchResults[targetRowIndex];
         
         if (!sourceRecord || !targetRecord) {
-            console.error('❌ ソースレコードまたはターゲットレコードが見つかりません');
+            // missing source/target
             return;
         }
 
@@ -256,7 +256,7 @@ class CellSwapper {
         // PC番号 → PC台帳、内線番号 → 内線台帳、座席番号 → 座席台帳
         const sourceApp = this.getPrimaryKeySourceApp(primaryKeyField);
         if (!sourceApp) {
-            console.error(`❌ 主キー ${primaryKeyField} に対応する台帳が見つかりません`);
+            // missing ledger
             return;
         }
         
@@ -319,7 +319,7 @@ class CellSwapper {
             }
         } catch (e) {
             // バリデーション失敗は致命ではないためログのみ
-            console.warn('セル交換後のバリデーションでエラー:', e);
+            // validation fail ignored
         }
         
         return true;
@@ -392,7 +392,7 @@ class CellSwapper {
             // DOM交換の詳細ログは省略（パフォーマンス向上）
 
         } catch (error) {
-            console.error('❌ DOM要素交換エラー:', error);
+            // dom swap error
         }
     }
 
@@ -429,7 +429,7 @@ class CellSwapper {
      * エラーログを統一フォーマットで出力
      */
     logError(operation, error) {
-        console.error(`❌ ${operation}エラー:`, error);
+        // minimal
     }
 
     /**
@@ -497,14 +497,14 @@ class CellSwapper {
         const sourceRecord = this.tableRenderer.currentSearchResults[recordIndex];
         
         if (!sourceRecord) {
-            console.error('❌ 分離対象のレコードが見つかりません');
+            // missing record
             return false;
         }
 
         // フィールドコードから台帳名を特定
         const ledgerName = this.getLedgerNameFromFieldCode(fieldCode);
         if (!ledgerName) {
-            console.error(`❌ フィールドコード ${fieldCode} に対応する台帳が見つかりません`);
+            // missing ledger for fieldCode
             return false;
         }
 
@@ -575,7 +575,7 @@ class CellSwapper {
                     this.tableRenderer._originalIntegratedData.push({ ...emptyRecord });
                 }
             } catch (e) {
-                console.warn('separateLedger: sync _originalIntegratedData failed', e);
+                // ignore sync failure
             }
         }
 
@@ -605,7 +605,7 @@ class CellSwapper {
                 await window.validation.validateRow(emptyRowIndex);
             }
         } catch (e) {
-            console.warn('分離後のバリデーションでエラー:', e);
+            // validation fail ignored
         }
         
         return true;
