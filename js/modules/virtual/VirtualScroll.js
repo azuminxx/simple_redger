@@ -69,16 +69,8 @@ class VirtualScroll {
         const consistencyMap = new Map();
         for (let i = 0; i < integratedData.length; i++) {
             const record = integratedData[i];
-            // 統合キー取得
-            let integrationKey = null;
-            for (const appId in CONFIG.apps) {
-                const ledgerName = CONFIG.apps[appId].name;
-                const key = `${ledgerName}_${CONFIG.integrationKey}`;
-                if (record[key]) {
-                    integrationKey = record[key];
-                    break;
-                }
-            }
+            // 現在の行データから統合キーを再生成（常に最新の状態で評価）
+            const integrationKey = this.generateIntegrationKeyFromRow(record);
             let isConsistent = null;
             if (integrationKey) {
                 const DataIntegratorClass = window.DataIntegrator;

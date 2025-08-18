@@ -675,6 +675,17 @@ class TableRenderer {
                     const newKey = window.virtualScroll.generateIntegrationKeyFromRow(row);
                     // currentSearchResultsの統合キーも更新
                     row[CONFIG.integrationKey] = newKey;
+                    // _originalIntegratedData も同内容に同期（古い値が検索に残らないようにする）
+                    if (Array.isArray(this._originalIntegratedData)) {
+                        // 旧キー一致で検索 → 無ければ新キーでも検索
+                        let oriIdx = this._originalIntegratedData.findIndex(r => window.virtualScroll.getRecordIdFromRow(r) === oldKey);
+                        if (oriIdx === -1) {
+                            oriIdx = this._originalIntegratedData.findIndex(r => window.virtualScroll.getRecordIdFromRow(r) === newKey);
+                        }
+                        if (oriIdx !== -1) {
+                            this._originalIntegratedData[oriIdx] = { ...row };
+                        }
+                    }
                     // MAPのキーも新しい統合キーに移し替え
                     if (oldKey !== newKey) {
                         if (window.virtualScroll.changeFlags.has(oldKey)) {
@@ -688,6 +699,37 @@ class TableRenderer {
                         if (window.virtualScroll.originalValues.has(oldKey)) {
                             window.virtualScroll.originalValues.set(newKey, window.virtualScroll.originalValues.get(oldKey));
                             window.virtualScroll.originalValues.delete(oldKey);
+                        }
+                    }
+                });
+
+                // 保存後に整合性マップを最新化し、表示も更新
+                if (!window.consistencyMap) window.consistencyMap = new Map();
+                const consistencyColIdxInConfig = CONFIG.integratedTableConfig.columns.findIndex(col => col.isConsistencyCheck);
+                const consistencyTdIndex = consistencyColIdxInConfig >= 0 ? (1 + consistencyColIdxInConfig) : -1; // 先頭にチェックボックス列があるため+1
+                changedIndices.forEach(index => {
+                    const row = this.currentSearchResults[index];
+                    const recordId = window.virtualScroll.getRecordIdFromRow(row);
+                    const label = this.getConsistencyResult(row); // '整合' | '不整合' | ''
+                    const isConsistent = label === '整合' ? true : (label === '不整合' ? false : null);
+                    window.consistencyMap.set(recordId, isConsistent);
+
+                    // 可視範囲に行がある場合はセルも即時更新
+                    if (consistencyTdIndex >= 0) {
+                        const tr = document.querySelector(`tr[data-record-index="${index}"]`);
+                        if (tr && tr.children && tr.children[consistencyTdIndex]) {
+                            const td = tr.children[consistencyTdIndex];
+                            let text = '-';
+                            if (isConsistent === true) {
+                                text = '✅';
+                                td.className = 'consistency-ok readonly-cell';
+                            } else if (isConsistent === false) {
+                                text = '❌';
+                                td.className = 'consistency-ng readonly-cell';
+                            } else {
+                                td.className = 'null-value readonly-cell';
+                            }
+                            td.textContent = text;
                         }
                     }
                 });
@@ -1516,9 +1558,11 @@ class TableRenderer {
                 // 除外するプロパティパターン
                 // - レコードID: *_$id
                 // - リビジョン: *_$revision  
-                // 統合キーは検索対象として残す
+                // - 各台帳の統合キー: *_{CONFIG.integrationKey}（古い値が残るため検索対象から除外）
+                // グローバル統合キー（CONFIG.integrationKey）は残す
                 return !key.endsWith('_$id') && 
-                       !key.endsWith('_$revision');
+                       !key.endsWith('_$revision') &&
+                       !(key.endsWith('_' + CONFIG.integrationKey));
             })
             .map(key => row[key])
             .filter(value => value !== null && value !== undefined);
@@ -1549,14 +1593,19 @@ class TableRenderer {
      * 行の整合性チェック結果を取得
      */
     getConsistencyResult(row) {
-        // 統合キー取得
+        // 可能なら現在の行データから統合キーを再生成（最も信頼できる現状値）
         let integrationKey = null;
-        for (const appId in CONFIG.apps) {
-            const ledgerName = CONFIG.apps[appId].name;
-            const key = `${ledgerName}_${CONFIG.integrationKey}`;
-            if (row[key]) {
-                integrationKey = row[key];
-                break;
+        if (window.virtualScroll && typeof window.virtualScroll.generateIntegrationKeyFromRow === 'function') {
+            integrationKey = window.virtualScroll.generateIntegrationKeyFromRow(row);
+        } else {
+            // フォールバック: 既存の台帳別統合キーから取得
+            for (const appId in CONFIG.apps) {
+                const ledgerName = CONFIG.apps[appId].name;
+                const key = `${ledgerName}_${CONFIG.integrationKey}`;
+                if (row[key]) {
+                    integrationKey = row[key];
+                    break;
+                }
             }
         }
 
