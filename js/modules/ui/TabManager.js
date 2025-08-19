@@ -93,6 +93,17 @@ class TabManager {
         // 更新履歴タブのタブコンテンツを追加
         const historyContent = DOMHelper.createElement('div', { id: 'tab-history' }, 'tab-content');
         const historyContainer = DOMHelper.createElement('div', {}, 'history-container');
+        // 初期表示用の空テーブル（列ヘッダのみ）
+        try {
+            const table = document.createElement('table');
+            table.className = 'history-table';
+            const thead = document.createElement('thead');
+            thead.innerHTML = '<tr><th>台帳名</th><th>レコードID</th><th>主キー</th><th>結果</th><th>更新内容</th><th>バッチID</th><th>時刻</th></tr>';
+            table.appendChild(thead);
+            const tbody = document.createElement('tbody');
+            table.appendChild(tbody);
+            historyContainer.appendChild(table);
+        } catch (e) { /* noop */ }
         historyContent.appendChild(historyContainer);
         tabContainer.appendChild(historyContent);
 
@@ -678,7 +689,7 @@ class TabManager {
         // テーブルヘッダー
         const thead = DOMHelper.createElement('thead');
         const headerRow = DOMHelper.createElement('tr');
-                            const headers = ['更新日時', '更新者 (code)', '更新者 (name)', 'バッチID', '台帳名', 'レコードID', '結果', '詳細'];
+        const headers = ['更新日時', '更新者 (code)', '更新者 (name)', 'バッチID', '台帳名', 'レコードID', '主キー', '統合キー(変更後)', '結果', '更新内容', '詳細'];
         
         headers.forEach(headerText => {
             const th = DOMHelper.createElement('th');
@@ -790,12 +801,29 @@ class TabManager {
         }
         row.appendChild(recordIdCell);
 
+        // 主キー（表示専用）
+        const primaryKeyCell = DOMHelper.createElement('td');
+        primaryKeyCell.textContent = record[CONFIG.historyApp.fields.primaryKey]?.value || '';
+        row.appendChild(primaryKeyCell);
+
+        // 統合キー(変更後)
+        const ikAfterCell = DOMHelper.createElement('td');
+        ikAfterCell.textContent = record[CONFIG.historyApp.fields.integrationKeyAfter]?.value || '';
+        row.appendChild(ikAfterCell);
+
         // 結果
         const resultCell = DOMHelper.createElement('td');
         const result = record[CONFIG.historyApp.fields.result]?.value || '';
         resultCell.textContent = result;
         resultCell.className = result === 'success' ? 'success' : 'failure';
         row.appendChild(resultCell);
+
+        // 更新内容
+        const changeCell = DOMHelper.createElement('td');
+        changeCell.textContent = record[CONFIG.historyApp.fields.changeContent]?.value || '';
+        // 改行を反映して表示
+        changeCell.style.whiteSpace = 'pre-line';
+        row.appendChild(changeCell);
 
         // 詳細ボタン
         const detailCell = DOMHelper.createElement('td');
@@ -822,6 +850,7 @@ class TabManager {
             'アプリID': record[CONFIG.historyApp.fields.appId]?.value || '',
             '台帳名': record[CONFIG.historyApp.fields.ledgerName]?.value || '',
             '結果': record[CONFIG.historyApp.fields.result]?.value || '',
+            '更新内容': record[CONFIG.historyApp.fields.changeContent]?.value || '',
             'リクエスト': record[CONFIG.historyApp.fields.request]?.value || '',
             'レスポンス': record[CONFIG.historyApp.fields.response]?.value || '',
             'エラー': record[CONFIG.historyApp.fields.error]?.value || ''

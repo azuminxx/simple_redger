@@ -2,6 +2,10 @@
  * データ統合クラス
  */
 class DataIntegrator {
+    constructor() {
+        // 更新前参照用インデックス: appId(string) -> Map(recordId(string) -> kintoneRecord(object))
+        this.recordIndexByApp = new Map();
+    }
     /**
      * 統合キーを使って全台帳を検索
      */
@@ -49,6 +53,8 @@ class DataIntegrator {
             .then(async (results) => {
                 // 最後の結果がユーザー台帳データ
                 const userListData = results.pop();
+                // インデックスを構築/更新
+                this.buildOrUpdateRecordIndex(allLedgerData);
                 return await this.integrateAllLedgerDataWithUserList(allLedgerData, integrationKeys, userListData);
             });
     }
@@ -76,6 +82,73 @@ class DataIntegrator {
         return result;
     }
 
+    /**
+     * 検索結果を更新前参照用のインデックスに反映
+     * 形式: this.recordIndexByApp[appId][recordId] = kintoneRecord
+     */
+    buildOrUpdateRecordIndex(allLedgerData) {
+        if (!allLedgerData) return;
+        Object.entries(allLedgerData).forEach(([appId, records]) => {
+            const appKey = String(appId);
+            if (!this.recordIndexByApp.has(appKey)) {
+                this.recordIndexByApp.set(appKey, new Map());
+            }
+            const map = this.recordIndexByApp.get(appKey);
+            (records || []).forEach(record => {
+                const recordIdField = record['$id'];
+                const recordIdValue = recordIdField && recordIdField.value !== undefined
+                    ? String(recordIdField.value)
+                    : (record['$id'] ? String(record['$id']) : null);
+                if (!recordIdValue) return;
+                map.set(recordIdValue, record);
+            });
+        });
+    }
+
+    /**
+     * 単一アプリの検索結果をインデックスに追記
+     */
+    updateRecordIndexForApp(appId, records) {
+        if (!appId || !records) return;
+        this.buildOrUpdateRecordIndex({ [String(appId)]: records });
+    }
+
+    /**
+     * インデックスから元レコードを取得
+     */
+    getOriginalRecord(appId, recordId) {
+        const appKey = String(appId);
+        const recKey = String(recordId);
+        if (!this.recordIndexByApp || !this.recordIndexByApp.has(appKey)) return null;
+        return this.recordIndexByApp.get(appKey).get(recKey) || null;
+    }
+
+    /**
+     * デバッグ: インデックス概要を出力
+     */
+    debugPrintIndex(appIdFilter = null) {
+        try {
+            if (!this.recordIndexByApp) {
+                console.log('🧾 DataIntegrator: recordIndexByApp 未初期化');
+                return;
+            }
+            const appIds = appIdFilter ? [String(appIdFilter)] : Array.from(this.recordIndexByApp.keys());
+            console.log(`🧾 DataIntegrator: インデックス概要 apps=${appIds.length}`);
+            appIds.forEach(appId => {
+                const map = this.recordIndexByApp.get(String(appId));
+                const ledgerName = (window.CONFIG && window.CONFIG.apps && window.CONFIG.apps[appId]) ? window.CONFIG.apps[appId].name : 'Unknown';
+                if (!map) {
+                    console.log(`  - appId=${appId}(${ledgerName}): <no entries>`);
+                    return;
+                }
+                const size = map.size;
+                const sampleIds = Array.from(map.keys()).slice(0, 5);
+                console.log(`  - appId=${appId}(${ledgerName}): ${size}件, sampleIds=[${sampleIds.join(', ')}]`);
+            });
+        } catch (e) {
+            console.log('🧾 DataIntegrator: インデックスダンプ中に例外', e);
+        }
+    }
     /**
      * 統合キーから抽出した主キーで各台帳を検索（全主キーフィールドをOR条件で検索）
      */

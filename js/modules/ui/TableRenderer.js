@@ -396,6 +396,7 @@ class TableRenderer {
             
             // バッチIDを生成（一括更新全体で共通）
             const batchId = this.generateBatchId();
+            this._pendingBatchId = batchId;
             
             // 変更されたレコードのみから各台帳ごとにレコードをグループ化
             const recordsByApp = this.groupRecordsByApp(changedIndices);
@@ -409,6 +410,16 @@ class TableRenderer {
             }
             
             await Promise.all(updatePromises);
+            // 送信成功後、updateHistoryMap内のpendingエントリに結果反映
+            try {
+                for (const [, ledgerHistoryMap] of this.updateHistoryMap) {
+                    for (const [key, historyData] of ledgerHistoryMap) {
+                        if (historyData && historyData.batchId === batchId && historyData.updateResult === 'pending') {
+                            historyData.updateResult = 'success';
+                        }
+                    }
+                }
+            } catch (e) { /* noop */ }
             
             // 変更フラグをリセット
             this.resetChangeFlags(changedIndices);
@@ -457,6 +468,7 @@ class TableRenderer {
             this.showToast('変更が失敗しました', 'error');
             alert(`保存中にエラーが発生しました。\n詳細: ${error.message}`);
         } finally {
+            this._pendingBatchId = null;
             if (saveButton) {
                 saveButton.disabled = false;
                 saveButton.textContent = '変更を保存';
@@ -472,6 +484,9 @@ class TableRenderer {
         // ■ 各台帳の交換されたデータを、kintone REST API形式に変換
         // ■ 形式：{id: レコードID, record: {フィールド名: {value: 値}}}
         const updateRecordsByApp = {};
+        // 差分表示（console.table）および履歴送信用の行バッファ
+        const diffRows = [];
+        const diffTextByAppAndId = new Map(); // key: `${appId}:${recordId}` -> array of lines
         
         changedIndices.forEach(rowIndex => {
             // 変更されたフィールドを取得
@@ -560,11 +575,107 @@ class TableRenderer {
                         }
                     });
                     
+                    // --- 追加: 更新差分ログ（適用前の確認用）---
+                    try {
+                        const originalRecord = (window.dataIntegrator && typeof window.dataIntegrator.getOriginalRecord === 'function')
+                            ? window.dataIntegrator.getOriginalRecord(appId, recordId)
+                            : null;
+                        // デバッグ: インデックス状況と対象レコードの存在確認
+                        try {
+                            const appKey = String(appId);
+                            const recKey = String(recordId);
+                            const idxMap = window.dataIntegrator && window.dataIntegrator.recordIndexByApp ? window.dataIntegrator.recordIndexByApp.get(appKey) : null;
+                            if (!window.dataIntegrator || !window.dataIntegrator.recordIndexByApp) {
+                                console.log(`🧭 DataIntegratorインデックス未初期化: appId=${appKey}`);
+                            } else if (!idxMap) {
+                                console.log(`🧭 インデックス未登録: appId=${appKey}`);
+                            } else if (!idxMap.has(recKey)) {
+                                console.log(`🧭 レコード未登録(インデックス): appId=${appKey}, id=${recKey}, size=${idxMap.size}`);
+                            } else {
+                                console.log(`🧭 インデックス一致: appId=${appKey}, id=${recKey}`);
+                            }
+                        } catch (e) { /* noop */ }
+                        const toText = v => {
+                            if (v === undefined || v === null || v === '') return '-';
+                            if (Array.isArray(v)) return v.join(',');
+                            return String(v);
+                        };
+                        Object.entries(updateRecord.record).forEach(([fieldCode, body]) => {
+                            const before = originalRecord && originalRecord[fieldCode] && originalRecord[fieldCode].hasOwnProperty('value')
+                                ? originalRecord[fieldCode].value
+                                : null;
+                            const after = body && body.value !== undefined ? body.value : null;
+                            const isEqual = (() => {
+                                const norm = v => {
+                                    if (v === undefined || v === null) return '';
+                                    return Array.isArray(v) ? v.join(',') : String(v);
+                                };
+                                return norm(before) === norm(after);
+                            })();
+                            if (isEqual) return; // 前後が同じなら表示しない
+                            // 表示用テキスト（afterの空は(空)と表示）
+                            const beforeText = toText(before);
+                            const afterText = (() => {
+                                if (after === undefined || after === null) return '(空)';
+                                if (Array.isArray(after)) return after.length === 0 ? '(空)' : after.join(',');
+                                if (String(after) === '') return '(空)';
+                                return String(after);
+                            })();
+                            // ログ出力（台帳名 フィールド名: 変更前→変更後）
+                            console.log(`${ledgerName}　${fieldCode}:${beforeText}→${afterText} (appId=${appId}, id=${recordId})`);
+                            // 表形式のために行を追加
+                            diffRows.push({
+                                Ledger: ledgerName,
+                                Field: fieldCode,
+                                Before: beforeText,
+                                After: afterText,
+                                appId: appId,
+                                id: recordId
+                            });
+                            // 履歴アプリ用テキストを蓄積
+                            const key = `${appId}:${recordId}`;
+                            if (!diffTextByAppAndId.has(key)) diffTextByAppAndId.set(key, []);
+                            diffTextByAppAndId.get(key).push(`${fieldCode}:${beforeText}→${afterText}`);
+                            if (!originalRecord || !originalRecord[fieldCode]) {
+                                // デバッグ: フィールド未登録の理由（ユーザー台帳由来など）
+                                try {
+                                    const col = CONFIG.integratedTableConfig.columns.find(c => c.ledger === ledgerName && c.fieldCode === fieldCode);
+                                    const isUserDerived = col && col.isUserListDerived === true;
+                                    if (isUserDerived) {
+                                        console.log(`🧭 前値なし理由: ユーザー台帳由来フィールド（${ledgerName}_${fieldCode}）はインデックス対象外`);
+                                    } else {
+                                        console.log(`🧭 前値なし理由: インデックスにフィールド未登録（${ledgerName}_${fieldCode}）`);
+                                    }
+                                } catch (e) { /* noop */ }
+                            }
+                        });
+                    } catch (e) { /* noop */ }
+                    // --- ここまで追加 ---
+
                     updateRecordsByApp[appId].push(updateRecord);
                 }
             });
         });
         
+        // 差分があれば表形式でまとめて表示
+        try {
+            if (diffRows.length > 0 && console && typeof console.table === 'function') {
+                console.table(diffRows);
+            }
+        } catch (e) { /* noop */ }
+
+        // 履歴アプリ送信用に、変更内容マップを保存（updateAppRecordsBatchで合成）
+        try {
+            this._changeContentByAppIdRecordId = new Map();
+            for (const [key, lines] of diffTextByAppAndId) {
+                const [appIdStr, recordIdStr] = key.split(':');
+                const appId = String(parseInt(appIdStr));
+                const recordId = String(recordIdStr);
+                if (!this._changeContentByAppIdRecordId.has(appId)) this._changeContentByAppIdRecordId.set(appId, new Map());
+                this._changeContentByAppIdRecordId.get(appId).set(recordId, lines.join('\n'));
+            }
+        } catch (e) { /* noop */ }
+
         return updateRecordsByApp;
     }
 
@@ -698,14 +809,48 @@ class TableRenderer {
                 
                 // リクエストデータを取得（updateRecordsから該当するレコードを検索）
                 const requestData = updateRecords.find(reqRecord => reqRecord.id === parseInt(recordIdValue)) || null;
+                // 変更内容（groupRecordsByAppで蓄積済みのもの）を取得
+                let changeContent = '';
+                try {
+                    const appKey = String(appId);
+                    const recKey = String(recordIdValue);
+                    changeContent = this._changeContentByAppIdRecordId?.get(appKey)?.get(recKey) || '';
+                } catch (e) { /* noop */ }
+                // 主キー（表示用）を取得
+                let primaryKeyText = '';
+                try {
+                    const ledgerNameForApp = CONFIG.apps[appId]?.name;
+                    const primaryFieldCode = (ledgerNameForApp === 'PC台帳') ? 'PC番号' : (ledgerNameForApp === '内線台帳') ? '内線番号' : (ledgerNameForApp === '座席台帳') ? '座席番号' : null;
+                    if (primaryFieldCode) {
+                        const before = this._changeContentByAppIdRecordId?.get(String(appId))?.get(String(recordIdValue));
+                        // インデックスから現在の表示用主キー値を取得（変更前に関係なく常に表示したい）
+                        const original = window.dataIntegrator?.getOriginalRecord?.(String(appId), String(recordIdValue));
+                        const pkVal = original && original[primaryFieldCode]?.value ? original[primaryFieldCode].value : '';
+                        primaryKeyText = pkVal || '';
+                    }
+                } catch (e) { /* noop */ }
+                // 変更後の統合キー（表示・保存用）を生成
+                let integrationKeyAfter = '';
+                try {
+                    const row = this.currentSearchResults.find(r => {
+                        const ledgerNameHere = CONFIG.apps[appId]?.name;
+                        return r && String(r[`${ledgerNameHere}_$id`]) === String(recordIdValue);
+                    });
+                    if (row && window.virtualScroll?.generateIntegrationKeyFromRow) {
+                        integrationKeyAfter = window.virtualScroll.generateIntegrationKeyFromRow(row) || '';
+                    }
+                } catch (e) { /* noop */ }
                 
                 const historyData = {
                     appId: appId,
                     ledgerName: ledgerName,
                     recordId: recordIdValue,
+                    primaryKey: primaryKeyText,
                     updateResult: 'success',
                     timestamp: timestamp,
                     batchId: batchId,
+                    integrationKeyAfter,
+                    changeContent,
                     request: requestData,
                     response: (response && Array.isArray(response.records) && response.records[index]) ? response.records[index] : null
                 };

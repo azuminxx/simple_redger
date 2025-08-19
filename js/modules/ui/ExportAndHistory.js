@@ -6,6 +6,8 @@
 class ExportAndHistory {
     constructor(tableRenderer) {
         this.tableRenderer = tableRenderer;
+        // 履歴タブ用の簡易レンダリング先
+        this.historyContainerSelector = '.history-container';
     }
 
     // エクスポート用カラムを台帳ごとにグループ化
@@ -154,8 +156,11 @@ class ExportAndHistory {
                         [CONFIG.historyApp.fields.recordId]: { value: historyData.recordId },
                         [CONFIG.historyApp.fields.appId]: { value: historyData.appId },
                         [CONFIG.historyApp.fields.ledgerName]: { value: historyData.ledgerName },
+                        [CONFIG.historyApp.fields.primaryKey]: { value: historyData.primaryKey || '' },
                         [CONFIG.historyApp.fields.result]: { value: historyData.updateResult }
                     };
+                    if (historyData.changeContent) record[CONFIG.historyApp.fields.changeContent] = { value: historyData.changeContent };
+                    if (historyData.integrationKeyAfter) record[CONFIG.historyApp.fields.integrationKeyAfter] = { value: historyData.integrationKeyAfter };
                     if (historyData.request) record[CONFIG.historyApp.fields.request] = { value: JSON.stringify(historyData.request) };
                     if (historyData.response) record[CONFIG.historyApp.fields.response] = { value: JSON.stringify(historyData.response) };
                     if (historyData.error) record[CONFIG.historyApp.fields.error] = { value: JSON.stringify(historyData.error) };
@@ -164,6 +169,8 @@ class ExportAndHistory {
                 const response = await kintone.api(kintone.api.url('/k/v1/records', true), 'POST', { app: CONFIG.historyApp.appId, records });
                 // uploaded
                 tr.updateHistoryMap.delete(appId);
+                // タブ側に直近アップロード分を反映
+                this.renderHistoryPreview(ledgerHistoryData);
             } else {
                 if (tr.updateHistoryMap.size === 0) {
                     // no data
@@ -183,8 +190,11 @@ class ExportAndHistory {
                         [CONFIG.historyApp.fields.recordId]: { value: historyData.recordId },
                         [CONFIG.historyApp.fields.appId]: { value: historyData.appId },
                         [CONFIG.historyApp.fields.ledgerName]: { value: historyData.ledgerName },
+                        [CONFIG.historyApp.fields.primaryKey]: { value: historyData.primaryKey || '' },
                         [CONFIG.historyApp.fields.result]: { value: historyData.updateResult }
                     };
+                    if (historyData.changeContent) record[CONFIG.historyApp.fields.changeContent] = { value: historyData.changeContent };
+                    if (historyData.integrationKeyAfter) record[CONFIG.historyApp.fields.integrationKeyAfter] = { value: historyData.integrationKeyAfter };
                     if (historyData.request) record[CONFIG.historyApp.fields.request] = { value: JSON.stringify(historyData.request) };
                     if (historyData.response) record[CONFIG.historyApp.fields.response] = { value: JSON.stringify(historyData.response) };
                     if (historyData.error) record[CONFIG.historyApp.fields.error] = { value: JSON.stringify(historyData.error) };
@@ -193,10 +203,47 @@ class ExportAndHistory {
                 const response = await kintone.api(kintone.api.url('/k/v1/records', true), 'POST', { app: CONFIG.historyApp.appId, records });
                 // uploaded
                 tr.updateHistoryMap.clear();
+                // タブ側に直近アップロード分を反映
+                this.renderHistoryPreview(allHistoryData);
             }
         } catch (error) {
             // minimal logging
         }
+    }
+
+    // 更新履歴タブに簡易表示
+    renderHistoryPreview(historyDataArray) {
+        try {
+            const container = document.querySelector(this.historyContainerSelector);
+            if (!container) return;
+            // 最新から最大100件まで
+            const items = historyDataArray.slice(-100).reverse();
+            const table = document.createElement('table');
+            table.className = 'history-table';
+            const thead = document.createElement('thead');
+            thead.innerHTML = '<tr><th>台帳名</th><th>レコードID</th><th>結果</th><th>更新内容</th><th>バッチID</th><th>時刻</th></tr>';
+            table.appendChild(thead);
+            const tbody = document.createElement('tbody');
+            items.forEach(h => {
+                const tr = document.createElement('tr');
+                const tdLedger = document.createElement('td'); tdLedger.textContent = h.ledgerName || '';
+                const tdId = document.createElement('td'); tdId.textContent = h.recordId || '';
+                const tdResult = document.createElement('td'); tdResult.textContent = h.updateResult || '';
+                const tdChange = document.createElement('td'); tdChange.textContent = h.changeContent || '';
+                const tdBatch = document.createElement('td'); tdBatch.textContent = h.batchId || '';
+                const tdTs = document.createElement('td'); tdTs.textContent = h.timestamp || '';
+                tr.appendChild(tdLedger);
+                tr.appendChild(tdId);
+                tr.appendChild(tdResult);
+                tr.appendChild(tdChange);
+                tr.appendChild(tdBatch);
+                tr.appendChild(tdTs);
+                tbody.appendChild(tr);
+            });
+            table.appendChild(tbody);
+            container.innerHTML = '';
+            container.appendChild(table);
+        } catch (e) { /* noop */ }
     }
 }
 
