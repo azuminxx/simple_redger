@@ -550,46 +550,44 @@ class CellSwapper {
             }
         });
         
-        // 分離後、両行の統合キーを現在値から再生成して設定
-        if (window.virtualScroll && typeof window.virtualScroll.generateIntegrationKeyFromRow === 'function') {
-            const newSourceKey = window.virtualScroll.generateIntegrationKeyFromRow(updatedSourceRecord);
-            const newEmptyKey = window.virtualScroll.generateIntegrationKeyFromRow(emptyRecord);
-            updatedSourceRecord[CONFIG.integrationKey] = newSourceKey;
-            emptyRecord[CONFIG.integrationKey] = newEmptyKey;
-        }
-
-        // テーブル内検索のベースデータ（_originalIntegratedData）にも同期
-        if (Array.isArray(this.tableRenderer._originalIntegratedData)) {
-            try {
-                const oriIdx = this.tableRenderer._originalIntegratedData.findIndex(r => {
-                    return (window.virtualScroll?.getRecordIdFromRow?.(r) || null) === oldSourceKey;
-                });
-                if (oriIdx !== -1) {
-                    // 元行を最新値で上書き
-                    this.tableRenderer._originalIntegratedData[oriIdx] = { ...updatedSourceRecord };
-                    // 新規行を直後に挿入
-                    this.tableRenderer._originalIntegratedData.splice(oriIdx + 1, 0, { ...emptyRecord });
-                } else {
-                    // 見つからない場合は末尾に追加（保険）
-                    this.tableRenderer._originalIntegratedData.push({ ...updatedSourceRecord });
-                    this.tableRenderer._originalIntegratedData.push({ ...emptyRecord });
-                }
-            } catch (e) {
-                // ignore sync failure
-            }
-        }
-
-        // 整合性マップを更新（表示と検索の整合を担保）
-        if (window.virtualScroll && window.tableRenderer) {
-            if (!window.consistencyMap) window.consistencyMap = new Map();
-            [recordIndex, emptyRowIndex].forEach(idx => {
-                const row = this.tableRenderer.currentSearchResults[idx];
-                const recordId = window.virtualScroll.getRecordIdFromRow(row);
-                const label = this.tableRenderer.getConsistencyResult(row);
-                const isConsistent = label === '整合' ? true : (label === '不整合' ? false : null);
-                window.consistencyMap.set(recordId, isConsistent);
+        // 分離後の統合キー更新と各種同期は、保存完了後に遅延実行する（変更管理キーの不整合回避）
+        if (window.tableRenderer && typeof window.tableRenderer.addPostSaveTask === 'function' && window.virtualScroll && typeof window.virtualScroll.generateIntegrationKeyFromRow === 'function') {
+            const renderer = window.tableRenderer;
+            const indexAfterSplit = { sourceIndex: recordIndex, emptyIndex: emptyRowIndex };
+            const sourceSnapshot = this.tableRenderer.currentSearchResults[recordIndex];
+            const emptySnapshot = this.tableRenderer.currentSearchResults[emptyRowIndex];
+            renderer.addPostSaveTask(() => {
+                try {
+                    const newSourceKey = window.virtualScroll.generateIntegrationKeyFromRow(sourceSnapshot);
+                    const newEmptyKey = window.virtualScroll.generateIntegrationKeyFromRow(emptySnapshot);
+                    sourceSnapshot[CONFIG.integrationKey] = newSourceKey;
+                    emptySnapshot[CONFIG.integrationKey] = newEmptyKey;
+                    // _originalIntegratedData 同期
+                    if (Array.isArray(renderer._originalIntegratedData)) {
+                        try {
+                            const oldKey = oldSourceKey;
+                            renderer.syncOriginalDataRowByKeys(oldKey, newSourceKey, sourceSnapshot);
+                            // 直後に挿入した空行は検索ベースにも追加（位置は厳密でなくてもよい）
+                            const exists = renderer._originalIntegratedData.some(r => window.virtualScroll.getRecordIdFromRow(r) === newEmptyKey);
+                            if (!exists) renderer._originalIntegratedData.push({ ...emptySnapshot });
+                        } catch (e) { /* noop */ }
+                    }
+                    // 整合性マップ更新
+                    if (!window.consistencyMap) window.consistencyMap = new Map();
+                    [indexAfterSplit.sourceIndex, indexAfterSplit.emptyIndex].forEach(idx => {
+                        const row = this.tableRenderer.currentSearchResults[idx];
+                        const recordId = window.virtualScroll.getRecordIdFromRow(row);
+                        const label = renderer.getConsistencyResult(row);
+                        const isConsistent = label === '整合' ? true : (label === '不整合' ? false : null);
+                        window.consistencyMap.set(recordId, isConsistent);
+                    });
+                } catch (e) { /* noop */ }
             });
         }
+
+        // 上記の_originalIntegratedData同期は保存後タスクで実施
+
+        // 整合性マップ更新も保存後タスクで実施
 
         // 変更フラグを設定
         window.virtualScroll.setChangeFlag(recordIndex, true);

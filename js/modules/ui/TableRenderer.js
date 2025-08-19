@@ -22,6 +22,25 @@ class TableRenderer {
         this.checkedRows = new Set(); // チェックされた行のインデックスを保存
         this.filterFlag = 'FILTER_SELECTED_ROW'; // DOM側に埋め込むフラグ文字列
         this.isFiltered = false; // 絞り込み状態を管理
+        // 保存後に実行するタスク（セル分離の遅延反映など）
+        this.postSaveTasks = [];
+    }
+
+    // 保存後タスクを追加
+    addPostSaveTask(task) {
+        if (typeof task === 'function') this.postSaveTasks.push(task);
+    }
+
+    // 保存後タスクを実行
+    runPostSaveTasks() {
+        if (!this.postSaveTasks || this.postSaveTasks.length === 0) return;
+        try {
+            this.postSaveTasks.forEach(fn => {
+                try { fn(); } catch (e) { /* noop */ }
+            });
+        } finally {
+            this.postSaveTasks = [];
+        }
     }
 
     // 内部ヘルパー: _originalIntegratedData を統合キーで同期
@@ -425,6 +444,9 @@ class TableRenderer {
                 // 保存後に整合性マップを最新化し、表示も更新
                 this.updateConsistencyForIndices(changedIndices);
             }
+            
+            // 保存成功後に遅延タスクを実行（セル分離後の統合キー再生成や同期など）
+            this.runPostSaveTasks();
             
             // 成功メッセージをトーストで表示
             this.showToast('変更が完了しました', 'success');
