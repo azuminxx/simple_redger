@@ -932,6 +932,9 @@ class TabManager {
                 if (v) {
                     const line = document.createElement('div');
                     line.textContent = `${labels[k]}:${v}`;
+                    if (k === 'PC') line.className = 'ik-line-pc';
+                    else if (k === 'EXT') line.className = 'ik-line-ext';
+                    else if (k === 'SEAT') line.className = 'ik-line-seat';
                     td.appendChild(line);
                     printed = true;
                 }

@@ -972,3 +972,8 @@ td.editable-cell select,
     transform: scale(1.2);
 }
 
+/* 履歴テーブル：統合キーの色分け表示 */
+.history-table .ik-line-pc { color: #1e88e5; font-weight: 600; }
+.history-table .ik-line-ext { color: #2e7d32; font-weight: 600; }
+.history-table .ik-line-seat { color: #ef6c00; font-weight: 600; }
+
