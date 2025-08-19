@@ -689,7 +689,7 @@ class TabManager {
         // テーブルヘッダー
         const thead = DOMHelper.createElement('thead');
         const headerRow = DOMHelper.createElement('tr');
-        const headers = ['更新日時', '更新者 (code)', '更新者 (name)', 'バッチID', '台帳名', 'レコードID', '主キー', '統合キー(変更後)', '結果', '更新内容', '詳細'];
+        const headers = ['更新日時', '更新者 (code)', '更新者 (name)', 'バッチID', '統合キー(変更後)', '台帳名', 'レコードID', '主キー', '更新内容', '結果', '詳細'];
         
         headers.forEach(headerText => {
             const th = DOMHelper.createElement('th');
@@ -704,7 +704,23 @@ class TabManager {
         let currentBatchId = null;
         let isAlternateRow = false;
         
-        records.forEach(record => {
+        // 並び替え: 更新日時 desc, バッチID asc, 統合キー(変更後) asc, 台帳名 asc
+        const sortedRecords = [...records].sort((a, b) => {
+            const aTime = a[CONFIG.historyApp.fields.updatedTime]?.value || '';
+            const bTime = b[CONFIG.historyApp.fields.updatedTime]?.value || '';
+            if (aTime !== bTime) return bTime.localeCompare(aTime);
+            const aBatch = a[CONFIG.historyApp.fields.batchId]?.value || '';
+            const bBatch = b[CONFIG.historyApp.fields.batchId]?.value || '';
+            if (aBatch !== bBatch) return aBatch.localeCompare(bBatch);
+            const aIk = a[CONFIG.historyApp.fields.integrationKeyAfter]?.value || '';
+            const bIk = b[CONFIG.historyApp.fields.integrationKeyAfter]?.value || '';
+            if (aIk !== bIk) return aIk.localeCompare(bIk);
+            const aLedger = a[CONFIG.historyApp.fields.ledgerName]?.value || '';
+            const bLedger = b[CONFIG.historyApp.fields.ledgerName]?.value || '';
+            return aLedger.localeCompare(bLedger);
+        });
+        
+        sortedRecords.forEach(record => {
             const batchId = record[CONFIG.historyApp.fields.batchId]?.value;
             
             // バッチIDが変わったら背景色を切り替え
@@ -768,20 +784,25 @@ class TabManager {
         updaterCodeCell.textContent = updater?.code || '';
         row.appendChild(updaterCodeCell);
 
-                                // 更新者 (name)
-                        const updaterNameCell = DOMHelper.createElement('td');
-                        updaterNameCell.textContent = updater?.name || '';
-                        row.appendChild(updaterNameCell);
+        // 更新者 (name)
+        const updaterNameCell = DOMHelper.createElement('td');
+        updaterNameCell.textContent = updater?.name || '';
+        row.appendChild(updaterNameCell);
    
-                        // バッチID
-                        const batchIdCell = DOMHelper.createElement('td');
-                        batchIdCell.textContent = record[CONFIG.historyApp.fields.batchId]?.value || '';
-                        row.appendChild(batchIdCell);
+        // バッチID
+        const batchIdCell = DOMHelper.createElement('td');
+        batchIdCell.textContent = record[CONFIG.historyApp.fields.batchId]?.value || '';
+        row.appendChild(batchIdCell);
    
-                        // 台帳名
+        // 統合キー(変更後)
+        const ikAfterCell = DOMHelper.createElement('td');
+        ikAfterCell.textContent = record[CONFIG.historyApp.fields.integrationKeyAfter]?.value || '';
+        // append later in order
+
+        // 台帳名
         const ledgerNameCell = DOMHelper.createElement('td');
         ledgerNameCell.textContent = record[CONFIG.historyApp.fields.ledgerName]?.value || '';
-        row.appendChild(ledgerNameCell);
+        // append later in order
 
         // レコードID（リンク）
         const recordIdCell = DOMHelper.createElement('td');
@@ -799,31 +820,26 @@ class TabManager {
         } else {
             recordIdCell.textContent = recordId || '';
         }
-        row.appendChild(recordIdCell);
+        // append later in order
 
         // 主キー（表示専用）
         const primaryKeyCell = DOMHelper.createElement('td');
         primaryKeyCell.textContent = record[CONFIG.historyApp.fields.primaryKey]?.value || '';
-        row.appendChild(primaryKeyCell);
-
-        // 統合キー(変更後)
-        const ikAfterCell = DOMHelper.createElement('td');
-        ikAfterCell.textContent = record[CONFIG.historyApp.fields.integrationKeyAfter]?.value || '';
-        row.appendChild(ikAfterCell);
-
-        // 結果
-        const resultCell = DOMHelper.createElement('td');
-        const result = record[CONFIG.historyApp.fields.result]?.value || '';
-        resultCell.textContent = result;
-        resultCell.className = result === 'success' ? 'success' : 'failure';
-        row.appendChild(resultCell);
+        // append later in order
 
         // 更新内容
         const changeCell = DOMHelper.createElement('td');
         changeCell.textContent = record[CONFIG.historyApp.fields.changeContent]?.value || '';
         // 改行を反映して表示
         changeCell.style.whiteSpace = 'pre-line';
-        row.appendChild(changeCell);
+        // append later in order
+
+        // 結果
+        const resultCell = DOMHelper.createElement('td');
+        const result = record[CONFIG.historyApp.fields.result]?.value || '';
+        resultCell.textContent = result;
+        resultCell.className = result === 'success' ? 'success' : 'failure';
+        // append later in order
 
         // 詳細ボタン
         const detailCell = DOMHelper.createElement('td');
@@ -831,7 +847,16 @@ class TabManager {
         detailBtn.textContent = '詳細';
         detailBtn.addEventListener('click', () => this.showHistoryDetail(record));
         detailCell.appendChild(detailBtn);
-        row.appendChild(detailCell);
+        // append later in order
+
+        // === append cells in requested order ===
+        row.appendChild(ikAfterCell);     // 統合キー(変更後)
+        row.appendChild(ledgerNameCell);  // 台帳名
+        row.appendChild(recordIdCell);    // レコードID
+        row.appendChild(primaryKeyCell);  // 主キー
+        row.appendChild(changeCell);      // 更新内容
+        row.appendChild(resultCell);      // 結果
+        row.appendChild(detailCell);      // 詳細
 
         return row;
     }
