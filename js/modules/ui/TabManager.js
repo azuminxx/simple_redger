@@ -840,12 +840,12 @@ class TabManager {
    
         // 統合キー(変更前)
         const ikBeforeCell = DOMHelper.createElement('td');
-        ikBeforeCell.textContent = record[CONFIG.historyApp.fields.integrationKeyBefore]?.value || '';
+        this.renderIntegrationKeyCell(ikBeforeCell, record[CONFIG.historyApp.fields.integrationKeyBefore]?.value || '');
         // append later in order
    
         // 統合キー(変更後)
         const ikAfterCell = DOMHelper.createElement('td');
-        ikAfterCell.textContent = record[CONFIG.historyApp.fields.integrationKeyAfter]?.value || '';
+        this.renderIntegrationKeyCell(ikAfterCell, record[CONFIG.historyApp.fields.integrationKeyAfter]?.value || '');
         // append later in order
 
         // 台帳名
@@ -909,6 +909,38 @@ class TabManager {
         row.appendChild(detailCell);      // 詳細
 
         return row;
+    }
+
+    // 履歴テーブル用: 統合キーを「ＰＣ/内線/座席」の複数行で表示（空は非表示）
+    renderIntegrationKeyCell(td, integrationKeyText) {
+        try {
+            while (td.firstChild) td.removeChild(td.firstChild);
+            const text = typeof integrationKeyText === 'string' ? integrationKeyText : '';
+            if (!text) { td.textContent = ''; return; }
+            const labels = { PC: 'ＰＣ', EXT: '内線', SEAT: '座席' };
+            const values = { PC: '', EXT: '', SEAT: '' };
+            text.split('|').forEach(part => {
+                const idx = part.indexOf(':');
+                if (idx === -1) return;
+                const key = part.slice(0, idx).trim();
+                const val = part.slice(idx + 1).trim();
+                if (key in values) values[key] = val;
+            });
+            let printed = false;
+            ['PC','EXT','SEAT'].forEach(k => {
+                const v = values[k];
+                if (v) {
+                    const line = document.createElement('div');
+                    line.textContent = `${labels[k]}:${v}`;
+                    td.appendChild(line);
+                    printed = true;
+                }
+            });
+            if (!printed) td.textContent = '';
+        } catch (e) {
+            // フォールバック: 生文字表示
+            td.textContent = integrationKeyText || '';
+        }
     }
 
     /**
