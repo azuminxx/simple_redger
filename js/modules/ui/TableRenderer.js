@@ -498,6 +498,8 @@ class TableRenderer {
                             const targetLedgerName = CONFIG.apps[appId].name;
                             affectedLedgers.add(targetLedgerName);
                         });
+                        // 起点台帳も必ず対象に含める（主キー交換時に自台帳の主キーも更新対象にするため）
+                        affectedLedgers.add(ledgerName);
                         primaryKeyChanges.add(fieldCode);
                     } else {
                         // 通常フィールドの場合、元の台帳のみ

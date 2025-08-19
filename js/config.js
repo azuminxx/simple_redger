@@ -376,12 +376,12 @@ const CONFIG = {
     getLedgerUpdateFields(ledgerName) {
         const updateFields = {};
         
-        // 自台帳のフィールド（primaryKey: falseのフィールドを動的に取得）
+        // 自台帳のフィールド（primaryKey: true/false を含めて取得）
         const ownFields = this.integratedTableConfig.columns
-            .filter(column => column.ledger === ledgerName && !column.primaryKey && !column.isChangeFlag && !column.isDetailLink)
-            .map(column => column.fieldCode);
+            .filter(column => column.ledger === ledgerName && !column.isChangeFlag && !column.isDetailLink)
+            .map(column => ({ fieldCode: column.fieldCode, isPrimary: !!column.primaryKey }));
         
-        ownFields.forEach(fieldCode => {
+        ownFields.forEach(({ fieldCode }) => {
             updateFields[fieldCode] = {
                 sourceKey: `${ledgerName}_${fieldCode}`,
                 fieldCode: fieldCode
