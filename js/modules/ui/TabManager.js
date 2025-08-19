@@ -689,7 +689,7 @@ class TabManager {
         // テーブルヘッダー
         const thead = DOMHelper.createElement('thead');
         const headerRow = DOMHelper.createElement('tr');
-        const headers = ['更新日時', '更新者 (code)', '更新者 (name)', 'バッチID', '統合キー(変更後)', 'レコードID', '台帳名', '主キー', '更新内容', '結果', '詳細'];
+        const headers = ['更新日時', '更新者 (code)', '更新者 (name)', 'バッチID', '統合キー(変更前)', '統合キー(変更後)', 'レコードID', '台帳名', '主キー', '更新内容', '結果', '詳細'];
         
         headers.forEach(headerText => {
             const th = DOMHelper.createElement('th');
@@ -748,11 +748,11 @@ class TabManager {
         const tbody = table.querySelector('tbody');
         if (!tbody) return;
         // ヘッダー順に基づく列インデックス
-        // 0:更新日時,1:更新者(code),2:更新者(name),3:バッチID,4:統合キー(変更後),5:レコードID,6:台帳名,7:主キー,8:更新内容,9:結果,10:詳細
+        // 0:更新日時,1:更新者(code),2:更新者(name),3:バッチID,4:統合キー(変更前),5:統合キー(変更後),6:レコードID,7:台帳名,8:主キー,9:更新内容,10:結果,11:詳細
         const batchColIdx = 3;
-        const maxCols = 11;
-        // 更新内容(8)・結果(9)・詳細(10)は結合しない
-        const colsToMerge = [0,1,2,3,4,5,6,7];
+        const maxCols = 12;
+        // 更新内容(9)・結果(10)・詳細(11)は結合しない
+        const colsToMerge = [0,1,2,3,4,5,6,7,8];
         colsToMerge.forEach(colIdx => {
             let prevCell = null;
             let prevValue = null;
@@ -838,6 +838,11 @@ class TabManager {
         batchIdCell.textContent = record[CONFIG.historyApp.fields.batchId]?.value || '';
         row.appendChild(batchIdCell);
    
+        // 統合キー(変更前)
+        const ikBeforeCell = DOMHelper.createElement('td');
+        ikBeforeCell.textContent = record[CONFIG.historyApp.fields.integrationKeyBefore]?.value || '';
+        // append later in order
+   
         // 統合キー(変更後)
         const ikAfterCell = DOMHelper.createElement('td');
         ikAfterCell.textContent = record[CONFIG.historyApp.fields.integrationKeyAfter]?.value || '';
@@ -894,6 +899,7 @@ class TabManager {
         // append later in order
 
         // === append cells in requested order ===
+        row.appendChild(ikBeforeCell);    // 統合キー(変更前)
         row.appendChild(ikAfterCell);     // 統合キー(変更後)
         row.appendChild(recordIdCell);    // レコードID
         row.appendChild(ledgerNameCell);  // 台帳名
@@ -915,6 +921,7 @@ class TabManager {
             '更新者 (code)': updater?.code || '',
             '更新者 (name)': updater?.name || '',
             'バッチID': record[CONFIG.historyApp.fields.batchId]?.value || '',
+            '統合キー(変更前)': record[CONFIG.historyApp.fields.integrationKeyBefore]?.value || '',
             '統合キー(変更後)': record[CONFIG.historyApp.fields.integrationKeyAfter]?.value || '',
             'レコードID': record[CONFIG.historyApp.fields.recordId]?.value || '',
             'アプリID': record[CONFIG.historyApp.fields.appId]?.value || '',

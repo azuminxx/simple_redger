@@ -52,7 +52,11 @@ class TableRenderer {
                 idx = this._originalIntegratedData.findIndex(r => window.virtualScroll.getRecordIdFromRow(r) === newKey);
             }
             if (idx !== -1) {
-                this._originalIntegratedData[idx] = { ...newRow };
+                try {
+                    this._originalIntegratedData[idx] = JSON.parse(JSON.stringify(newRow));
+                } catch (e2) {
+                    this._originalIntegratedData[idx] = { ...newRow };
+                }
             }
         } catch (e) {
             console.warn('syncOriginalDataRowByKeys error:', e);
@@ -134,8 +138,13 @@ class TableRenderer {
         // 現在の検索結果を更新
         this.currentSearchResults = integratedData;
 
-        // 検索用データの保持
-        this._originalIntegratedData = integratedData.slice();
+        // 検索用データの保持（変更前スナップショット）
+        // 画面表示直後の完全な状態をディープコピーで保持し、保存直前の「変更前」取得に利用する
+        try {
+            this._originalIntegratedData = integratedData.map(r => JSON.parse(JSON.stringify(r)));
+        } catch (e) {
+            this._originalIntegratedData = integratedData.map(r => ({ ...r }));
+        }
 
         // データが0件の場合は0件メッセージを表示
         if (integratedData.length === 0) {
@@ -841,7 +850,26 @@ class TableRenderer {
                         integrationKeyAfter = window.virtualScroll.generateIntegrationKeyFromRow(row) || '';
                     }
                 } catch (e) { /* noop */ }
-                
+ 
+                // 変更前の統合キー（直前スナップショットから再構成）
+                let integrationKeyBefore = '';
+                try {
+                    const ledgerNameHere = CONFIG.apps[appId]?.name;
+                    const snapshotRow = Array.isArray(this._originalIntegratedData)
+                        ? this._originalIntegratedData.find(r => r && String(r[`${ledgerNameHere}_$id`]) === String(recordIdValue))
+                        : null;
+                    if (snapshotRow) {
+                        if (window.virtualScroll?.generateIntegrationKeyFromRow) {
+                            integrationKeyBefore = window.virtualScroll.generateIntegrationKeyFromRow(snapshotRow) || '';
+                        } else {
+                            const pc = snapshotRow['PC台帳_PC番号'] || '';
+                            const ext = snapshotRow['内線台帳_内線番号'] || '';
+                            const seat = snapshotRow['座席台帳_座席番号'] || '';
+                            integrationKeyBefore = `PC:${pc}|EXT:${ext}|SEAT:${seat}`;
+                        }
+                    }
+                } catch (e) { /* noop */ }
+
                 const historyData = {
                     appId: appId,
                     ledgerName: ledgerName,
@@ -850,6 +878,7 @@ class TableRenderer {
                     updateResult: 'success',
                     timestamp: timestamp,
                     batchId: batchId,
+                    integrationKeyBefore,
                     integrationKeyAfter,
                     changeContent,
                     request: requestData,

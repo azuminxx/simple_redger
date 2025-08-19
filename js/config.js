@@ -46,6 +46,7 @@ const CONFIG = {
             primaryKey: '主キー',
             result: '結果',
             changeContent: '更新内容',
+            integrationKeyBefore: '統合キー変更前',
             integrationKeyAfter: '統合キー変更後',
             request: 'request',
             response: 'response',

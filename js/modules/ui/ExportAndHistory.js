@@ -161,6 +161,7 @@ class ExportAndHistory {
                     };
                     if (historyData.changeContent) record[CONFIG.historyApp.fields.changeContent] = { value: historyData.changeContent };
                     if (historyData.integrationKeyAfter) record[CONFIG.historyApp.fields.integrationKeyAfter] = { value: historyData.integrationKeyAfter };
+                    if (historyData.integrationKeyBefore) record[CONFIG.historyApp.fields.integrationKeyBefore] = { value: historyData.integrationKeyBefore };
                     if (historyData.request) record[CONFIG.historyApp.fields.request] = { value: JSON.stringify(historyData.request) };
                     if (historyData.response) record[CONFIG.historyApp.fields.response] = { value: JSON.stringify(historyData.response) };
                     if (historyData.error) record[CONFIG.historyApp.fields.error] = { value: JSON.stringify(historyData.error) };
@@ -195,6 +196,7 @@ class ExportAndHistory {
                     };
                     if (historyData.changeContent) record[CONFIG.historyApp.fields.changeContent] = { value: historyData.changeContent };
                     if (historyData.integrationKeyAfter) record[CONFIG.historyApp.fields.integrationKeyAfter] = { value: historyData.integrationKeyAfter };
+                    if (historyData.integrationKeyBefore) record[CONFIG.historyApp.fields.integrationKeyBefore] = { value: historyData.integrationKeyBefore };
                     if (historyData.request) record[CONFIG.historyApp.fields.request] = { value: JSON.stringify(historyData.request) };
                     if (historyData.response) record[CONFIG.historyApp.fields.response] = { value: JSON.stringify(historyData.response) };
                     if (historyData.error) record[CONFIG.historyApp.fields.error] = { value: JSON.stringify(historyData.error) };
