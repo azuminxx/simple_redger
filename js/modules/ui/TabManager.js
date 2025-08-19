@@ -246,25 +246,25 @@ class TabManager {
         return tabContent;
     }
 
-    /**
-     * エラー用タブコンテンツを作成
-     */
-    createErrorTabContent(appId, error) {
-        const tabContent = DOMHelper.createElement('div', {
-            id: `tab-${appId}`
-        }, 'tab-content error-tab');
+    // /**
+    //  * エラー用タブコンテンツを作成
+    //  */
+    // createErrorTabContent(appId, error) {
+    //     const tabContent = DOMHelper.createElement('div', {
+    //         id: `tab-${appId}`
+    //     }, 'tab-content error-tab');
 
-        const errorMessage = DOMHelper.createElement('div', {}, 'error-message');
-        errorMessage.innerHTML = `
-            <h4>タブの初期化に失敗しました</h4>
-            <p>アプリID: ${appId}</p>
-            <p>エラー: ${error.message}</p>
-            <button onclick="location.reload()">ページを再読み込み</button>
-        `;
+    //     const errorMessage = DOMHelper.createElement('div', {}, 'error-message');
+    //     errorMessage.innerHTML = `
+    //         <h4>タブの初期化に失敗しました</h4>
+    //         <p>アプリID: ${appId}</p>
+    //         <p>エラー: ${error.message}</p>
+    //         <button onclick="location.reload()">ページを再読み込み</button>
+    //     `;
         
-        tabContent.appendChild(errorMessage);
-        return tabContent;
-    }
+    //     tabContent.appendChild(errorMessage);
+    //     return tabContent;
+    // }
 
     /**
      * タブを切り替え

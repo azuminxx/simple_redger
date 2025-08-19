@@ -596,8 +596,9 @@ class TableRenderer {
                             }
                         } catch (e) { /* noop */ }
                         const toText = v => {
-                            if (v === undefined || v === null || v === '') return '-';
-                            if (Array.isArray(v)) return v.join(',');
+                            if (v === undefined || v === null) return '(空)';
+                            if (Array.isArray(v)) return v.length === 0 ? '(空)' : v.join(',');
+                            if (String(v) === '') return '(空)';
                             return String(v);
                         };
                         Object.entries(updateRecord.record).forEach(([fieldCode, body]) => {
