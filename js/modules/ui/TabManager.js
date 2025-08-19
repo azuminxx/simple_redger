@@ -98,7 +98,7 @@ class TabManager {
             const table = document.createElement('table');
             table.className = 'history-table';
             const thead = document.createElement('thead');
-            thead.innerHTML = '<tr><th>台帳名</th><th>レコードID</th><th>主キー</th><th>結果</th><th>更新内容</th><th>バッチID</th><th>時刻</th></tr>';
+            thead.innerHTML = '<tr><th>レコードID</th><th>台帳名</th><th>主キー</th><th>結果</th><th>更新内容</th><th>バッチID</th><th>時刻</th></tr>';
             table.appendChild(thead);
             const tbody = document.createElement('tbody');
             table.appendChild(tbody);
@@ -689,7 +689,7 @@ class TabManager {
         // テーブルヘッダー
         const thead = DOMHelper.createElement('thead');
         const headerRow = DOMHelper.createElement('tr');
-        const headers = ['更新日時', '更新者 (code)', '更新者 (name)', 'バッチID', '統合キー(変更後)', '台帳名', 'レコードID', '主キー', '更新内容', '結果', '詳細'];
+        const headers = ['更新日時', '更新者 (code)', '更新者 (name)', 'バッチID', '統合キー(変更後)', 'レコードID', '台帳名', '主キー', '更新内容', '結果', '詳細'];
         
         headers.forEach(headerText => {
             const th = DOMHelper.createElement('th');
@@ -748,7 +748,7 @@ class TabManager {
         const tbody = table.querySelector('tbody');
         if (!tbody) return;
         // ヘッダー順に基づく列インデックス
-        // 0:更新日時,1:更新者(code),2:更新者(name),3:バッチID,4:統合キー(変更後),5:台帳名,6:レコードID,7:主キー,8:更新内容,9:結果,10:詳細
+        // 0:更新日時,1:更新者(code),2:更新者(name),3:バッチID,4:統合キー(変更後),5:レコードID,6:台帳名,7:主キー,8:更新内容,9:結果,10:詳細
         const batchColIdx = 3;
         const maxCols = 11;
         // 更新内容(8)・結果(9)・詳細(10)は結合しない
@@ -895,8 +895,8 @@ class TabManager {
 
         // === append cells in requested order ===
         row.appendChild(ikAfterCell);     // 統合キー(変更後)
-        row.appendChild(ledgerNameCell);  // 台帳名
         row.appendChild(recordIdCell);    // レコードID
+        row.appendChild(ledgerNameCell);  // 台帳名
         row.appendChild(primaryKeyCell);  // 主キー
         row.appendChild(changeCell);      // 更新内容
         row.appendChild(resultCell);      // 結果
@@ -915,6 +915,7 @@ class TabManager {
             '更新者 (code)': updater?.code || '',
             '更新者 (name)': updater?.name || '',
             'バッチID': record[CONFIG.historyApp.fields.batchId]?.value || '',
+            '統合キー(変更後)': record[CONFIG.historyApp.fields.integrationKeyAfter]?.value || '',
             'レコードID': record[CONFIG.historyApp.fields.recordId]?.value || '',
             'アプリID': record[CONFIG.historyApp.fields.appId]?.value || '',
             '台帳名': record[CONFIG.historyApp.fields.ledgerName]?.value || '',
