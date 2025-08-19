@@ -734,7 +734,51 @@ class TabManager {
         });
         table.appendChild(tbody);
 
+        // 並び替え後に、バッチIDが同じ連続行について、同一値のセルを結合
+        try {
+            this.mergeHistoryTableCells(table);
+        } catch (e) { /* noop */ }
+
         return table;
+    }
+
+    // バッチIDが同じ行に限り、同一値のセルを縦結合
+    mergeHistoryTableCells(table) {
+        if (!table) return;
+        const tbody = table.querySelector('tbody');
+        if (!tbody) return;
+        // ヘッダー順に基づく列インデックス
+        // 0:更新日時,1:更新者(code),2:更新者(name),3:バッチID,4:統合キー(変更後),5:台帳名,6:レコードID,7:主キー,8:更新内容,9:結果,10:詳細
+        const batchColIdx = 3;
+        const maxCols = 11;
+        // 更新内容(8)・結果(9)・詳細(10)は結合しない
+        const colsToMerge = [0,1,2,3,4,5,6,7];
+        colsToMerge.forEach(colIdx => {
+            let prevCell = null;
+            let prevValue = null;
+            let prevBatch = null;
+            let rowspan = 1;
+            const rows = Array.from(tbody.rows);
+            rows.forEach((tr, i) => {
+                if (tr.cells.length < maxCols) return; // 保険
+                const batchCell = tr.cells[batchColIdx];
+                const cell = tr.cells[colIdx];
+                if (!cell || !batchCell) return;
+                const batchVal = batchCell.textContent || '';
+                const value = cell.textContent || '';
+                if (prevCell && batchVal === prevBatch && value === prevValue) {
+                    rowspan += 1;
+                    prevCell.rowSpan = rowspan;
+                    cell.style.display = 'none';
+                } else {
+                    // リセット
+                    prevCell = cell;
+                    prevValue = value;
+                    prevBatch = batchVal;
+                    rowspan = 1;
+                }
+            });
+        });
     }
 
     /**
