@@ -137,6 +137,8 @@ class TableRenderer {
 
         // 現在の検索結果を更新
         this.currentSearchResults = integratedData;
+        // フィルタ作業用の退避データは初期表示時にクリア
+        this._unfilteredWorkingData = null;
 
         // 検索用データの保持（変更前スナップショット）
         // 画面表示直後の完全な状態をディープコピーで保持し、保存直前の「変更前」取得に利用する
@@ -575,13 +577,32 @@ class TableRenderer {
                         });
                     }
                     
-                    // 変更されたフィールドのみをリクエストボディに含める
+                    // 変更されたフィールドのみをリクエストボディに含める（実前後差分で最終フィルタ）
                     const updateFields = CONFIG.getLedgerUpdateFields(ledgerName);
+                    // スナップショット（表示直後の「変更前」）を取得
+                    let snapshotRow = null;
+                    try {
+                        snapshotRow = Array.isArray(this._originalIntegratedData)
+                            ? this._originalIntegratedData.find(r => r && String(r[`${ledgerName}_$id`]) === String(recordId))
+                            : null;
+                    } catch (e) { /* noop */ }
+
+                    const isEqual = (a, b) => {
+                        const norm = (v) => {
+                            if (Array.isArray(v)) return v.join(',');
+                            if (v === undefined || v === null || String(v) === '-' || String(v) === '') return '';
+                            return String(v);
+                        };
+                        return norm(a) === norm(b);
+                    };
+
                     Object.entries(updateFields).forEach(([fieldCode, fieldConfig]) => {
-                        if (changedFieldsForLedger.has(fieldCode)) {
-                            const value = this.currentSearchResults[rowIndex][fieldConfig.sourceKey];
-                            updateRecord.record[fieldCode] = { value: value };
-                        }
+                        if (!changedFieldsForLedger.has(fieldCode)) return;
+                        const afterValue = this.currentSearchResults[rowIndex][fieldConfig.sourceKey];
+                        const beforeValue = snapshotRow ? snapshotRow[fieldConfig.sourceKey] : undefined;
+                        // 前後が等しい場合は更新対象から除外（誤検知抑止・readOnlyの見掛け差分も回避）
+                        if (isEqual(beforeValue, afterValue)) return;
+                        updateRecord.record[fieldCode] = { value: afterValue };
                     });
                     
                     // --- 追加: 更新差分ログ（適用前の確認用）---

@@ -110,11 +110,15 @@ class SearchAndFilter {
         const positiveLogic = this.positiveLogicSelect.value;
         const negativeLogic = this.negativeLogicSelect.value;
 
+        // フィルタの基準データは「未フィルタの作業データ（編集中の最新状態）」があればそれを優先
+        const baseData = this.tableRenderer._unfilteredWorkingData || this.tableRenderer._originalIntegratedData;
+
         let filteredData;
         if (positiveKeywords.length === 0 && negativeKeywords.length === 0) {
-            filteredData = this.tableRenderer._originalIntegratedData;
+            // 解除時は作業データ（未フィルタ全件）へ戻す
+            filteredData = baseData;
         } else {
-            filteredData = this.tableRenderer._originalIntegratedData.filter((row, rowIndex) => {
+            filteredData = baseData.filter((row, rowIndex) => {
                 const positiveOk = positiveKeywords.length === 0 || (positiveLogic === 'or' ? 
                     positiveKeywords.some(keyword => this.evaluateKeyword(row, rowIndex, keyword, true)) :
                     positiveKeywords.every(keyword => this.evaluateKeyword(row, rowIndex, keyword, true))
@@ -233,6 +237,10 @@ class SearchAndFilter {
             // no target
             return;
         }
+        // 初回フィルタ実行時に、未フィルタの作業データ（現在の全件データ）を退避
+        if (!this.tableRenderer.isFiltered) {
+            this.tableRenderer._unfilteredWorkingData = this.tableRenderer.currentSearchResults;
+        }
         const positiveInput = document.querySelector('#positive-search-input');
         if (positiveInput) {
             positiveInput.value = this.tableRenderer.filterFlag;
@@ -260,6 +268,12 @@ class SearchAndFilter {
         const checkboxes = document.querySelectorAll('.row-checkbox');
         checkboxes.forEach(checkbox => { checkbox.checked = false; });
         this.tableRenderer.isFiltered = false;
+        // 退避していた未フィルタ作業データがあれば復元し、以降の編集・保存は最新データに対して行う
+        if (Array.isArray(this.tableRenderer._unfilteredWorkingData) && this.tableRenderer._unfilteredWorkingData.length > 0) {
+            this.tableRenderer.currentSearchResults = this.tableRenderer._unfilteredWorkingData;
+            // 復元後は退避をクリア
+            this.tableRenderer._unfilteredWorkingData = null;
+        }
         this.updateAllToggleButtons();
     }
 
