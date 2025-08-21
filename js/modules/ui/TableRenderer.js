@@ -163,6 +163,11 @@ class TableRenderer {
         // タイトルと保存ボタンのコンテナを作成
         const titleContainer = DOMHelper.createElement('div', {}, 'results-title-container');
 
+        // SearchAndFilter はヘッダー生成前にインスタンス化しておく（初回表示でのボタン初期化のため）
+        if (window.SearchAndFilter && !this.searchAndFilter) {
+            this.searchAndFilter = new window.SearchAndFilter(this);
+        }
+
         // 仮想スクロール対応のテーブルコンテナを作成
         const tableContainer = this.virtualScroll.createVirtualScrollTable(integratedData);
 
@@ -1277,6 +1282,14 @@ class TableRenderer {
     updateToggleButtonState(button) {
         if (this.searchAndFilter && typeof this.searchAndFilter.updateToggleButtonState === 'function') {
             return this.searchAndFilter.updateToggleButtonState(button);
+        }
+        // フォールバック（SearchAndFilter未生成の初回表示時など）
+        if (this.isFiltered) {
+            button.textContent = '解除';
+            button.className = 'header-clear-button';
+        } else {
+            button.textContent = '絞込';
+            button.className = 'header-filter-button';
         }
     }
 
