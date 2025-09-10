@@ -6,6 +6,7 @@
           "js/config.js",
           "js/modules/utils/DOMHelper.js",
           "js/modules/utils/Validation.js",
+          "js/vendor/fabric.min.js",
           "js/modules/api/UserListAPI.js",
           "js/modules/api/FieldInfoAPI.js",
           "js/modules/ui/FormBuilder.js",
@@ -18,6 +19,7 @@
           "js/modules/ui/SearchAndFilter.js",
           "js/modules/ui/ExportAndHistory.js",
           "js/modules/ui/TableRenderer.js",
+          "js/modules/seatmap/SeatMap.js",
           "js/main.js"
         ],
         "css": [

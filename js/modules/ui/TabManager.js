@@ -156,6 +156,12 @@ class TabManager {
         settingsContent.appendChild(info);
         tabContainer.appendChild(settingsContent);
 
+        // 座席表タブのタブコンテンツを追加
+        const seatmapContent = DOMHelper.createElement('div', { id: 'tab-seatmap' }, 'tab-content');
+        const seatmapContainer = DOMHelper.createElement('div', { id: 'seatmap-root' }, 'seatmap-root');
+        seatmapContent.appendChild(seatmapContainer);
+        tabContainer.appendChild(seatmapContent);
+
         return tabContainer;
     }
 
@@ -193,6 +199,13 @@ class TabManager {
         settingsTabButton.textContent = '⚙️ 設定';
         settingsTabButton.addEventListener('click', () => this.switchTab('settings'));
         tabMenu.appendChild(settingsTabButton);
+
+        // 座席表タブ（独立UI）
+        const seatmapTabButton = DOMHelper.createElement('button', {}, 'tab-button seatmap-tab');
+        seatmapTabButton.setAttribute('data-app', 'seatmap');
+        seatmapTabButton.textContent = '🗺️ 座席表';
+        seatmapTabButton.addEventListener('click', () => this.switchTab('seatmap'));
+        tabMenu.appendChild(seatmapTabButton);
 
         return tabMenu;
     }
@@ -301,6 +314,25 @@ class TabManager {
         // 設定タブが選択された場合、検索メニューが閉じられていた場合は開く
         if (appId === 'settings') {
             this.openSearchMenuIfClosed();
+        }
+
+        // 座席表タブが選択された場合、SeatMapを初期化/破棄
+        if (appId === 'seatmap') {
+            try {
+                const container = document.getElementById('seatmap-root');
+                if (container) {
+                    if (!this._seatMap) this._seatMap = new window.SeatMap();
+                    this._seatMap.init(container);
+                }
+            } catch (e) {
+                console.error('SeatMap初期化エラー:', e);
+            }
+        } else {
+            try {
+                if (this._seatMap && typeof this._seatMap.destroy === 'function') {
+                    this._seatMap.destroy();
+                }
+            } catch (e) { /* noop */ }
         }
 
         // search-results要素の表示・非表示を切り替え
@@ -988,8 +1020,8 @@ class TabManager {
             return;
         }
 
-        // 設定タブまたは更新履歴タブの場合は非表示
-        if (appId === 'settings' || appId === 'history') {
+        // 設定タブ/更新履歴タブ/座席表タブ の場合は非表示
+        if (appId === 'settings' || appId === 'history' || appId === 'seatmap') {
             searchResultsElement.style.display = 'none';
             console.log(`📋 ${appId}タブ: search-results要素を非表示`);
         } else {
