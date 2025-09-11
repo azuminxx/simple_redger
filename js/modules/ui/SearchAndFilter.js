@@ -107,6 +107,13 @@ class SearchAndFilter {
         const negativeRaw = this.negativeInput.value.trim();
         const positiveKeywords = positiveRaw.split(/[\s,\r\n]+/).filter(Boolean);
         const negativeKeywords = negativeRaw.split(/[\s,\r\n]+/).filter(Boolean);
+
+        // 手動で FILTER_SELECTED_ROW が削除されたら、絞込みトグルも解除する
+        const hadRowFilter = this.tableRenderer.isFiltered === true;
+        const hasFilterFlagToken = positiveKeywords.includes(this.tableRenderer.filterFlag);
+        if (hadRowFilter && !hasFilterFlagToken) {
+            this.resetFilterState();
+        }
         const positiveLogic = this.positiveLogicSelect.value;
         const negativeLogic = this.negativeLogicSelect.value;
 
@@ -170,18 +177,22 @@ class SearchAndFilter {
         if (oldTable && newTable) {
             oldTable.parentNode.replaceChild(newTable, oldTable);
         }
+        // テーブル再生成後にトグルボタン表示を最新状態に更新
+        try {
+            this.updateAllToggleButtons();
+        } catch (e) { /* noop */ }
     }
 
     // キーワード評価（肯定/否定）
     evaluateKeyword(row, rowIndex, keyword, isPositive) {
         if (keyword.includes(':')) {
             const [fieldName, searchValue] = keyword.split(':', 2);
-            if (fieldName.toLowerCase() === '整合' || fieldName.toLowerCase() === 'consistency') {
-                const consistencyResult = this.tableRenderer.getConsistencyResult(row);
-                return isPositive
-                    ? (consistencyResult && consistencyResult.toLowerCase().includes(searchValue.toLowerCase()))
-                    : !(consistencyResult && consistencyResult.toLowerCase().includes(searchValue.toLowerCase()));
-            }
+            // if (fieldName.toLowerCase() === '整合' || fieldName.toLowerCase() === 'consistency') {
+            //     const consistencyResult = this.tableRenderer.getConsistencyResult(row);
+            //     return isPositive
+            //         ? (consistencyResult && consistencyResult.toLowerCase().includes(searchValue.toLowerCase()))
+            //         : !(consistencyResult && consistencyResult.toLowerCase().includes(searchValue.toLowerCase()));
+            // }
             const matchingKeys = Object.keys(row).filter(key => {
                 const column = CONFIG.integratedTableConfig.columns.find(col => col.key === key);
                 return column && column.label.toLowerCase().includes(fieldName.toLowerCase());
@@ -204,10 +215,10 @@ class SearchAndFilter {
                 });
             }
         }
-        // 通常の検索（部分一致） - DOM属性/整合結果も含む
+        // 通常の検索（部分一致） - DOM属性も含む（整合は廃止）
         const searchableValues = this.tableRenderer.getSearchableValues(row);
-        const consistencyResult = this.tableRenderer.getConsistencyResult(row);
-        if (consistencyResult) searchableValues.push(consistencyResult);
+        // const consistencyResult = this.tableRenderer.getConsistencyResult(row);
+        // if (consistencyResult) searchableValues.push(consistencyResult);
         const domFlags = this.getDOMFlagsForRow(rowIndex);
         searchableValues.push(...domFlags);
         if (isPositive) {
@@ -275,6 +286,12 @@ class SearchAndFilter {
             this.tableRenderer._unfilteredWorkingData = null;
         }
         this.updateAllToggleButtons();
+        // ユーザーが入力欄からフラグを削除→即解除したケースに備え、ヘッダーにも反映
+        try {
+            if (this.tableRenderer && typeof this.tableRenderer.updateAllToggleButtons === 'function') {
+                this.tableRenderer.updateAllToggleButtons();
+            }
+        } catch (e) { /* noop */ }
     }
 
     // 絞り込み状態をリセット

@@ -63,37 +63,42 @@ class TableRenderer {
         }
     }
 
-    // 内部ヘルパー: 整合性マップ更新と表示セル反映
-    updateConsistencyForIndices(indices) {
-        if (!indices || indices.length === 0) return;
-        if (!window.consistencyMap) window.consistencyMap = new Map();
-        const colIdx = CONFIG.integratedTableConfig.columns.findIndex(col => col.isConsistencyCheck);
-        const tdIndex = colIdx >= 0 ? (1 + colIdx) : -1; // 先頭のチェックボックス列ぶん+1
-        indices.forEach(index => {
-            const row = this.currentSearchResults[index];
-            const recordId = window.virtualScroll.getRecordIdFromRow(row);
-            const label = this.getConsistencyResult(row);
-            const isConsistent = label === '整合' ? true : (label === '不整合' ? false : null);
-            window.consistencyMap.set(recordId, isConsistent);
-            if (tdIndex >= 0) {
-                const tr = document.querySelector(`tr[data-record-index="${index}"]`);
-                if (tr && tr.children && tr.children[tdIndex]) {
-                    const td = tr.children[tdIndex];
-                    let text = '-';
-                    if (isConsistent === true) {
-                        text = '✅';
-                        td.className = 'consistency-ok readonly-cell';
-                    } else if (isConsistent === false) {
-                        text = '❌';
-                        td.className = 'consistency-ng readonly-cell';
-                    } else {
-                        td.className = 'null-value readonly-cell';
-                    }
-                    td.textContent = text;
-                }
-            }
-        });
-    }
+    // 内部ヘルパー: 整合性マップ更新と表示セル反映（廃止）
+    // updateConsistencyForIndices(indices) {
+    //     if (!indices || indices.length === 0) return;
+    //     if (!window.consistencyMap) window.consistencyMap = new Map();
+    //     const colIdx = CONFIG.integratedTableConfig.columns.findIndex(col => col.isConsistencyCheck);
+    //     const tdIndex = colIdx >= 0 ? (1 + colIdx) : -1; // 先頭のチェックボックス列ぶん+1
+    //     indices.forEach(index => {
+    //         const row = this.currentSearchResults[index];
+    //         const recordId = window.virtualScroll.getRecordIdFromRow(row);
+    //         const label = this.getConsistencyResult(row);
+    //         const isConsistent = label === '整合' ? true : (label === '不整合' ? false : null);
+    //         window.consistencyMap.set(recordId, isConsistent);
+    //         if (tdIndex >= 0) {
+    //             const tr = document.querySelector(`tr[data-record-index="${index}"]`);
+    //             if (tr && tr.children && tr.children[tdIndex]) {
+    //                 const td = tr.children[tdIndex];
+    //                 let text = '-';
+    //                 if (isConsistent === true) {
+    //                     text = '✅';
+    //                     td.className = 'consistency-ok readonly-cell';
+    //                 } else if (isConsistent === false) {
+    //                     text = '❌';
+    //                     td.className = 'consistency-ng readonly-cell';
+    //                 } else {
+    //                     td.className = 'null-value readonly-cell';
+    //                 }
+    //                 td.textContent = text;
+    //             }
+    //         }
+    //     });
+    // }
+
+    // 整合性マップ更新のダミー（廃止に伴う呼び出し互換用の空実装）
+    // updateConsistencyForIndices(indices) {
+    //     // no-op
+    // }
 
     /**
      * 更新ルールを動的に生成
@@ -137,6 +142,11 @@ class TableRenderer {
 
         // 現在の検索結果を更新
         this.currentSearchResults = integratedData;
+        // フィルタ状態をリセット（新規検索開始時は常に未フィルタ）
+        this.isFiltered = false;
+        if (this.checkedRows && typeof this.checkedRows.clear === 'function') {
+            this.checkedRows.clear();
+        }
         // フィルタ作業用の退避データは初期表示時にクリア
         this._unfilteredWorkingData = null;
 
@@ -154,7 +164,7 @@ class TableRenderer {
             return;
         }
 
-        // 動的CSSを生成してテーブル幅を設定
+        // 動的CSSを生成してテーブル幅を設定（ユーザー手動の上書きも反映）
         CSSGenerator.generateTableWidthCSS();
 
         // 統合結果コンテナを作成
@@ -170,24 +180,28 @@ class TableRenderer {
 
         // 仮想スクロール対応のテーブルコンテナを作成
         const tableContainer = this.virtualScroll.createVirtualScrollTable(integratedData);
+        
+        // 新しいテーブル表示に合わせてトグルボタン表示を更新（絞込み→解除 表示ズレ対策）
+        try {
+            this.updateAllToggleButtons();
+        } catch (e) { /* noop */ }
 
-        // --- ここでconsistencyMapが生成されるので、ここから下でカウント ---
-        let normalCount = 0;
-        let inconsistentCount = 0;
-        if (window.consistencyMap && this.currentSearchResults) {
-            this.currentSearchResults.forEach((row, idx) => {
-                const key = window.virtualScroll.getRecordIdFromRow(row);
-                const val = window.consistencyMap.get(key);
-                if (val === true) normalCount++;
-                else if (val === false) inconsistentCount++;
-            });
-        }
-        // --- ここまで追加 ---
+        // // --- ここでconsistencyMapが生成されるので、ここから下でカウント ---
+        // let normalCount = 0;
+        // let inconsistentCount = 0;
+        // if (window.consistencyMap && this.currentSearchResults) {
+        //     this.currentSearchResults.forEach((row, idx) => {
+        //         const key = window.virtualScroll.getRecordIdFromRow(row);
+        //         const val = window.consistencyMap.get(key);
+        //         if (val === true) normalCount++;
+        //         else if (val === false) inconsistentCount++;
+        //     });
+        // }
+        // // --- ここまで追加 ---
 
-        // 件数表示を拡張
+        // 件数表示（整合/不整合サマリは廃止）
         const title = DOMHelper.createElement('h5');
-        title.textContent = `統合検索結果：${integratedData.length}件（` +
-            `正常：${normalCount}件／不整合：${inconsistentCount}件）`;
+        title.textContent = `統合検索結果：${integratedData.length}件`;
         titleContainer.appendChild(title);
 
         // テーブル内検索結果件数表示用
@@ -209,7 +223,7 @@ class TableRenderer {
 
         // エクスポートボタンを作成
         const exportButton = DOMHelper.createElement('button', {}, 'export-data-button');
-        exportButton.textContent = 'Excel出力';
+        exportButton.textContent = 'CSV出力';
         exportButton.addEventListener('click', () => {
             this.exportToExcel();
         });
@@ -285,12 +299,28 @@ class TableRenderer {
         const ledgerGroups = this.groupColumnsByLedger();
         
         ledgerGroups.forEach(group => {
-            const th = DOMHelper.createElement('th');
-            th.textContent = group.ledgerName;
-            th.className = 'header-ledger-cell';
-            th.colSpan = group.columns.length;
-            
-            row.appendChild(th);
+            if (group.ledgerName === '操作') {
+                // 操作グループは各列ごとに1列目ヘッダーへ直接ラベルを表示し、2行分結合
+                group.columns.forEach(col => {
+                    const th = DOMHelper.createElement('th');
+                    th.textContent = col.label || '操作';
+                    th.className = 'header-ledger-cell';
+                    th.rowSpan = 2;
+                    th.colSpan = 1;
+                    // 列リサイズハンドルを付与
+                    try {
+                        const colIndex = CONFIG.integratedTableConfig.columns.findIndex(c => c.key === col.key);
+                        if (colIndex >= 0) this.attachColResizer(th, colIndex);
+                    } catch (e) { /* noop */ }
+                    row.appendChild(th);
+                });
+            } else {
+                const th = DOMHelper.createElement('th');
+                th.textContent = group.ledgerName;
+                th.className = 'header-ledger-cell';
+                th.colSpan = group.columns.length;
+                row.appendChild(th);
+            }
         });
         
         return row;
@@ -305,6 +335,10 @@ class TableRenderer {
         // チェックボックスカラムは1行目で2行分結合済みなのでスキップ
         
         CONFIG.integratedTableConfig.columns.forEach(column => {
+            // 「操作」グループの列は1行目でrowSpan=2としているため、2行目には追加しない
+            const ledgerName = DOMHelper.getLedgerNameFromKey(column.key);
+            if (ledgerName === '操作') return;
+
             const th = DOMHelper.createElement('th');
             th.textContent = column.label;
             th.className = 'header-field-cell';
@@ -314,10 +348,58 @@ class TableRenderer {
                 th.setAttribute('data-field-code', column.fieldCode);
             }
             
+            // 列リサイズハンドルを付与
+            try {
+                const colIndex = CONFIG.integratedTableConfig.columns.findIndex(c => c.key === column.key);
+                if (colIndex >= 0) this.attachColResizer(th, colIndex);
+            } catch (e) { /* noop */ }
+
             row.appendChild(th);
         });
         
         return row;
+    }
+
+    // 列リサイズ用ハンドルを付与し、ドラッグで幅変更→window.columnWidthOverridesに保存
+    attachColResizer(th, colIndex) {
+        try {
+            const handle = document.createElement('div');
+            handle.className = 'col-resize-handle';
+            handle.style.position = 'absolute';
+            handle.style.top = '0';
+            handle.style.right = '0';
+            handle.style.width = '6px';
+            handle.style.cursor = 'col-resize';
+            handle.style.userSelect = 'none';
+            handle.style.height = '100%';
+            handle.style.zIndex = 10;
+
+            th.style.position = 'relative';
+            th.appendChild(handle);
+
+            let startX = 0;
+            let startWidth = 0;
+            const onMouseMove = (e) => {
+                const dx = e.clientX - startX;
+                const newWidth = Math.max(16, startWidth + dx);
+                if (!window.columnWidthOverrides) window.columnWidthOverrides = {};
+                window.columnWidthOverrides[colIndex] = newWidth;
+                // 動的CSSを再生成して即時反映
+                try { CSSGenerator.generateTableWidthCSS(); } catch (e) { /* noop */ }
+            };
+            const onMouseUp = () => {
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+            };
+            handle.addEventListener('mousedown', (e) => {
+                startX = e.clientX;
+                // 現在の列幅を取得
+                const colEl = document.querySelector(`.integrated-table .col-${colIndex}`);
+                startWidth = colEl ? colEl.getBoundingClientRect().width : (parseInt(getComputedStyle(th).width) || 120);
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+            });
+        } catch (e) { /* noop */ }
     }
 
     /**
@@ -468,8 +550,8 @@ class TableRenderer {
                     }
                 });
 
-                // 保存後に整合性マップを最新化し、表示も更新
-                this.updateConsistencyForIndices(changedIndices);
+                // 保存後に整合性マップを最新化し、表示も更新（廃止）
+                // this.updateConsistencyForIndices(changedIndices);
             }
             
             // 保存成功後に遅延タスクを実行（セル分離後の統合キー再生成や同期など）
@@ -671,7 +753,7 @@ class TableRenderer {
                             // 履歴アプリ用テキストを蓄積
                             const key = `${appId}:${recordId}`;
                             if (!diffTextByAppAndId.has(key)) diffTextByAppAndId.set(key, []);
-                            diffTextByAppAndId.get(key).push(`${fieldCode}:${beforeText}→${afterText}`);
+                            diffTextByAppAndId.get(key).push(`【${fieldCode}】${beforeText}→${afterText}`);
                             if (!originalRecord || !originalRecord[fieldCode]) {
                                 // デバッグ: フィールド未登録の理由（ユーザー台帳由来など）
                                 try {
@@ -1024,6 +1106,8 @@ class TableRenderer {
                 
                 // 新しいVirtualScrollテーブルを作成
                 const newTableContainer = this.virtualScroll.createVirtualScrollTable(this.currentSearchResults);
+                // 列幅の動的CSSを再生成（ユーザー上書き維持）
+                try { CSSGenerator.generateTableWidthCSS(); } catch (e) { /* noop */ }
                 
                 // 変更フラグを復元
                 this.virtualScroll.changeFlags = currentChangeFlags;
@@ -1214,49 +1298,40 @@ class TableRenderer {
         return [];
     }
 
-    /**
-     * 行の整合性チェック結果を取得
-     */
-    getConsistencyResult(row) {
-        // 可能なら現在の行データから統合キーを再生成（最も信頼できる現状値）
-        let integrationKey = null;
-        if (window.virtualScroll && typeof window.virtualScroll.generateIntegrationKeyFromRow === 'function') {
-            integrationKey = window.virtualScroll.generateIntegrationKeyFromRow(row);
-        } else {
-            // フォールバック: 既存の台帳別統合キーから取得
-            for (const appId in CONFIG.apps) {
-                const ledgerName = CONFIG.apps[appId].name;
-                const key = `${ledgerName}_${CONFIG.integrationKey}`;
-                if (row[key]) {
-                    integrationKey = row[key];
-                    break;
-                }
-            }
-        }
-
-        if (integrationKey) {
-            const DataIntegratorClass = window.DataIntegrator;
-            const dataIntegrator = new DataIntegratorClass();
-            const parsed = dataIntegrator.parseIntegrationKey(integrationKey);
-            const pc = row['PC台帳_PC番号'] || '';
-            const ext = row['内線台帳_内線番号'] || '';
-            const seat = row['座席台帳_座席番号'] || '';
-            
-            function isFieldConsistent(a, b) {
-                const isEmpty = v => v === null || v === undefined || v === '';
-                if (isEmpty(a) && isEmpty(b)) return true;
-                return a === b;
-            }
-            
-            const isConsistent =
-                isFieldConsistent(parsed.PC, pc) &&
-                isFieldConsistent(parsed.EXT, ext) &&
-                isFieldConsistent(parsed.SEAT, seat);
-            
-            return isConsistent ? '整合' : '不整合';
-        }
-        return '';
-    }
+    // /**
+    //  * 行の整合性チェック結果を取得（廃止）
+    //  */
+    // getConsistencyResult(row) {
+    //     let integrationKey = null;
+    //     if (window.virtualScroll && typeof window.virtualScroll.generateIntegrationKeyFromRow === 'function') {
+    //         integrationKey = window.virtualScroll.generateIntegrationKeyFromRow(row);
+    //     } else {
+    //         for (const appId in CONFIG.apps) {
+    //             const ledgerName = CONFIG.apps[appId].name;
+    //             const key = `${ledgerName}_${CONFIG.integrationKey}`;
+    //             if (row[key]) {
+    //                 integrationKey = row[key];
+    //                 break;
+    //             }
+    //         }
+    //     }
+    //     if (integrationKey) {
+    //         const DataIntegratorClass = window.DataIntegrator;
+    //         const dataIntegrator = new DataIntegratorClass();
+    //         const parsed = dataIntegrator.parseIntegrationKey(integrationKey);
+    //         const pc = row['PC台帳_PC番号'] || '';
+    //         const ext = row['内線台帳_内線番号'] || '';
+    //         const seat = row['座席台帳_座席番号'] || '';
+    //         const isEmpty = v => v === null || v === undefined || v === '';
+    //         const isFieldConsistent = (a, b) => (isEmpty(a) && isEmpty(b)) || a === b;
+    //         const isConsistent =
+    //             isFieldConsistent(parsed.PC, pc) &&
+    //             isFieldConsistent(parsed.EXT, ext) &&
+    //             isFieldConsistent(parsed.SEAT, seat);
+    //         return isConsistent ? '整合' : '不整合';
+    //     }
+    //     return '';
+    // }
 
     /**
      * テーブル内検索を活用した絞り込み実行

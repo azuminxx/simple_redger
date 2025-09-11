@@ -156,11 +156,7 @@ class TabManager {
         settingsContent.appendChild(info);
         tabContainer.appendChild(settingsContent);
 
-        // 座席表タブのタブコンテンツを追加
-        const seatmapContent = DOMHelper.createElement('div', { id: 'tab-seatmap' }, 'tab-content');
-        const seatmapContainer = DOMHelper.createElement('div', { id: 'seatmap-root' }, 'seatmap-root');
-        seatmapContent.appendChild(seatmapContainer);
-        tabContainer.appendChild(seatmapContent);
+        // 座席表タブは廃止
 
         return tabContainer;
     }
@@ -200,12 +196,7 @@ class TabManager {
         settingsTabButton.addEventListener('click', () => this.switchTab('settings'));
         tabMenu.appendChild(settingsTabButton);
 
-        // 座席表タブ（独立UI）
-        const seatmapTabButton = DOMHelper.createElement('button', {}, 'tab-button seatmap-tab');
-        seatmapTabButton.setAttribute('data-app', 'seatmap');
-        seatmapTabButton.textContent = '🗺️ 座席表';
-        seatmapTabButton.addEventListener('click', () => this.switchTab('seatmap'));
-        tabMenu.appendChild(seatmapTabButton);
+        // 座席表タブは廃止
 
         return tabMenu;
     }
@@ -316,24 +307,7 @@ class TabManager {
             this.openSearchMenuIfClosed();
         }
 
-        // 座席表タブが選択された場合、SeatMapを初期化/破棄
-        if (appId === 'seatmap') {
-            try {
-                const container = document.getElementById('seatmap-root');
-                if (container) {
-                    if (!this._seatMap) this._seatMap = new window.SeatMap();
-                    this._seatMap.init(container);
-                }
-            } catch (e) {
-                console.error('SeatMap初期化エラー:', e);
-            }
-        } else {
-            try {
-                if (this._seatMap && typeof this._seatMap.destroy === 'function') {
-                    this._seatMap.destroy();
-                }
-            } catch (e) { /* noop */ }
-        }
+        // 座席表タブ廃止に伴い、初期化/破棄処理は不要
 
         // search-results要素の表示・非表示を切り替え
         this.toggleSearchResultsVisibility(appId);
@@ -533,37 +507,35 @@ class TabManager {
     // 配列→CSV変換
     convertToCSV(records) {
         if (!records.length) return '';
-        // 整合判定カラムを追加
-        const dataIntegrator = window.dataIntegrator || new DataIntegrator();
-        records.forEach(record => {
-            const integrationKey = record['統合キー'];
-            const parsed = dataIntegrator.parseIntegrationKey(integrationKey);
-            let isConsistent = true;
-            // PC台帳_PC番号
-            let pc = record['PC台帳_PC番号'] ?? '';
-            let parsedPC = parsed.PC ?? '';
-            if (pc !== parsedPC) isConsistent = false;
-            // 内線台帳_内線番号
-            let ext = record['内線台帳_内線番号'] ?? '';
-            let parsedEXT = parsed.EXT ?? '';
-            if (ext !== parsedEXT) isConsistent = false;
-            // 座席台帳_座席番号
-            let seat = record['座席台帳_座席番号'] ?? '';
-            let parsedSEAT = parsed.SEAT ?? '';
-            if (seat !== parsedSEAT) isConsistent = false;
-            record['整合判定'] = isConsistent ? '整合' : '不整合';
-        });
+        // // 整合判定カラムを追加（廃止）
+        // const dataIntegrator = window.dataIntegrator || new DataIntegrator();
+        // records.forEach(record => {
+        //     const integrationKey = record['統合キー'];
+        //     const parsed = dataIntegrator.parseIntegrationKey(integrationKey);
+        //     let isConsistent = true;
+        //     let pc = record['PC台帳_PC番号'] ?? '';
+        //     let parsedPC = parsed.PC ?? '';
+        //     if (pc !== parsedPC) isConsistent = false;
+        //     let ext = record['内線台帳_内線番号'] ?? '';
+        //     let parsedEXT = parsed.EXT ?? '';
+        //     if (ext !== parsedEXT) isConsistent = false;
+        //     let seat = record['座席台帳_座席番号'] ?? '';
+        //     let parsedSEAT = parsed.SEAT ?? '';
+        //     if (seat !== parsedSEAT) isConsistent = false;
+        //     record['整合判定'] = isConsistent ? '整合' : '不整合';
+        // });
 
         // 必ずallFieldsを生成・フィルタ
         let allFields = Array.from(new Set(records.flatMap(r => Object.keys(r))));
         allFields = allFields.filter(f => !f.endsWith('_$revision') && !f.endsWith('_$id'));
         allFields = allFields.filter(f => f !== '統合キー' && !f.endsWith('_' + CONFIG.integrationKey));
-        // 整合判定を先頭に
-        allFields = ['整合判定', '統合キー', ...allFields.filter(f => f !== '整合判定' && f !== '統合キー')];
+        // 整合判定列は廃止
+        // allFields = ['整合判定', '統合キー', ...allFields.filter(f => f !== '整合判定' && f !== '統合キー')];
+        allFields = ['統合キー', ...allFields.filter(f => f !== '統合キー')];
 
         // 並び順制御
         const mainOrder = [
-            '整合判定',
+            // '整合判定',
             '統合キー',
             'PC台帳',
             'ユーザー台帳',
@@ -608,7 +580,7 @@ class TabManager {
             // 残りはそのまま
             return [...ordered, ...fields];
         }
-        let finalFields = ['整合判定'];
+        let finalFields = [];
         mainOrder.forEach(group => {
             if (group === '統合キー') {
                 finalFields.push('統合キー');

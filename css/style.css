@@ -396,9 +396,32 @@ table input {
     line-height: 1.2;
 }
 
+/* 1列目のみ左右余白をさらに縮小 */
+/* .integrated-table th:first-child,
+.integrated-table td:first-child {
+    padding: 1px 1px;
+} */
+
 .integrated-table th:first-child,
 .integrated-table td:first-child {
     border-left: 1px solid #dee2e6;
+}
+
+/* 先頭3列のヘッダーを縦書きにする */
+.integrated-table thead tr:first-child th:nth-child(1),
+.integrated-table thead tr:first-child th:nth-child(2),
+.integrated-table thead tr:first-child th:nth-child(3) {
+    writing-mode: vertical-rl;
+    text-orientation: upright;
+    padding: 2px 0;
+}
+
+/* トグルボタン内の表示も縦書きにする */
+.header-toggle-button,
+.header-filter-button,
+.header-clear-button {
+    writing-mode: vertical-rl;
+    text-orientation: upright;
 }
 
 .integrated-table thead tr:first-child th {
@@ -415,15 +438,24 @@ table input {
 
 .header-ledger-cell {
     background-color: #e9ecef;
-    text-align: center;
+    text-align: center !important;
     font-weight: 700;
     color: #212529;
     border-bottom: 2px solid #adb5bd;
+    vertical-align: middle;
 }
 
 .header-field-cell {
     background-color: #f8f9fa;
     font-size: 10px;
+}
+
+/* 列リサイズハンドル */
+.col-resize-handle {
+    background: transparent;
+}
+.col-resize-handle:hover {
+    background: rgba(0,0,0,0.08);
 }
 
 /* ボディスタイル */
@@ -483,12 +515,13 @@ table input {
 }
 
 /* 詳細リンクセルのスタイル */
+.integrated-table td.detail-link-cell,
 .detail-link-cell {
-    text-align: center;
-    width: 50px;
-    min-width: 50px;
-    max-width: 50px;
-    padding: 4px 2px;
+    text-align: center !important;
+    width: 30px;
+    min-width: 30px;
+    max-width: 30px;
+    padding: 1px 1px;
     vertical-align: middle;
 }
 
@@ -888,14 +921,15 @@ td.editable-cell select,
     text-align: center;
     font-weight: bold;
     background-color: #f8f9fa;
-    padding: 4px;
+    padding: 0;
+    width: 1px;
 }
 
 /* フィルターボタンコンテナ */
 .filter-button-container {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 0;
     align-items: center;
     justify-content: center;
 }
@@ -904,13 +938,13 @@ td.editable-cell select,
 .header-toggle-button {
     color: white;
     border: none;
-    padding: 3px 6px;
-    border-radius: 3px;
+    padding: 0 2px;
+    border-radius: 2px;
     cursor: pointer;
     font-size: 10px;
     font-weight: bold;
     transition: background-color 0.2s ease;
-    min-width: 30px;
+    min-width: 0;
 }
 
 /* ヘッダー内の絞り込みボタン（青色） */
@@ -918,13 +952,14 @@ td.editable-cell select,
     background-color: #007bff;
     color: white;
     border: none;
-    padding: 3px 6px;
-    border-radius: 3px;
+    padding: 6px 2px;
+    border-radius: 2px;
     cursor: pointer;
     font-size: 10px;
     font-weight: bold;
     transition: background-color 0.2s ease;
-    min-width: 30px;
+    min-width: 0;
+    width: auto;
 }
 
 .header-filter-button:hover {
@@ -940,13 +975,14 @@ td.editable-cell select,
     background-color: #dc3545;
     color: white;
     border: none;
-    padding: 3px 6px;
-    border-radius: 3px;
+    padding: 6px 2px;
+    border-radius: 2px;
     cursor: pointer;
     font-size: 10px;
     font-weight: bold;
     transition: background-color 0.2s ease;
-    min-width: 30px;
+    min-width: 0;
+    width: auto;
 }
 
 .header-clear-button:hover {
@@ -961,15 +997,21 @@ td.editable-cell select,
 .checkbox-cell {
     text-align: center;
     vertical-align: middle;
-    padding: 8px;
+    padding: 0;
     display: flex;
     justify-content: center;
     align-items: center;
+    width: 1px;
 }
 
 .row-checkbox {
     cursor: pointer;
-    transform: scale(1.2);
+    transform: scale(1.0);
+}
+
+/* 最左列（チェックボックス列）のcolgroup幅を極小化 */
+.col-0 {
+    width: 1px;
 }
 
 /* 履歴テーブル：統合キーの色分け表示 */

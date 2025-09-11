@@ -65,37 +65,43 @@ class VirtualScroll {
         
         // 元の値は動的に管理（セル交換時のみ保存）
         
-        // 一括不整合チェック＆キャッシュ
-        const consistencyMap = new Map();
-        for (let i = 0; i < integratedData.length; i++) {
-            const record = integratedData[i];
-            // 現在の行データから統合キーを再生成（常に最新の状態で評価）
-            const integrationKey = this.generateIntegrationKeyFromRow(record);
-            let isConsistent = null;
-            if (integrationKey) {
-                const DataIntegratorClass = window.DataIntegrator;
-                const dataIntegrator = new DataIntegratorClass();
-                const parsed = dataIntegrator.parseIntegrationKey(integrationKey);
-                const pc = record['PC台帳_PC番号'] || '';
-                const ext = record['内線台帳_内線番号'] || '';
-                const seat = record['座席台帳_座席番号'] || '';
-                function isFieldConsistent(a, b) {
-                    const isEmpty = v => v === null || v === undefined || v === '';
-                    if (isEmpty(a) && isEmpty(b)) return true;
-                    return a === b;
-                }
-                isConsistent =
-                    isFieldConsistent(parsed.PC, pc) &&
-                    isFieldConsistent(parsed.EXT, ext) &&
-                    isFieldConsistent(parsed.SEAT, seat);
-            }
-            const recordId = this.getRecordId(i);
-            consistencyMap.set(recordId, isConsistent);
-        }
-        window.consistencyMap = consistencyMap;
+        // 一括不整合チェック＆キャッシュ（廃止）
+        // const consistencyMap = new Map();
+        // for (let i = 0; i < integratedData.length; i++) {
+        //     const record = integratedData[i];
+        //     const integrationKey = this.generateIntegrationKeyFromRow(record);
+        //     let isConsistent = null;
+        //     if (integrationKey) {
+        //         const DataIntegratorClass = window.DataIntegrator;
+        //         const dataIntegrator = new DataIntegratorClass();
+        //         const parsed = dataIntegrator.parseIntegrationKey(integrationKey);
+        //         const pc = record['PC台帳_PC番号'] || '';
+        //         const ext = record['内線台帳_内線番号'] || '';
+        //         const seat = record['座席台帳_座席番号'] || '';
+        //         function isFieldConsistent(a, b) {
+        //             const isEmpty = v => v === null || v === undefined || v === '';
+        //             if (isEmpty(a) && isEmpty(b)) return true;
+        //             return a === b;
+        //         }
+        //         isConsistent =
+        //             isFieldConsistent(parsed.PC, pc) &&
+        //             isFieldConsistent(parsed.EXT, ext) &&
+        //             isFieldConsistent(parsed.SEAT, seat);
+        //     }
+        //     const recordId = this.getRecordId(i);
+        //     consistencyMap.set(recordId, isConsistent);
+        // }
+        // window.consistencyMap = consistencyMap;
         
         // 初期レンダリング
         this.renderVirtualRows(virtualState);
+        
+        // 列幅ユーザー指定があれば適用（リレンダリング後にも維持）
+        try {
+            if (window.DOMHelper && typeof window.DOMHelper.generateTableWidthCSS === 'function') {
+                window.DOMHelper.generateTableWidthCSS();
+            }
+        } catch (e) { /* noop */ }
         
         // スクロールイベント
         scrollContainer.addEventListener('scroll', async () => {
@@ -539,7 +545,7 @@ class VirtualScroll {
         // チェックボックスカラム用のcol要素を追加
         const checkboxCol = DOMHelper.createElement('col');
         checkboxCol.className = 'col-checkbox';
-        checkboxCol.style.width = '50px';
+        checkboxCol.style.width = '30px';
         colgroup.appendChild(checkboxCol);
         
         CONFIG.integratedTableConfig.columns.forEach((column, index) => {

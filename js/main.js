@@ -124,7 +124,7 @@
                     fieldCode: 'change-flag',
                     appId: null,
                     isChangeFlag: true,
-                    width: '30px'
+                    width: '25px'
                 }, {
                     key: 'detail-link',
                     label: '📁',
@@ -132,16 +132,18 @@
                     fieldCode: 'detail-link',
                     appId: null,
                     isDetailLink: true,
-                    width: '40px'
-                }, {
-                    key: 'consistency-check',
-                    label: '整合',
-                    ledger: '操作',
-                    fieldCode: 'consistency-check',
-                    appId: null,
-                    isConsistencyCheck: true,
-                    width: '40px'
-                }, ...dynamicColumns];
+                    width: '25px'
+                }
+                // , {
+                //     key: 'consistency-check',
+                //     label: '整合',
+                //     ledger: '操作',
+                //     fieldCode: 'consistency-check',
+                //     appId: null,
+                //     isConsistencyCheck: true,
+                //     width: '40px'
+                // }
+                , ...dynamicColumns];
                 CONFIG.integratedTableConfig.columns = columnsWithSpecialColumns;
                 console.log(`📋 統合テーブル設定完了 (${dynamicColumns.length}列)`);
             } catch (error) {

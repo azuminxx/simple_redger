@@ -67,26 +67,26 @@ class ExportAndHistory {
                         }
                         return integrationKey || '';
                     }
-                    if (col.key === 'consistency-check') {
-                        let integrationKey = null;
-                        for (const appId in CONFIG.apps) {
-                            const ledgerName = CONFIG.apps[appId].name;
-                            const key = `${ledgerName}_${CONFIG.integrationKey}`;
-                            if (record[key]) { integrationKey = record[key]; break; }
-                        }
-                        if (integrationKey) {
-                            const dataIntegrator = new window.DataIntegrator();
-                            const parsed = dataIntegrator.parseIntegrationKey(integrationKey);
-                            const pc = record['PC台帳_PC番号'] || '';
-                            const ext = record['内線台帳_内線番号'] || '';
-                            const seat = record['座席台帳_座席番号'] || '';
-                            const isEmpty = v => v === null || v === undefined || v === '';
-                            const isFieldConsistent = (a, b) => (isEmpty(a) && isEmpty(b)) || a === b;
-                            const isConsistent = isFieldConsistent(parsed.PC, pc) && isFieldConsistent(parsed.EXT, ext) && isFieldConsistent(parsed.SEAT, seat);
-                            return isConsistent ? '整合' : '不整合';
-                        }
-                        return '';
-                    }
+                    // if (col.key === 'consistency-check') {
+                    //     let integrationKey = null;
+                    //     for (const appId in CONFIG.apps) {
+                    //         const ledgerName = CONFIG.apps[appId].name;
+                    //         const key = `${ledgerName}_${CONFIG.integrationKey}`;
+                    //         if (record[key]) { integrationKey = record[key]; break; }
+                    //     }
+                    //     if (integrationKey) {
+                    //         const dataIntegrator = new window.DataIntegrator();
+                    //         const parsed = dataIntegrator.parseIntegrationKey(integrationKey);
+                    //         const pc = record['PC台帳_PC番号'] || '';
+                    //         const ext = record['内線台帳_内線番号'] || '';
+                    //         const seat = record['座席台帳_座席番号'] || '';
+                    //         const isEmpty = v => v === null || v === undefined || v === '';
+                    //         const isFieldConsistent = (a, b) => (isEmpty(a) && isEmpty(b)) || a === b;
+                    //         const isConsistent = isFieldConsistent(parsed.PC, pc) && isFieldConsistent(parsed.EXT, ext) && isFieldConsistent(parsed.SEAT, seat);
+                    //         return isConsistent ? '整合' : '不整合';
+                    //     }
+                    //     return '';
+                    // }
                     const value = record[col.key];
                     if (value === null || value === undefined) return '';
                     if (Array.isArray(value)) return value.join(', ');
@@ -129,7 +129,7 @@ class ExportAndHistory {
             const exportButton = document.querySelector('.export-data-button');
             if (exportButton) {
                 exportButton.disabled = false;
-                exportButton.textContent = 'Excel出力';
+                exportButton.textContent = 'CSV出力';
             }
         }
     }

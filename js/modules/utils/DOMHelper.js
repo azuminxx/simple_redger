@@ -73,9 +73,13 @@ class DOMHelper {
         let css = '';
         let totalWidth = 0;
         
+        const overrides = (window.columnWidthOverrides && typeof window.columnWidthOverrides === 'object') ? window.columnWidthOverrides : null;
         CONFIG.integratedTableConfig.columns.forEach((column, index) => {
-            // 変更フラグ列は固定幅
-            const width = column.isChangeFlag ? '40px' : (column.width || CONFIG.system.defaultColumnWidth);
+            // 変更フラグ列の既定幅（ユーザー指定があればそれを優先）
+            let width = overrides && overrides[index] ? `${parseInt(overrides[index])}px` : null;
+            if (!width) {
+                width = column.isChangeFlag ? '25px' : (column.width || CONFIG.system.defaultColumnWidth);
+            }
             css += `.integrated-table .col-${index} { 
                 width: ${width} !important; 
                 min-width: ${width} !important; 

@@ -572,22 +572,22 @@ class CellSwapper {
                             if (!exists) renderer._originalIntegratedData.push({ ...emptySnapshot });
                         } catch (e) { /* noop */ }
                     }
-                    // 整合性マップ更新
-                    if (!window.consistencyMap) window.consistencyMap = new Map();
-                    [indexAfterSplit.sourceIndex, indexAfterSplit.emptyIndex].forEach(idx => {
-                        const row = this.tableRenderer.currentSearchResults[idx];
-                        const recordId = window.virtualScroll.getRecordIdFromRow(row);
-                        const label = renderer.getConsistencyResult(row);
-                        const isConsistent = label === '整合' ? true : (label === '不整合' ? false : null);
-                        window.consistencyMap.set(recordId, isConsistent);
-                    });
+                    // 整合性マップ更新（廃止）
+                    // if (!window.consistencyMap) window.consistencyMap = new Map();
+                    // [indexAfterSplit.sourceIndex, indexAfterSplit.emptyIndex].forEach(idx => {
+                    //     const row = this.tableRenderer.currentSearchResults[idx];
+                    //     const recordId = window.virtualScroll.getRecordIdFromRow(row);
+                    //     const label = renderer.getConsistencyResult(row);
+                    //     const isConsistent = label === '整合' ? true : (label === '不整合' ? false : null);
+                    //     window.consistencyMap.set(recordId, isConsistent);
+                    // });
                 } catch (e) { /* noop */ }
             });
         }
 
         // 上記の_originalIntegratedData同期は保存後タスクで実施
 
-        // 整合性マップ更新も保存後タスクで実施
+        // 整合性マップ更新も保存後タスクで実施（廃止）
 
         // 変更フラグを設定
         window.virtualScroll.setChangeFlag(recordIndex, true);
