@@ -413,6 +413,49 @@ class VirtualScroll {
         return `PC:${pc}|EXT:${ext}|SEAT:${seat}`;
     }
 
+    // 行が全て空か判定（変更フラグやシステム列は除外）
+    isRowAllEmpty(row) {
+        try {
+            return CONFIG.integratedTableConfig.columns.every(col => {
+                if (col.isChangeFlag) return true;
+                const v = row[col.key];
+                return v === '' || v === null || v === undefined || v === '-';
+            });
+        } catch (e) { return false; }
+    }
+
+    // 行に含まれる各台帳の統合キーから、指定コンポーネント(PC/EXT/SEAT)の多数決値を取得
+    getExpectedComponentFromRow(row, component /* 'PC' | 'EXT' | 'SEAT' */) {
+        try {
+            const counts = new Map();
+            const bump = (v) => {
+                if (!v || String(v).trim() === '') return;
+                const key = String(v).trim();
+                counts.set(key, (counts.get(key) || 0) + 1);
+            };
+            const di = new window.DataIntegrator();
+            Object.values(CONFIG.apps).forEach(app => {
+                const ledger = app.name;
+                const keyField = `${ledger}_${CONFIG.integrationKey}`;
+                const ik = row[keyField];
+                if (!ik) return;
+                const parsed = di.parseIntegrationKey(ik);
+                if (component === 'PC') bump(parsed.PC);
+                else if (component === 'EXT') bump(parsed.EXT);
+                else if (component === 'SEAT') bump(parsed.SEAT);
+            });
+            // 直接フィールドも参考（補助）
+            if (component === 'PC') bump(row['PC台帳_PC番号']);
+            if (component === 'EXT') bump(row['内線台帳_内線番号']);
+            if (component === 'SEAT') bump(row['座席台帳_座席番号']);
+            if (counts.size === 0) return '';
+            // 最大出現の値を返す（同率は辞書順で安定）
+            const arr = Array.from(counts.entries());
+            arr.sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0])));
+            return arr[0][0];
+        } catch (e) { return ''; }
+    }
+
 
     /**
      * フィールドの元の値を保存し、現在の値と比較して変更状態を更新
@@ -577,6 +620,7 @@ class VirtualScroll {
             if (i >= data.length) break;
             
             const record = data[i];
+            const rowIsEmpty = this.isRowAllEmpty(record);
             const row = DOMHelper.createElement('tr');
             row.setAttribute('data-record-index', i);
             
@@ -697,8 +741,14 @@ class VirtualScroll {
                 } else {
                     // 読み取り専用フィールドの場合は通常のテキスト表示
                     if (value === null || value === undefined || value === '') {
-                        td.textContent = '-';
-                        td.className = 'null-value readonly-cell';
+                        // 主キー（PC/内線/座席）の空表示は '-' を出さず空にする
+                        if (column.primaryKey && (column.fieldCode === 'PC番号' || column.fieldCode === '内線番号' || column.fieldCode === '座席番号')) {
+                            td.textContent = '';
+                            td.className = 'readonly-cell';
+                        } else {
+                            td.textContent = '-';
+                            td.className = 'null-value readonly-cell';
+                        }
                     } else {
                         // 主キーフィールドの場合は分離ボタンも追加
                         if (column.primaryKey && value && value.trim() !== '') {
@@ -721,6 +771,28 @@ class VirtualScroll {
                             }
                         }
                         td.className = 'readonly-cell';
+                    }
+
+                    // 期待値ヒント（主キーフィールドのみ・不一致時）
+                    if (!rowIsEmpty && column.primaryKey && (column.fieldCode === 'PC番号' || column.fieldCode === '内線番号' || column.fieldCode === '座席番号')) {
+                        const comp = column.fieldCode === 'PC番号' ? 'PC' : (column.fieldCode === '内線番号' ? 'EXT' : 'SEAT');
+                        const expected = this.getExpectedComponentFromRow(record, comp);
+                        const actual = (value === null || value === undefined || value === '') ? '' : String(value);
+                        const actualNormalized = (actual === '-' ? '' : actual);
+                        if (expected && expected !== actualNormalized) {
+                            const hint = DOMHelper.createElement('span', {}, 'expected-hint');
+                            // 候補: や括弧を付けず、薄いオレンジ色で値のみを併記
+                            hint.textContent = `${expected}`;
+                            hint.style.color = '#ffcc80';
+                            hint.style.marginLeft = '6px';
+                            hint.style.fontSize = '11px';
+                            hint.style.fontWeight = '700';
+                            hint.style.fontStyle = 'italic';
+                            td.appendChild(hint);
+                            td.classList.add('expected-mismatch');
+                            // ツールチップも値のみ
+                            if (td.title) td.title += ` / ${expected}`; else td.title = `${expected}`;
+                        }
                     }
                 }
                 
@@ -1346,6 +1418,12 @@ class VirtualScroll {
                 this.changedFields.set(recordId, new Set());
                 this.clearCellChangedStyles(index);
                 this.updateChangeCheckbox(index, false);
+                // 期待値ヒント（expected-hint）も除去
+                const tr = document.querySelector(`tr[data-record-index="${index}"]`);
+                if (tr) {
+                    const hints = tr.querySelectorAll('span.expected-hint');
+                    hints.forEach(h => h.remove());
+                }
             }
         });
     }

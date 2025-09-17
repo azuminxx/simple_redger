@@ -127,6 +127,43 @@ class TabManager {
             window.open(settingsUrl, '_blank');
         });
         settingsContent.appendChild(appSettingsBtn);
+
+        // フィールド情報キャッシュクリアボタン
+        const clearCacheBtn = DOMHelper.createElement('button', {}, 'clear-field-cache-btn');
+        clearCacheBtn.textContent = 'フィールド情報キャッシュをクリア';
+        clearCacheBtn.style.fontSize = '12px';
+        clearCacheBtn.style.marginRight = '10px';
+        clearCacheBtn.style.marginBottom = '10px';
+        clearCacheBtn.addEventListener('click', () => {
+            try {
+                // localStorage から fieldInfo_* を削除
+                const prefix = (window.fieldInfoAPI && window.fieldInfoAPI.localStoragePrefix) ? window.fieldInfoAPI.localStoragePrefix : 'fieldInfo_';
+                const keysToRemove = [];
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && key.startsWith(prefix)) {
+                        keysToRemove.push(key);
+                    }
+                }
+                keysToRemove.forEach(key => localStorage.removeItem(key));
+
+                // メモリキャッシュをクリア
+                if (window.fieldInfoAPI) {
+                    if (window.fieldInfoAPI.fieldCache && typeof window.fieldInfoAPI.fieldCache.clear === 'function') {
+                        window.fieldInfoAPI.fieldCache.clear();
+                    }
+                    if (window.fieldInfoAPI.loadingPromises && typeof window.fieldInfoAPI.loadingPromises.clear === 'function') {
+                        window.fieldInfoAPI.loadingPromises.clear();
+                    }
+                }
+
+                alert('フィールド情報キャッシュをクリアしました。次回の取得はAPIから実行されます。\nブラウザをリロードしてください。');
+            } catch (e) {
+                alert('キャッシュクリア中にエラーが発生しました。');
+                console.error('キャッシュクリアエラー:', e);
+            }
+        });
+        settingsContent.appendChild(clearCacheBtn);
         
         // ボタンと説明文を追加
         const exportBtn = DOMHelper.createElement('button', {}, 'export-all-btn');
@@ -155,6 +192,24 @@ class TabManager {
         info.style.fontSize = '12px';
         settingsContent.appendChild(info);
         tabContainer.appendChild(settingsContent);
+
+        // 不整合タブのタブコンテンツを追加
+        const inconsistencyContent = DOMHelper.createElement('div', { id: 'tab-inconsistency' }, 'tab-content');
+        const inconsistencyContainer = DOMHelper.createElement('div', {}, 'inconsistency-container');
+        try {
+            const runBtn = DOMHelper.createElement('button', {}, 'inconsistency-run-btn');
+            runBtn.textContent = '不整合抽出';
+            runBtn.style.fontSize = '12px';
+            runBtn.addEventListener('click', () => this.runInconsistencyExtraction());
+            inconsistencyContainer.appendChild(runBtn);
+            const note = DOMHelper.createElement('div', {}, 'inconsistency-note');
+            note.textContent = '※ 全台帳を対象に不整合（キー分断）を抽出します。';
+            note.style.fontSize = '12px';
+            note.style.marginTop = '8px';
+            inconsistencyContainer.appendChild(note);
+        } catch (e) { /* noop */ }
+        inconsistencyContent.appendChild(inconsistencyContainer);
+        tabContainer.appendChild(inconsistencyContent);
 
         // 座席表タブは廃止
 
@@ -189,6 +244,13 @@ class TabManager {
         historyTabButton.addEventListener('click', () => this.switchTab('history'));
         tabMenu.appendChild(historyTabButton);
 
+        // 不整合タブ（更新履歴の隣）
+        const inconsistencyTabButton = DOMHelper.createElement('button', {}, 'tab-button inconsistency-tab');
+        inconsistencyTabButton.setAttribute('data-app', 'inconsistency');
+        inconsistencyTabButton.textContent = '⚠️ 不整合';
+        inconsistencyTabButton.addEventListener('click', () => this.switchTab('inconsistency'));
+        tabMenu.appendChild(inconsistencyTabButton);
+        
         // 設定タブ（右寄せ）
         const settingsTabButton = DOMHelper.createElement('button', {}, 'tab-button settings-tab');
         settingsTabButton.setAttribute('data-app', 'settings');
@@ -304,6 +366,12 @@ class TabManager {
         
         // 設定タブが選択された場合、検索メニューが閉じられていた場合は開く
         if (appId === 'settings') {
+            this.openSearchMenuIfClosed();
+        }
+
+        // 不整合タブが選択された場合、不整合抽出を実行
+        if (appId === 'inconsistency') {
+            // 自動抽出は行わない（ボタン押下時に実行）
             this.openSearchMenuIfClosed();
         }
 
@@ -1000,6 +1068,73 @@ class TabManager {
             // その他のタブ（台帳タブ）の場合は表示
             searchResultsElement.style.display = 'block';
             console.log(`📋 ${CONFIG.apps[appId]?.name || appId}タブ: search-results要素を表示`);
+        }
+    }
+
+    /**
+     * 不整合データを抽出して表示
+     */
+    async runInconsistencyExtraction() {
+        try {
+            const resultsContainer = document.getElementById(CONFIG.system.resultsContainerId);
+            if (resultsContainer) {
+                resultsContainer.innerHTML = '<div class="loading-message">不整合データを抽出中...</div>';
+            }
+
+            const dataIntegrator = window.dataIntegrator || new DataIntegrator();
+            const allLedgerData = {};
+            for (const appId of Object.keys(CONFIG.apps)) {
+                allLedgerData[appId] = await window.searchEngine.searchRecordsWithQuery(appId, '');
+            }
+
+            const integrated = await dataIntegrator.buildInconsistencyIntegratedData(allLedgerData);
+            if (window.tableRenderer) {
+                const sorted = dataIntegrator.sortIntegratedRowsByRelatedness(integrated || []);
+
+                // 並び順の統合キーをログ出力
+                try {
+                    const lines = (sorted || []).map((row, idx) => {
+                        let key = '';
+                        try {
+                            if (window.virtualScroll && typeof window.virtualScroll.generateIntegrationKeyFromRow === 'function') {
+                                key = window.virtualScroll.generateIntegrationKeyFromRow(row) || '';
+                            } else {
+                                const pc = row['PC台帳_PC番号'] || '';
+                                const ext = row['内線台帳_内線番号'] || '';
+                                const seat = row['座席台帳_座席番号'] || '';
+                                key = `PC:${pc}|EXT:${ext}|SEAT:${seat}`;
+                            }
+                        } catch (e) { /* noop */ }
+                        return `${String(idx + 1).padStart(4, ' ')}: ${key}`;
+                    });
+                    console.log(`\n==== 不整合タブ 並び替え結果 (${sorted.length}件) ====`);
+                    lines.forEach(l => console.log(l));
+                    console.log('==== ここまで ====' );
+                } catch (e) { /* noop */ }
+
+                // ローディングを消去
+                try {
+                    const rc = document.getElementById(CONFIG.system.resultsContainerId);
+                    if (rc) {
+                        const lm = rc.querySelector('.loading-message');
+                        if (lm) lm.remove();
+                    }
+                } catch (e) { /* noop */ }
+
+                // 通常の列構成で表示
+                window.tableRenderer.displayIntegratedTable('inconsistency', sorted);
+            }
+        } catch (error) {
+            console.error('不整合抽出エラー:', error);
+            // ローディングを消去
+            try {
+                const rc = document.getElementById(CONFIG.system.resultsContainerId);
+                if (rc) {
+                    const lm = rc.querySelector('.loading-message');
+                    if (lm) lm.remove();
+                }
+            } catch (e) { /* noop */ }
+            alert(`不整合抽出中にエラーが発生しました。\n詳細: ${error.message}`);
         }
     }
 }
