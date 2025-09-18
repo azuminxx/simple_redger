@@ -1115,6 +1115,12 @@ td.editable-cell select,
     padding: 6px 8px;
 }
 
+/* 貸出状況: 貸出中の強調 */
+.lending-table tbody td.status-loan {
+    color: #d32f2f; /* 赤系 */
+    font-weight: 700;
+}
+
 /* 品名のセレクト高さを他の入力と合わせる */
 .lending-table tbody td select {
     height: 32px;

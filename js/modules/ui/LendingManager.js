@@ -285,7 +285,8 @@ class LendingManager {
                 id: row.id || null,
                 '貸出日': v['貸出日']?.value || '',
                 '品名': v['品名']?.value || '',
-                '型番': v['型番']?.value || '',
+                'メーカー・型番': v['メーカー・型番']?.value || '',
+                '機器仕様補足': v['機器仕様補足']?.value || '',
                 '貸出状況': v['貸出状況']?.value || '', // 表示のみ
                 '返却日': v['返却日']?.value || '',
                 '備考': v['備考']?.value || '',
@@ -308,7 +309,8 @@ class LendingManager {
         thead.innerHTML = '<tr class="lending-header-row">' +
             '<th class="lending-th">貸出日<span class="req">*</span></th>' +
             '<th class="lending-th">品名<span class="req">*</span></th>' +
-            '<th class="lending-th">型番</th>' +
+            '<th class="lending-th">メーカー・型番</th>' +
+            '<th class="lending-th">機器仕様補足（任意）</th>' +
             '<th class="lending-th">貸出状況</th>' +
             '<th class="lending-th">返却日</th>' +
             '<th class="lending-th lending-note-col">備考</th>' +
@@ -347,12 +349,17 @@ class LendingManager {
         placeholderOpt.value = '';
         placeholderOpt.textContent = '選択してください';
         selectItem.appendChild(placeholderOpt);
+        // 後続のメーカー・型番連動のための全候補を保持
+        let allMakerModelOptions = [];
+        let allItemOptions = [];
         try {
             const appId = CONFIG.userList.appId;
             const fieldsPromise = window.fieldInfoAPI ? window.fieldInfoAPI.getAppFields(appId) : Promise.resolve([]);
             fieldsPromise.then((fields) => {
                 const itemField = (fields || []).find(f => f.code === '品名' && Array.isArray(f.options));
+                const makerField = (fields || []).find(f => f.code === 'メーカー・型番' && Array.isArray(f.options));
                 if (itemField && itemField.options) {
+                    allItemOptions = itemField.options.slice();
                     itemField.options.forEach(optLabel => {
                         const o = document.createElement('option');
                         o.value = optLabel;
@@ -363,22 +370,78 @@ class LendingManager {
                         selectItem.value = row['品名'];
                     }
                 }
+                if (makerField && makerField.options) {
+                    allMakerModelOptions = makerField.options.slice();
+                }
+                // アイテムが投入された後にメーカー・型番を反映
+                populateMakerModel(selectItem.value);
             }).catch(() => {});
         } catch (e) { /* noop */ }
         tdItem.appendChild(selectItem);
         tr.appendChild(tdItem);
 
-        // 型番
+        // メーカー・型番（品名と連動）
+        const tdMakerModel = document.createElement('td');
+        const selectMakerModel = document.createElement('select');
+        const mmPlaceholder = document.createElement('option');
+        mmPlaceholder.value = '';
+        mmPlaceholder.textContent = '-';
+        selectMakerModel.appendChild(mmPlaceholder);
+
+        // マッピング定義（品名 → メーカー・型番候補）
+        const getCategoryKey = (itemValue) => {
+            if (!itemValue) return '';
+            const m = String(itemValue).trim().match(/^(\d+)[\.|\-]/);
+            if (m && m[1]) return m[1];
+            // 先頭数字が無い場合は、品名の配列内インデックス+1をキーとする
+            const idx = allItemOptions.indexOf(itemValue);
+            if (idx >= 0) return String(idx + 1);
+            return '';
+        };
+
+        const populateMakerModel = (itemValue) => {
+            // 初期化
+            while (selectMakerModel.options.length > 1) selectMakerModel.remove(1);
+            if (!itemValue || allMakerModelOptions.length === 0) return;
+            const key = getCategoryKey(itemValue);
+            const candidates = allMakerModelOptions.filter(label => String(label).startsWith(`${key}-`));
+            candidates.forEach(label => {
+                const o = document.createElement('option');
+                o.value = label;
+                o.textContent = label;
+                selectMakerModel.appendChild(o);
+            });
+            // 既存値があれば反映
+            if (row['メーカー・型番']) {
+                selectMakerModel.value = row['メーカー・型番'];
+            }
+        };
+
+        // 品名の変更で連動
+        selectItem.addEventListener('change', () => {
+            populateMakerModel(selectItem.value);
+        });
+        // 初期値反映
+        populateMakerModel(row['品名']);
+
+        tdMakerModel.appendChild(selectMakerModel);
+        tr.appendChild(tdMakerModel);
+
+        // 機器仕様補足（任意）
         const tdModel = document.createElement('td');
         const inputModel = DOMHelper.createElement('input', { type: 'text' }, 'model-input');
-        inputModel.value = row['型番'] || '';
+        inputModel.value = row['機器仕様補足'] || '';
         tdModel.appendChild(inputModel);
         tr.appendChild(tdModel);
 
         // 貸出状況（表示のみ）
         const tdStatus = document.createElement('td');
-        tdStatus.textContent = row['貸出状況'] || '';
+        const statusText = row['貸出状況'] || '';
+        tdStatus.textContent = statusText;
         tdStatus.className = 'readonly-cell';
+        if (statusText === '貸出中') {
+            tdStatus.classList.add('status-loan');
+        }
         tr.appendChild(tdStatus);
 
         // 返却日
@@ -448,9 +511,10 @@ class LendingManager {
             const inputs = tr.querySelectorAll('input, select');
             const loanDate = inputs[0]?.value || '';
             const item = inputs[1]?.value || '';
-            const model = inputs[2]?.value || '';
-            const returnDate = inputs[3]?.value || '';
-            const note = inputs[4]?.value || '';
+            const makerModel = inputs[2]?.value || '';
+            const model = inputs[3]?.value || '';
+            const returnDate = inputs[4]?.value || '';
+            const note = inputs[5]?.value || '';
 
             const loginName = (kintone.getLoginUser && kintone.getLoginUser().name) ? kintone.getLoginUser().name : '';
 
@@ -459,7 +523,8 @@ class LendingManager {
                 id: orig.id || null,
                 '貸出日': loanDate,
                 '品名': item,
-                '型番': model,
+                'メーカー・型番': makerModel,
+                '機器仕様補足': model,
                 '貸出状況': orig['貸出状況'] || '',
                 '返却日': returnDate,
                 '備考': note,
@@ -507,7 +572,8 @@ class LendingManager {
             const value = {
                 '貸出日': { value: row['貸出日'] || '' },
                 '品名': { value: row['品名'] || '' },
-                '型番': { value: row['型番'] || '' },
+                'メーカー・型番': { value: row['メーカー・型番'] || '' },
+                '機器仕様補足': { value: row['機器仕様補足'] || '' },
                 '返却日': { value: row['返却日'] || '' },
                 '備考': { value: row['備考'] || '' },
                 '最終更新者': { value: row['最終更新者'] || '' }
