@@ -90,6 +90,19 @@ class TabManager {
             }
         }
 
+        // 貸出管理タブのタブコンテンツを追加
+        const lendingContent = DOMHelper.createElement('div', { id: 'tab-lending' }, 'tab-content');
+        try {
+            this.lendingManager = new LendingManager();
+            const lendingView = this.lendingManager.buildTabContent();
+            lendingContent.appendChild(lendingView);
+        } catch (e) {
+            const errorMessage = DOMHelper.createElement('div', {}, 'error-message');
+            errorMessage.textContent = '貸出管理タブの初期化に失敗しました';
+            lendingContent.appendChild(errorMessage);
+        }
+        tabContainer.appendChild(lendingContent);
+
         // 更新履歴タブのタブコンテンツを追加
         const historyContent = DOMHelper.createElement('div', { id: 'tab-history' }, 'tab-content');
         const historyContainer = DOMHelper.createElement('div', {}, 'history-container');
@@ -237,6 +250,13 @@ class TabManager {
             tabMenu.appendChild(tabButton);
         });
 
+        // 貸出管理タブ（既存群の右隣）
+        const lendingTabButton = DOMHelper.createElement('button', {}, 'tab-button lending-tab');
+        lendingTabButton.setAttribute('data-app', 'lending');
+        lendingTabButton.textContent = '📦 貸出管理';
+        lendingTabButton.addEventListener('click', () => this.switchTab('lending'));
+        tabMenu.appendChild(lendingTabButton);
+
         // 更新履歴タブ（座席台帳のすぐ隣）
         const historyTabButton = DOMHelper.createElement('button', {}, 'tab-button history-tab');
         historyTabButton.setAttribute('data-app', 'history');
@@ -365,7 +385,7 @@ class TabManager {
         }
         
         // 設定タブが選択された場合、検索メニューが閉じられていた場合は開く
-        if (appId === 'settings') {
+        if (appId === 'settings' || appId === 'lending') {
             this.openSearchMenuIfClosed();
         }
 
@@ -1060,8 +1080,8 @@ class TabManager {
             return;
         }
 
-        // 設定タブ/更新履歴タブ/座席表タブ の場合は非表示
-        if (appId === 'settings' || appId === 'history' || appId === 'seatmap') {
+        // 設定タブ/更新履歴タブ/座席表タブ/貸出管理 の場合は非表示（貸出は独自ビューをタブ内に表示）
+        if (appId === 'settings' || appId === 'history' || appId === 'seatmap' || appId === 'lending') {
             searchResultsElement.style.display = 'none';
             console.log(`📋 ${appId}タブ: search-results要素を非表示`);
         } else {

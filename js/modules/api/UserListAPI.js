@@ -64,6 +64,33 @@ class UserListAPI {
         const userRecord = await this.searchUserById(userId);
         return this.getUserMapValues(userRecord);
     }
+
+    /**
+     * サブテーブル「貸出管理」を更新
+     * @param {number} recordId - ユーザー台帳のレコードID
+     * @param {number|undefined} revision - リビジョン（省略可）
+     * @param {Array} rowsPayload - サブテーブルの行配列（{id?, value:{...}}）
+     */
+    async updateLendingSubtable(recordId, revision, rowsPayload) {
+        if (!recordId) throw new Error('recordId is required');
+        const body = {
+            app: this.appId,
+            id: recordId,
+            record: {
+                '貸出管理': { value: rowsPayload || [] }
+            }
+        };
+        if (revision !== undefined && revision !== null) {
+            body.revision = revision;
+        }
+        try {
+            const resp = await kintone.api(kintone.api.url('/k/v1/record', true), 'PUT', body);
+            return resp;
+        } catch (error) {
+            console.error('サブテーブル更新エラー:', error);
+            throw error;
+        }
+    }
 }
 
 // グローバルに公開

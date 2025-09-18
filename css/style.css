@@ -1018,3 +1018,90 @@ td.editable-cell select,
 .history-table .ik-line-ext { color: #2e7d32; font-weight: 600; }
 .history-table .ik-line-seat { color: #ef6c00; font-weight: 600; }
 
+/* === 貸出管理タブ専用スタイル === */
+.lending-tab-container {
+    font-size: 12px;
+}
+
+.lending-header h4 {
+    margin: 0 0 6px 0;
+}
+
+.lending-search-area {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px; /* BSSID検索とテーブルの間隔 */
+}
+
+#lending-bssid-input {
+    height: 32px;
+    padding: 4px 8px;
+    font-size: 12px;
+}
+
+.lending-table {
+    border-collapse: collapse;
+    width: auto;
+    max-width: 100%;
+}
+
+.lending-table-area {
+    display: inline-block;
+}
+
+.lending-table thead .lending-header-row .lending-th,
+.lending-table thead .lending-th {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6; /* タイトル行に枠線 */
+    padding: 6px 8px;
+    text-align: left;
+}
+
+.lending-table .req { color: #d00; }
+
+.lending-table tbody td {
+    border: 1px solid #e5e7eb;
+    padding: 4px 6px;
+    vertical-align: middle;
+}
+
+/* 読み取り専用（貸出状況/最終更新者）のパディング */
+.lending-table tbody td.readonly-cell {
+    padding: 6px 8px;
+}
+
+/* 品名のセレクト高さを他の入力と合わせる */
+.lending-table tbody td select {
+    height: 32px;
+    padding: 4px 6px;
+}
+
+/* テキスト/日付入力の高さ統一 */
+.lending-table tbody td input[type="text"],
+.lending-table tbody td input[type="date"] {
+    height: 32px;
+    padding: 4px 6px;
+    box-sizing: border-box;
+}
+
+/* 備考列を広くする */
+.lending-table .lending-note-col {
+    min-width: 320px; /* おおよそ従来の2倍 */
+}
+.lending-table tbody td.note-cell input[type="text"] {
+    min-width: 320px;
+    width: 100%;
+}
+
+/* テーブルとボタンの上下間隔 */
+.lending-controls-area {
+    margin-top: 10px;
+}
+
+.lending-controls-area button {
+    padding: 6px 12px;
+    font-size: 12px;
+    margin-right: 6px;
+} 
+
