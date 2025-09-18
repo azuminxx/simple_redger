@@ -104,8 +104,10 @@ class FormBuilder {
         inputHTML += `<label for="${fieldId}">${field.label}:</label>`;
 
         if (field.type === 'dropdown' || field.type === 'radio') {
-            // 複数選択可能なリストボックスに変更
-            inputHTML += `<select id="${fieldId}" name="${field.code}" multiple size="5"${isRequired ? ' required' : ''}>`;
+            // 複数選択可能なリストボックス（選択肢数に応じて高さを動的設定、最大6）
+            const optionCount = Array.isArray(field.options) ? field.options.length : 0;
+            const listSize = Math.max(1, Math.min(optionCount || 5, 6));
+            inputHTML += `<select id="${fieldId}" name="${field.code}" multiple size="${listSize}"${isRequired ? ' required' : ''}>`;
             if (field.options && field.options.length > 0) {
                 field.options.forEach(option => {
                     const optionValue = option.label || option.value || option;

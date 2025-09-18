@@ -240,6 +240,10 @@ class TableRenderer {
         }
 
         integratedResultsContainer.appendChild(tableContainer);
+        // 初回描画後に高さ再計算
+        try {
+            setTimeout(() => { if (window.adjustTableHeight) window.adjustTableHeight(); }, 0);
+        } catch (e) { /* noop */ }
         
         resultsContainer.appendChild(integratedResultsContainer);
         
@@ -323,6 +327,14 @@ class TableRenderer {
                 const th = DOMHelper.createElement('th');
                 th.textContent = group.ledgerName;
                 th.className = 'header-ledger-cell';
+                // 台帳ごとに色分け用クラスを付与
+                try {
+                    const cls = (group.ledgerName === 'PC台帳') ? 'ledger-pc'
+                              : (group.ledgerName === '内線台帳') ? 'ledger-ext'
+                              : (group.ledgerName === '座席台帳') ? 'ledger-seat'
+                              : '';
+                    if (cls) th.classList.add(cls);
+                } catch (e) { /* noop */ }
                 th.colSpan = group.columns.length;
                 row.appendChild(th);
             }
@@ -347,6 +359,14 @@ class TableRenderer {
             const th = DOMHelper.createElement('th');
             th.textContent = column.label;
             th.className = 'header-field-cell';
+            // 台帳ごとに色分け用クラスを付与
+            try {
+                const cls = (ledgerName === 'PC台帳') ? 'ledger-pc'
+                          : (ledgerName === '内線台帳') ? 'ledger-ext'
+                          : (ledgerName === '座席台帳') ? 'ledger-seat'
+                          : '';
+                if (cls) th.classList.add(cls);
+            } catch (e) { /* noop */ }
             
             // data-field-code属性を追加（主キーフィールドのスタイル適用用）
             if (column.fieldCode) {
@@ -372,8 +392,9 @@ class TableRenderer {
             handle.className = 'col-resize-handle';
             handle.style.position = 'absolute';
             handle.style.top = '0';
-            handle.style.right = '0';
-            handle.style.width = '6px';
+            // 右端から少し外側にも領域を広げて掴みやすくする
+            handle.style.right = '-4px';
+            handle.style.width = '14px'; // 6px → 14px に拡大
             handle.style.cursor = 'col-resize';
             handle.style.userSelect = 'none';
             handle.style.height = '100%';

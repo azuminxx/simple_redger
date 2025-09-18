@@ -444,6 +444,20 @@ table input {
     vertical-align: middle;
 }
 
+/* 台帳ごとの淡色ヘッダー */
+.header-ledger-cell.ledger-pc,
+.header-field-cell.ledger-pc {
+    background-color: #d6eaf8; /* 少しだけ濃い青 */
+}
+.header-ledger-cell.ledger-ext,
+.header-field-cell.ledger-ext {
+    background-color: #dff0e4; /* 少しだけ濃い緑 */
+}
+.header-ledger-cell.ledger-seat,
+.header-field-cell.ledger-seat {
+    background-color: #ffe6cc; /* 少しだけ濃いオレンジ */
+}
+
 .header-field-cell {
     background-color: #f8f9fa;
     font-size: 10px;
@@ -451,7 +465,7 @@ table input {
 
 /* 列リサイズハンドル */
 .col-resize-handle {
-    background: transparent;
+    background: transparent; /* ヒット領域を広げるが見た目は変えない */
 }
 .col-resize-handle:hover {
     background: rgba(0,0,0,0.08);
@@ -856,11 +870,18 @@ td.editable-cell select,
 }
 
 /* 主キーフィールドのヘッダーもボールドに */
-.integrated-table th[data-field-code="PC番号"],
-.integrated-table th[data-field-code="内線番号"],
+/* 主キーフィールドのヘッダーは太字 + 台帳別の淡色背景 */
+.integrated-table th[data-field-code="PC番号"] {
+    font-weight: bold !important;
+    background-color: #d6eaf8 !important; /* 少しだけ濃い青 */
+}
+.integrated-table th[data-field-code="内線番号"] {
+    font-weight: bold !important;
+    background-color: #dff0e4 !important; /* 少しだけ濃い緑 */
+}
 .integrated-table th[data-field-code="座席番号"] {
     font-weight: bold !important;
-    background-color: #e8f4fd !important;
+    background-color: #ffe6cc !important; /* 少しだけ濃いオレンジ */
 }
 
 /* 主キーフィールドの入力要素もボールドに */
@@ -887,9 +908,10 @@ td.editable-cell select,
 } 
 
 .search-form select[multiple] {
-    min-height: 120px;
     min-width: 80px;
-    height: auto;
+    height: auto; /* size属性で高さを制御 */
+    max-height: calc(1.8em * 6 + 10px); /* 最大6行相当 + 余白 */
+    overflow: auto;
     appearance: none;
     -webkit-appearance: none;
     -moz-appearance: none;
@@ -1126,6 +1148,24 @@ td.editable-cell select,
     font-size: 12px;
     margin-right: 6px;
 } 
+
+/* 設定タブのテーブル */
+.settings-table {
+    border-collapse: collapse;
+    width: auto;
+}
+.settings-table td {
+    border: 1px solid #e5e7eb;
+    padding: 6px 10px;
+    vertical-align: middle;
+    font-size: 12px;
+}
+.settings-table td:first-child {
+    white-space: nowrap;
+}
+.settings-table button {
+    font-size: 12px;
+}
 
 /* セクション見出し */
 .lending-section {

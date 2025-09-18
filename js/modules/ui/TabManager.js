@@ -122,106 +122,109 @@ class TabManager {
 
         // 設定タブのタブコンテンツを追加
         const settingsContent = DOMHelper.createElement('div', { id: 'tab-settings' }, 'tab-content');
-        
-        // アプリの設定ボタンを追加
+
+        // テーブル化（1列目: ボタン、2列目: 説明）
+        const settingsTable = document.createElement('table');
+        settingsTable.className = 'settings-table';
+        const tbodySettings = document.createElement('tbody');
+
+        const addSettingsRow = (buttonEl, description) => {
+            const tr = document.createElement('tr');
+            const tdBtn = document.createElement('td');
+            const tdDesc = document.createElement('td');
+            tdBtn.appendChild(buttonEl);
+            tdDesc.textContent = description || '';
+            tr.appendChild(tdBtn);
+            tr.appendChild(tdDesc);
+            tbodySettings.appendChild(tr);
+        };
+
+        // アプリの設定ボタン
         const appSettingsBtn = DOMHelper.createElement('button', {}, 'app-settings-btn');
         appSettingsBtn.textContent = 'アプリの設定';
         appSettingsBtn.style.fontSize = '12px';
-        appSettingsBtn.style.marginRight = '10px';
-        appSettingsBtn.style.marginBottom = '10px';
         appSettingsBtn.addEventListener('click', () => {
-            // アプリIDを取得
             const appId = kintone.app.getId();
-            // ベースURLを取得
             const baseUrl = CONFIG.system.baseUrl;
-            // 設定ページのURLを構築
             const settingsUrl = `${baseUrl}/admin/app/flow?app=${appId}#section=settings`;
-            // 新しいタブで開く
             window.open(settingsUrl, '_blank');
         });
-        settingsContent.appendChild(appSettingsBtn);
+        addSettingsRow(appSettingsBtn, 'kintoneアプリ設定画面を開きます');
 
-        // フィールド情報キャッシュクリアボタン
+        // フィールド情報キャッシュクリア
         const clearCacheBtn = DOMHelper.createElement('button', {}, 'clear-field-cache-btn');
         clearCacheBtn.textContent = 'フィールド情報キャッシュをクリア';
         clearCacheBtn.style.fontSize = '12px';
-        clearCacheBtn.style.marginRight = '10px';
-        clearCacheBtn.style.marginBottom = '10px';
         clearCacheBtn.addEventListener('click', () => {
             try {
-                // localStorage から fieldInfo_* を削除
                 const prefix = (window.fieldInfoAPI && window.fieldInfoAPI.localStoragePrefix) ? window.fieldInfoAPI.localStoragePrefix : 'fieldInfo_';
                 const keysToRemove = [];
                 for (let i = 0; i < localStorage.length; i++) {
                     const key = localStorage.key(i);
-                    if (key && key.startsWith(prefix)) {
-                        keysToRemove.push(key);
-                    }
+                    if (key && key.startsWith(prefix)) keysToRemove.push(key);
                 }
                 keysToRemove.forEach(key => localStorage.removeItem(key));
-
-                // メモリキャッシュをクリア
                 if (window.fieldInfoAPI) {
-                    if (window.fieldInfoAPI.fieldCache && typeof window.fieldInfoAPI.fieldCache.clear === 'function') {
-                        window.fieldInfoAPI.fieldCache.clear();
-                    }
-                    if (window.fieldInfoAPI.loadingPromises && typeof window.fieldInfoAPI.loadingPromises.clear === 'function') {
-                        window.fieldInfoAPI.loadingPromises.clear();
-                    }
+                    if (window.fieldInfoAPI.fieldCache && typeof window.fieldInfoAPI.fieldCache.clear === 'function') window.fieldInfoAPI.fieldCache.clear();
+                    if (window.fieldInfoAPI.loadingPromises && typeof window.fieldInfoAPI.loadingPromises.clear === 'function') window.fieldInfoAPI.loadingPromises.clear();
                 }
-
                 alert('フィールド情報キャッシュをクリアしました。次回の取得はAPIから実行されます。\nブラウザをリロードしてください。');
             } catch (e) {
                 alert('キャッシュクリア中にエラーが発生しました。');
                 console.error('キャッシュクリアエラー:', e);
             }
         });
-        settingsContent.appendChild(clearCacheBtn);
-        
-        // ボタンと説明文を追加
+        addSettingsRow(clearCacheBtn, 'FieldInfoAPIのメモリ/ローカルキャッシュを削除します');
+
+        // 全データ抽出
         const exportBtn = DOMHelper.createElement('button', {}, 'export-all-btn');
         exportBtn.textContent = '全データ抽出';
         exportBtn.style.fontSize = '12px';
-        // 権限チェック付きの全データ抽出ボタン
         exportBtn.addEventListener('click', async () => {
-            // 権限チェック
             if (!window.PermissionChecker) {
                 console.error('PermissionCheckerが見つかりません');
                 return;
             }
-            
             const hasPermission = await window.PermissionChecker.hasAddRecordPermission();
             if (!hasPermission) {
                 window.PermissionChecker.showPermissionError();
                 return;
             }
-            
-            // 権限がある場合は全データ抽出実行
             this.exportAllData();
         });
-        settingsContent.appendChild(exportBtn);
-        const info = DOMHelper.createElement('div', {}, 'export-info');
-        info.textContent = '※「全データ抽出」ボタンを押すと、全台帳を無条件でCSVファイル出力します';
-        info.style.fontSize = '12px';
-        settingsContent.appendChild(info);
+        addSettingsRow(exportBtn, '全台帳を無条件でCSVファイル出力します');
+
+        settingsTable.appendChild(tbodySettings);
+        settingsContent.appendChild(settingsTable);
         tabContainer.appendChild(settingsContent);
 
-        // 不整合タブのタブコンテンツを追加
+        // 不整合タブのタブコンテンツを追加（設定タブと同様にテーブル化）
         const inconsistencyContent = DOMHelper.createElement('div', { id: 'tab-inconsistency' }, 'tab-content');
-        const inconsistencyContainer = DOMHelper.createElement('div', {}, 'inconsistency-container');
+        const inconsistencyTable = document.createElement('table');
+        inconsistencyTable.className = 'settings-table';
+        const tbodyInconsistency = document.createElement('tbody');
+
+        const addInconsistencyRow = (buttonEl, description) => {
+            const tr = document.createElement('tr');
+            const tdBtn = document.createElement('td');
+            const tdDesc = document.createElement('td');
+            tdBtn.appendChild(buttonEl);
+            tdDesc.textContent = description || '';
+            tr.appendChild(tdBtn);
+            tr.appendChild(tdDesc);
+            tbodyInconsistency.appendChild(tr);
+        };
+
         try {
             const runBtn = DOMHelper.createElement('button', {}, 'inconsistency-run-btn');
             runBtn.textContent = '不整合抽出';
             runBtn.style.fontSize = '12px';
             runBtn.addEventListener('click', () => this.runInconsistencyExtraction());
-            inconsistencyContainer.appendChild(runBtn);
-            const note = DOMHelper.createElement('div', {}, 'inconsistency-note');
-            note.textContent = '※ 全台帳を対象に不整合（キー分断）を抽出します。';
-            note.style.fontSize = '12px';
-            note.style.marginTop = '8px';
-            inconsistencyContainer.appendChild(note);
+            addInconsistencyRow(runBtn, '全台帳を対象に不整合（キー分断）を抽出します');
         } catch (e) { /* noop */ }
-        inconsistencyContent.appendChild(inconsistencyContainer);
+
+        inconsistencyTable.appendChild(tbodyInconsistency);
+        inconsistencyContent.appendChild(inconsistencyTable);
         tabContainer.appendChild(inconsistencyContent);
 
         // 座席表タブは廃止
@@ -250,13 +253,6 @@ class TabManager {
             tabMenu.appendChild(tabButton);
         });
 
-        // 貸出管理タブ（既存群の右隣）
-        const lendingTabButton = DOMHelper.createElement('button', {}, 'tab-button lending-tab');
-        lendingTabButton.setAttribute('data-app', 'lending');
-        lendingTabButton.textContent = '📦 貸出管理';
-        lendingTabButton.addEventListener('click', () => this.switchTab('lending'));
-        tabMenu.appendChild(lendingTabButton);
-
         // 更新履歴タブ（座席台帳のすぐ隣）
         const historyTabButton = DOMHelper.createElement('button', {}, 'tab-button history-tab');
         historyTabButton.setAttribute('data-app', 'history');
@@ -264,10 +260,17 @@ class TabManager {
         historyTabButton.addEventListener('click', () => this.switchTab('history'));
         tabMenu.appendChild(historyTabButton);
 
+        // 貸出管理タブ（更新履歴の直後）
+        const lendingTabButton = DOMHelper.createElement('button', {}, 'tab-button lending-tab');
+        lendingTabButton.setAttribute('data-app', 'lending');
+        lendingTabButton.textContent = '📦 貸出管理（テスト中）';
+        lendingTabButton.addEventListener('click', () => this.switchTab('lending'));
+        tabMenu.appendChild(lendingTabButton);
+
         // 不整合タブ（更新履歴の隣）
         const inconsistencyTabButton = DOMHelper.createElement('button', {}, 'tab-button inconsistency-tab');
         inconsistencyTabButton.setAttribute('data-app', 'inconsistency');
-        inconsistencyTabButton.textContent = '⚠️ 不整合';
+        inconsistencyTabButton.textContent = '⚠️ 不整合（テスト中）';
         inconsistencyTabButton.addEventListener('click', () => this.switchTab('inconsistency'));
         tabMenu.appendChild(inconsistencyTabButton);
         
@@ -374,6 +377,10 @@ class TabManager {
         const activeContent = document.getElementById(`tab-${appId}`);
         if (activeContent) {
             activeContent.classList.add('active');
+            // タブ毎に必要なレイアウト高さを再調整
+            try {
+                setTimeout(() => { if (window.adjustTableHeight) window.adjustTableHeight(); }, 0);
+            } catch (e) { /* noop */ }
         }
 
         // 更新履歴タブが選択された場合、履歴データを読み込む
@@ -1088,6 +1095,11 @@ class TabManager {
             // その他のタブ（台帳タブ）の場合は表示
             searchResultsElement.style.display = 'block';
             console.log(`📋 ${CONFIG.apps[appId]?.name || appId}タブ: search-results要素を表示`);
+
+            // 表示切替直後は高さ計算がずれるため、非同期で再計算
+            try {
+                setTimeout(() => { if (window.adjustTableHeight) window.adjustTableHeight(); }, 0);
+            } catch (e) { /* noop */ }
         }
     }
 
