@@ -176,6 +176,8 @@ class SearchAndFilter {
         }
         if (oldTable && newTable) {
             oldTable.parentNode.replaceChild(newTable, oldTable);
+            // 置換直後に高さを再計算（初回・再描画直後のはみ出し対策）
+            try { setTimeout(() => { if (window.adjustTableHeight) window.adjustTableHeight(); }, 0); } catch (e) { /* noop */ }
         }
         // テーブル再生成後にトグルボタン表示を最新状態に更新
         try {

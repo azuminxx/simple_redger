@@ -242,6 +242,11 @@ class TableRenderer {
         integratedResultsContainer.appendChild(tableContainer);
         
         resultsContainer.appendChild(integratedResultsContainer);
+        
+        // 初回表示直後に高さを再計算（DOM挿入後に実寸で補正）
+        try {
+            setTimeout(() => { if (window.adjustTableHeight) window.adjustTableHeight(); }, 0);
+        } catch (e) { /* noop */ }
     }
 
     /**

@@ -338,7 +338,6 @@ table input {
 
 /* 仮想スクロールコンテナ */
 .virtual-scroll-container {
-    height: calc(100vh - 450px);
     overflow: auto;
     position: relative;
 }

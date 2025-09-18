@@ -132,40 +132,57 @@ class VirtualScroll {
         }
         
         // 高さ調整関数
+        const self = this;
         function adjustTableHeight() {
             const windowHeight = window.innerHeight;
-            
-            // 基本の高さ計算: calc(100vh - 420px)
-            let baseHeight = windowHeight - 420;
-            
-            // 検索メニューが閉じられているかチェック
-            const searchMenu = document.querySelector(`#${CONFIG.system.searchMenuId}`);
-            if (searchMenu) {
-                // タブコンテンツの状態をチェック
-                const tabContents = searchMenu.querySelectorAll('.tab-content');
-                const isSearchMenuClosed = Array.from(tabContents).every(tc => tc.style.height === '0px');
-                
-                if (isSearchMenuClosed) {
-                    // 検索メニューが閉じられている場合、+180px追加
-                    baseHeight += 180;
+
+            // スクロールコンテナの画面上の位置から下端までの残り高さをベースに算出
+            // DOM未挿入の瞬間にも対応するため、まずは暫定値を設定し、その後に再計算する
+            const rect = scrollContainer.getBoundingClientRect();
+
+            // ラッパー側の下側余白・パディング・ボーダーを控除
+            let bottomReserve = 0;
+            try {
+                const resultsContainer = document.getElementById(CONFIG.system.resultsContainerId);
+                const resultsStyles = resultsContainer ? window.getComputedStyle(resultsContainer) : null;
+                if (resultsStyles) {
+                    bottomReserve += (parseFloat(resultsStyles.paddingBottom) || 0)
+                                   + (parseFloat(resultsStyles.borderBottomWidth) || 0)
+                                   + (parseFloat(resultsStyles.marginBottom) || 0);
                 }
+                const integratedResultsEl = scrollContainer.closest('.integrated-results');
+                const irStyles = integratedResultsEl ? window.getComputedStyle(integratedResultsEl) : null;
+                if (irStyles) {
+                    bottomReserve += (parseFloat(irStyles.paddingBottom) || 0)
+                                   + (parseFloat(irStyles.borderBottomWidth) || 0)
+                                   + (parseFloat(irStyles.marginBottom) || 0);
+                }
+                const containerStyles = window.getComputedStyle(container);
+                bottomReserve += (parseFloat(containerStyles.paddingBottom) || 0)
+                               + (parseFloat(containerStyles.borderBottomWidth) || 0)
+                               + (parseFloat(containerStyles.marginBottom) || 0);
+            } catch (e) { /* noop */ }
+
+            const top = rect && (rect.top || rect.top === 0) ? rect.top : 0;
+            let available = Math.floor(windowHeight - top - bottomReserve);
+            if (!Number.isFinite(available) || available <= 0) {
+                // 未挿入などでtopが取れない場合は安全値
+                available = Math.max(200, Math.floor(windowHeight * 0.5));
             }
-            
-            // 横スクロールバーの高さを考慮（通常15-20px）
-            const horizontalScrollbarHeight = 20;
-            
-            // 動的に計算された高さを設定
-            const tableHeight = Math.max(200, baseHeight - horizontalScrollbarHeight);
-            scrollContainer.style.height = tableHeight + 'px';
-            
-            // 横スクロールバーが実際に表示されている場合は、さらに調整
+            available = Math.max(200, available);
+            scrollContainer.style.height = available + 'px';
+
+            // 横スクロールバーが実際に表示されている場合は、さらに調整し、可視行数に応じて再描画
             setTimeout(() => {
                 if (scrollContainer.scrollWidth > scrollContainer.clientWidth) {
-                    // 横スクロールバーが表示されている場合、さらに高さを調整
-                    const adjustedHeight = Math.max(200, tableHeight - 15);
-                    scrollContainer.style.height = adjustedHeight + 'px';
+                    const adjusted = Math.max(200, available - 15);
+                    scrollContainer.style.height = adjusted + 'px';
                 }
-            }, 100);
+                // 可視行数の再計算に基づく再描画
+                setTimeout(() => {
+                    self.handleVirtualScroll(scrollContainer, virtualState);
+                }, 0);
+            }, 50);
         }
         adjustTableHeight();
         window.addEventListener('resize', adjustTableHeight);
@@ -836,14 +853,16 @@ class VirtualScroll {
      */
     async handleVirtualScroll(scrollContainer, virtualState) {
         const scrollTop = scrollContainer.scrollTop;
-        const { rowHeight, visibleRows, bufferRows } = CONFIG.virtualScroll;
+        const rowHeight = CONFIG.virtualScroll.rowHeight;
+        const bufferRows = CONFIG.virtualScroll.bufferRows;
+        const dynamicVisibleRows = Math.max(1, Math.ceil(scrollContainer.clientHeight / rowHeight));
         
         // 現在の表示開始インデックスを計算
         const newStartIndex = Math.floor(scrollTop / rowHeight);
         const bufferStart = Math.max(0, newStartIndex - bufferRows);
         const bufferEnd = Math.min(
             virtualState.data.length,
-            newStartIndex + visibleRows + bufferRows
+            newStartIndex + dynamicVisibleRows + bufferRows
         );
         
         // 表示範囲が変わった場合のみ再レンダリング
