@@ -91,6 +91,26 @@ class UserListAPI {
             throw error;
         }
     }
+
+    /**
+     * 氏名漢字でユーザーを検索（部分一致）
+     * 複数件の可能性あり → 最大50件返す
+     */
+    async searchUsersByKanjiName(partialName, limit = 50) {
+        if (!partialName || partialName.trim() === '') return [];
+        try {
+            const safe = partialName.replace(/"/g, '\\"');
+            const query = `氏名漢字 like "${safe}" limit ${parseInt(limit)}`;
+            const response = await kintone.api(kintone.api.url('/k/v1/records', true), 'GET', {
+                app: this.appId,
+                query
+            });
+            return response.records || [];
+        } catch (error) {
+            console.error('氏名漢字検索エラー:', error);
+            return [];
+        }
+    }
 }
 
 // グローバルに公開

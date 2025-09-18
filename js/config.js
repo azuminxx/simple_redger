@@ -61,7 +61,9 @@ const CONFIG = {
         appId: 13,
         name: 'ユーザー台帳',
         primaryKey: 'BSSID',
-        mapFields: ['氏名漢字','ユーザー部署']
+        mapFields: ['氏名漢字','ユーザー部署'],
+        // 貸出管理タブでユーザー情報として表示するフィールドコード（順序通りに表示）
+        userInfoFields: ['BSSID', '氏名']
     },
 
     // 共通グループ設定
@@ -246,7 +248,7 @@ const CONFIG = {
         
         // サポートしないフィールドタイプ
         unsupportedTypes: [
-            'SUBTABLE', 'FILE', 'REFERENCE_TABLE', 'GROUP', 'SPACER',
+            'FILE', 'REFERENCE_TABLE', 'GROUP', 'SPACER',
             'HR', 'CATEGORY', 'STATUS', 'STATUS_ASSIGNEE', 'CREATED_TIME',
             'UPDATED_TIME', 'CREATOR', 'MODIFIER'
         ]

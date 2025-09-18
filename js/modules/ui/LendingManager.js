@@ -6,8 +6,10 @@ class LendingManager {
         this.userListAPI = new UserListAPI();
         this.container = null;
         this.searchInput = null;
+		this.nameInput = null;
         this.searchButton = null;
         this.messageArea = null;
+		this.userInfoArea = null;
         this.tableArea = null;
         this.controlsArea = null;
 
@@ -21,34 +23,53 @@ class LendingManager {
     buildTabContent() {
         this.container = DOMHelper.createElement('div', {}, 'lending-tab-container');
 
-        const header = DOMHelper.createElement('div', {}, 'lending-header');
-        const title = DOMHelper.createElement('h4');
-        title.textContent = '貸出管理';
-        header.appendChild(title);
-        this.container.appendChild(header);
+        // 上部タイトルは非表示（不要）
 
         // 検索エリア
         const searchArea = DOMHelper.createElement('div', {}, 'lending-search-area');
-        const label = DOMHelper.createElement('label');
-        label.textContent = 'BSSID';
-        label.setAttribute('for', 'lending-bssid-input');
-        this.searchInput = DOMHelper.createElement('input', { type: 'text', id: 'lending-bssid-input', placeholder: 'BSSID を入力', autocomplete: 'off' }, 'lending-bssid-input');
-        this.searchButton = DOMHelper.createElement('button', {}, 'lending-search-button');
-        this.searchButton.textContent = '検索';
-        this.searchButton.addEventListener('click', () => this.handleSearch());
-        this.searchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') this.handleSearch(); });
-        searchArea.appendChild(label);
-        searchArea.appendChild(this.searchInput);
-        searchArea.appendChild(this.searchButton);
-        this.container.appendChild(searchArea);
-
-        // メッセージ表示エリア
+		// BSSID
+		const label = DOMHelper.createElement('label');
+		label.textContent = 'BSSID';
+		label.setAttribute('for', 'lending-bssid-input');
+		this.searchInput = DOMHelper.createElement('input', { type: 'text', id: 'lending-bssid-input', placeholder: 'BSSID を入力', autocomplete: 'off' }, 'lending-bssid-input');
+		// 氏名漢字
+		const nameLabel = DOMHelper.createElement('label');
+		nameLabel.textContent = '氏名漢字';
+		nameLabel.setAttribute('for', 'lending-name-input');
+		this.nameInput = DOMHelper.createElement('input', { type: 'text', id: 'lending-name-input', placeholder: '氏名漢字を入力', autocomplete: 'off' }, 'lending-name-input');
+		// 検索ボタン
+        this.searchButton = DOMHelper.createElement('button', {}, 'lending-search-button lending-search-button');
+		this.searchButton.textContent = '検索';
+		this.searchButton.addEventListener('click', () => this.handleSearch());
+		this.searchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') this.handleSearch(); });
+		this.nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') this.handleSearch(); });
+		searchArea.appendChild(label);
+		searchArea.appendChild(this.searchInput);
+		searchArea.appendChild(nameLabel);
+		searchArea.appendChild(this.nameInput);
+		searchArea.appendChild(this.searchButton);
+        // セクション: ユーザー検索
+        const searchSection = DOMHelper.createElement('div', {}, 'lending-section');
+        const searchTitle = DOMHelper.createElement('div', {}, 'lending-section-title');
+        searchTitle.textContent = '【ユーザー検索】';
+        searchSection.appendChild(searchTitle);
+        searchSection.appendChild(searchArea);
+        // メッセージ表示エリア（検索セクションの配下）
         this.messageArea = DOMHelper.createElement('div', {}, 'lending-message-area');
-        this.container.appendChild(this.messageArea);
+        searchSection.appendChild(this.messageArea);
+        this.container.appendChild(searchSection);
+
+        // 対象ユーザー情報エリア（検索とテーブルの間に表示）
+        this.userInfoArea = DOMHelper.createElement('div', {}, 'lending-user-info');
+        const targetSection = DOMHelper.createElement('div', {}, 'lending-section');
+        const targetTitle = DOMHelper.createElement('div', {}, 'lending-section-title');
+        targetTitle.textContent = '【対象者】';
+        targetSection.appendChild(targetTitle);
+        targetSection.appendChild(this.userInfoArea);
+        this.container.appendChild(targetSection);
 
         // テーブルエリア
         this.tableArea = DOMHelper.createElement('div', {}, 'lending-table-area');
-        this.container.appendChild(this.tableArea);
 
         // 操作エリア
         this.controlsArea = DOMHelper.createElement('div', {}, 'lending-controls-area');
@@ -67,7 +88,15 @@ class LendingManager {
         this.controlsArea.appendChild(addRowBtn);
         this.controlsArea.appendChild(updateBtn);
         this.controlsArea.appendChild(resetLink);
-        this.container.appendChild(this.controlsArea);
+
+        // セクション: 貸出管理入力
+        const inputSection = DOMHelper.createElement('div', {}, 'lending-section');
+        const inputTitle = DOMHelper.createElement('div', {}, 'lending-section-title');
+        inputTitle.textContent = '【貸出管理入力】';
+        inputSection.appendChild(inputTitle);
+        inputSection.appendChild(this.tableArea);
+        inputSection.appendChild(this.controlsArea);
+        this.container.appendChild(inputSection);
 
         return this.container;
     }
@@ -77,30 +106,171 @@ class LendingManager {
      */
     async handleSearch() {
         const bssid = (this.searchInput?.value || '').trim();
-        if (!bssid) {
-            this.showMessage('BSSIDを入力してください。');
+        const name = (this.nameInput?.value || '').trim();
+        if (!bssid && !name) {
+            this.showMessage('BSSID または 氏名漢字 を入力してください。');
             return;
         }
         this.setLoading(true);
         try {
-            const record = await this.userListAPI.searchUserById(bssid);
-            if (!record) {
-                this.currentRecord = null;
-                this.currentRows = [];
-                this.renderTable();
-                this.showMessage('該当ユーザーが見つかりません');
-                return;
+            if (bssid) {
+                // 1) BSSID優先（従来動作）
+                const record = await this.userListAPI.searchUserById(bssid);
+                await this.afterRecordResolved(record);
+            } else {
+                // 2) 氏名漢字検索（複数件対応）
+                const candidates = await this.userListAPI.searchUsersByKanjiName(name);
+                if (!candidates || candidates.length === 0) {
+                    this.currentRecord = null;
+                    this.currentRows = [];
+                    this.renderTable();
+                    this.showMessage('該当ユーザーが見つかりません');
+                    return;
+                }
+                if (candidates.length === 1) {
+                    await this.afterRecordResolved(candidates[0]);
+                } else {
+                    const chosen = await this.showCandidateDialog(candidates);
+                    if (chosen) {
+                        await this.afterRecordResolved(chosen);
+                    }
+                }
             }
-            this.currentRecord = record;
-            this.currentRows = this.extractRowsFromRecord(record);
-            this.renderTable();
-            this.showMessage('');
         } catch (e) {
             console.error('貸出管理 検索エラー:', e);
             this.showMessage('検索中にエラーが発生しました');
         } finally {
             this.setLoading(false);
         }
+    }
+
+    async afterRecordResolved(record) {
+        if (!record) {
+            this.currentRecord = null;
+            this.currentRows = [];
+			this.renderUserInfo(null);
+			this.renderTable();
+            this.showMessage('該当ユーザーが見つかりません');
+            return;
+        }
+        this.currentRecord = record;
+        this.currentRows = this.extractRowsFromRecord(record);
+		this.renderUserInfo(record);
+        this.renderTable();
+        this.showMessage('');
+    }
+
+	/**
+	 * 対象ユーザー情報の表示（BSSID / 氏名 / ユーザー部署）
+	 */
+	renderUserInfo(record) {
+		if (!this.userInfoArea) return;
+		this.userInfoArea.innerHTML = '';
+		if (!record) return;
+
+		// 設定から表示対象フィールドを取得
+		const fields = Array.isArray(CONFIG.userList?.userInfoFields) && CONFIG.userList.userInfoFields.length > 0
+			? CONFIG.userList.userInfoFields
+			: ['BSSID', '氏名', 'ユーザー部署'];
+
+		// テーブル（1行目: 見出し、2行目: 値）
+		const table = document.createElement('table');
+		table.className = 'lending-user-table';
+		const thead = document.createElement('thead');
+		const headRow = document.createElement('tr');
+		fields.forEach(code => {
+			const th = document.createElement('th');
+			th.textContent = code;
+			headRow.appendChild(th);
+		});
+		thead.appendChild(headRow);
+		table.appendChild(thead);
+
+		const tbody = document.createElement('tbody');
+		const valueRow = document.createElement('tr');
+		fields.forEach(code => {
+			const td = document.createElement('td');
+			let value = record[code]?.value;
+			if ((code === '氏名' || code === '氏名漢字') && (value === undefined || value === '')) {
+				value = record['氏名漢字']?.value || record['氏名']?.value || '';
+			}
+			td.textContent = value || '';
+			valueRow.appendChild(td);
+		});
+		tbody.appendChild(valueRow);
+		table.appendChild(tbody);
+		this.userInfoArea.appendChild(table);
+	}
+
+    /**
+     * 候補選択ダイアログを表示し、選択されたレコードを返す
+     */
+    showCandidateDialog(candidates) {
+        return new Promise((resolve) => {
+            try {
+                // オーバーレイ
+                const overlay = document.createElement('div');
+                overlay.className = 'lending-dialog-overlay';
+                // ダイアログ
+                const dialog = document.createElement('div');
+                dialog.className = 'lending-dialog';
+                const title = document.createElement('div');
+                title.className = 'lending-dialog-title';
+                title.textContent = `候補が ${candidates.length} 件あります。選択してください`;
+                const list = document.createElement('div');
+                list.className = 'lending-dialog-list';
+
+                // userInfoFieldsに基づくテーブル形式
+                const fields = Array.isArray(CONFIG.userList?.userInfoFields) && CONFIG.userList.userInfoFields.length > 0
+                    ? CONFIG.userList.userInfoFields
+                    : ['BSSID', '氏名'];
+
+                const table = document.createElement('table');
+                table.className = 'lending-dialog-table';
+                const thead = document.createElement('thead');
+                const hr = document.createElement('tr');
+                fields.forEach(code => {
+                    const th = document.createElement('th');
+                    th.textContent = code;
+                    hr.appendChild(th);
+                });
+                thead.appendChild(hr);
+                table.appendChild(thead);
+
+                const tbody = document.createElement('tbody');
+                candidates.forEach(rec => {
+                    const tr = document.createElement('tr');
+                    tr.tabIndex = 0;
+                    fields.forEach(code => {
+                        const td = document.createElement('td');
+                        let value = rec[code]?.value;
+                        if ((code === '氏名' || code === '氏名漢字') && (value === undefined || value === '')) {
+                            value = rec['氏名漢字']?.value || rec['氏名']?.value || '';
+                        }
+                        td.textContent = value || '';
+                        tr.appendChild(td);
+                    });
+                    tr.addEventListener('click', () => { cleanup(); resolve(rec); });
+                    tr.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); cleanup(); resolve(rec); }});
+                    tbody.appendChild(tr);
+                });
+                table.appendChild(tbody);
+                list.appendChild(table);
+                const cancel = document.createElement('button');
+                cancel.textContent = 'キャンセル';
+                cancel.className = 'lending-dialog-cancel';
+                cancel.addEventListener('click', () => { cleanup(); resolve(null); });
+                dialog.appendChild(title);
+                dialog.appendChild(list);
+                dialog.appendChild(cancel);
+                overlay.appendChild(dialog);
+                document.body.appendChild(overlay);
+                function cleanup() { try { overlay.remove(); } catch (e) {} }
+            } catch (e) {
+                console.error('候補ダイアログ生成エラー', e);
+                resolve(null);
+            }
+        });
     }
 
     /**
@@ -169,16 +339,32 @@ class LendingManager {
         tdLoanDate.appendChild(inputLoanDate);
         tr.appendChild(tdLoanDate);
 
-        // 品名 (必須)
+        // 品名 (必須) - 動的選択肢
         const tdItem = document.createElement('td');
         const selectItem = document.createElement('select');
-        ['','モニター','USB変換'].forEach(opt => {
-            const o = document.createElement('option');
-            o.value = opt;
-            o.textContent = opt || '選択してください';
-            if (opt === (row['品名'] || '')) o.selected = true;
-            selectItem.appendChild(o);
-        });
+        // 先頭にプレースホルダ
+        const placeholderOpt = document.createElement('option');
+        placeholderOpt.value = '';
+        placeholderOpt.textContent = '選択してください';
+        selectItem.appendChild(placeholderOpt);
+        try {
+            const appId = CONFIG.userList.appId;
+            const fieldsPromise = window.fieldInfoAPI ? window.fieldInfoAPI.getAppFields(appId) : Promise.resolve([]);
+            fieldsPromise.then((fields) => {
+                const itemField = (fields || []).find(f => f.code === '品名' && Array.isArray(f.options));
+                if (itemField && itemField.options) {
+                    itemField.options.forEach(optLabel => {
+                        const o = document.createElement('option');
+                        o.value = optLabel;
+                        o.textContent = optLabel;
+                        selectItem.appendChild(o);
+                    });
+                    if (row['品名']) {
+                        selectItem.value = row['品名'];
+                    }
+                }
+            }).catch(() => {});
+        } catch (e) { /* noop */ }
         tdItem.appendChild(selectItem);
         tr.appendChild(tdItem);
 

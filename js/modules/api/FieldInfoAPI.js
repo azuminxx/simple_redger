@@ -126,9 +126,23 @@ class FieldInfoAPI {
         const fields = [];
 
         Object.entries(properties).forEach(([fieldCode, fieldInfo]) => {
-            // システムフィールドやサブテーブルなどをスキップ
+            // システムフィールドなどの除外
             if (this.shouldSkipField(fieldCode, fieldInfo)) {
                 return;
+            }
+
+            // SUBTABLE は親自体をフィールドとしては返さず、配下の子フィールドを展開して返す
+            if (fieldInfo && fieldInfo.type === 'SUBTABLE' && fieldInfo.fields && typeof fieldInfo.fields === 'object') {
+                Object.entries(fieldInfo.fields).forEach(([childCode, childInfo]) => {
+                    if (this.shouldSkipField(childCode, childInfo)) return;
+                    const processedChild = this.createFieldConfig(childCode, childInfo);
+                    if (processedChild) {
+                        // 親サブテーブルのフィールドコードをメタ情報として保持
+                        processedChild.parentSubtableCode = fieldCode;
+                        fields.push(processedChild);
+                    }
+                });
+                return; // 親SUBTABLEは追加しない
             }
 
             const processedField = this.createFieldConfig(fieldCode, fieldInfo);

@@ -1040,6 +1040,28 @@ td.editable-cell select,
     font-size: 12px;
 }
 
+#lending-name-input {
+    height: 32px;
+    padding: 4px 8px;
+    font-size: 12px;
+}
+
+/* 検索エリアの入力高さを貸出入力と揃える */
+.lending-search-area input[type="text"],
+.lending-search-area input[type="date"],
+.lending-search-area select {
+    height: 32px;
+    padding: 4px 8px;
+    box-sizing: border-box;
+}
+.lending-search-area label {
+    line-height: 32px;
+}
+.lending-search-button {
+    height: 32px;
+    padding: 0 10px;
+}
+
 .lending-table {
     border-collapse: collapse;
     width: auto;
@@ -1104,4 +1126,100 @@ td.editable-cell select,
     font-size: 12px;
     margin-right: 6px;
 } 
+
+/* セクション見出し */
+.lending-section {
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    padding: 8px;
+    margin-bottom: 10px;
+    background: #fff;
+}
+.lending-section-title {
+    font-weight: 700;
+    color: #495057;
+    margin-bottom: 6px;
+    border-left: 4px solid #3498DB;
+    padding-left: 8px;
+}
+
+/* 対象ユーザー情報 */
+.lending-user-info {
+    margin-bottom: 8px; /* ユーザー情報とテーブルの間隔 */
+}
+.lending-user-table {
+    border-collapse: collapse;
+    border-spacing: 0;
+}
+.lending-user-table th,
+.lending-user-table td {
+    border: 1px solid #dee2e6;
+    padding: 4px 8px;
+    white-space: nowrap; /* 文字に合わせつつ折返しを抑制 */
+    font-size: 12px;
+}
+.lending-user-table th {
+    background: #f8f9fa;
+    font-weight: 600;
+    color: #495057;
+}
+.lending-user-table td {
+    background: #ffffff;
+    color: #212529;
+}
+
+/* 候補選択ダイアログ */
+.lending-dialog-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 99999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.lending-dialog {
+    background: #fff;
+    border-radius: 6px;
+    padding: 12px;
+    min-width: 420px;
+    max-width: 720px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+    font-size: 12px;
+}
+
+.lending-dialog-title {
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.lending-dialog-list {
+    max-height: 320px;
+    overflow: auto;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+}
+
+.lending-dialog-cancel {
+    margin-top: 10px;
+    padding: 6px 12px;
+}
+
+/* 候補テーブル */
+.lending-dialog-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+.lending-dialog-table th,
+.lending-dialog-table td {
+    border: 1px solid #e5e7eb;
+    padding: 6px 8px;
+    white-space: nowrap;
+    font-size: 12px;
+}
+.lending-dialog-table tbody tr:hover {
+    background: #f8f9fa;
+    cursor: pointer;
+}
 
