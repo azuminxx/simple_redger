@@ -718,83 +718,51 @@ class TableRenderer {
                         updateRecord.record[fieldCode] = { value: afterValue };
                     });
                     
-                    // --- 追加: 更新差分ログ（適用前の確認用）---
-                    try {
-                        const originalRecord = (window.dataIntegrator && typeof window.dataIntegrator.getOriginalRecord === 'function')
-                            ? window.dataIntegrator.getOriginalRecord(appId, recordId)
-                            : null;
-                        // デバッグ: インデックス状況と対象レコードの存在確認
-                        try {
-                            const appKey = String(appId);
-                            const recKey = String(recordId);
-                            const idxMap = window.dataIntegrator && window.dataIntegrator.recordIndexByApp ? window.dataIntegrator.recordIndexByApp.get(appKey) : null;
-                            if (!window.dataIntegrator || !window.dataIntegrator.recordIndexByApp) {
-                                console.log(`🧭 DataIntegratorインデックス未初期化: appId=${appKey}`);
-                            } else if (!idxMap) {
-                                console.log(`🧭 インデックス未登録: appId=${appKey}`);
-                            } else if (!idxMap.has(recKey)) {
-                                console.log(`🧭 レコード未登録(インデックス): appId=${appKey}, id=${recKey}, size=${idxMap.size}`);
-                            } else {
-                                console.log(`🧭 インデックス一致: appId=${appKey}, id=${recKey}`);
-                            }
-                        } catch (e) { /* noop */ }
-                        const toText = v => {
-                            if (v === undefined || v === null) return '(空)';
-                            if (Array.isArray(v)) return v.length === 0 ? '(空)' : v.join(',');
-                            if (String(v) === '') return '(空)';
-                            return String(v);
-                        };
-                        Object.entries(updateRecord.record).forEach(([fieldCode, body]) => {
-                            const before = originalRecord && originalRecord[fieldCode] && originalRecord[fieldCode].hasOwnProperty('value')
-                                ? originalRecord[fieldCode].value
-                                : null;
-                            const after = body && body.value !== undefined ? body.value : null;
-                            const isEqual = (() => {
-                                const norm = v => {
-                                    if (v === undefined || v === null) return '';
-                                    return Array.isArray(v) ? v.join(',') : String(v);
-                                };
-                                return norm(before) === norm(after);
-                            })();
-                            if (isEqual) return; // 前後が同じなら表示しない
-                            // 表示用テキスト（afterの空は(空)と表示）
-                            const beforeText = toText(before);
-                            const afterText = (() => {
-                                if (after === undefined || after === null) return '(空)';
-                                if (Array.isArray(after)) return after.length === 0 ? '(空)' : after.join(',');
-                                if (String(after) === '') return '(空)';
-                                return String(after);
-                            })();
-                            // ログ出力（台帳名 フィールド名: 変更前→変更後）
-                            console.log(`${ledgerName}　${fieldCode}:${beforeText}→${afterText} (appId=${appId}, id=${recordId})`);
-                            // 表形式のために行を追加
-                            diffRows.push({
-                                Ledger: ledgerName,
-                                Field: fieldCode,
-                                Before: beforeText,
-                                After: afterText,
-                                appId: appId,
-                                id: recordId
-                            });
-                            // 履歴アプリ用テキストを蓄積
-                            const key = `${appId}:${recordId}`;
-                            if (!diffTextByAppAndId.has(key)) diffTextByAppAndId.set(key, []);
-                            diffTextByAppAndId.get(key).push(`【${fieldCode}】${beforeText}→${afterText}`);
-                            if (!originalRecord || !originalRecord[fieldCode]) {
-                                // デバッグ: フィールド未登録の理由（ユーザー台帳由来など）
-                                try {
-                                    const col = CONFIG.integratedTableConfig.columns.find(c => c.ledger === ledgerName && c.fieldCode === fieldCode);
-                                    const isUserDerived = col && col.isUserListDerived === true;
-                                    if (isUserDerived) {
-                                        console.log(`🧭 前値なし理由: ユーザー台帳由来フィールド（${ledgerName}_${fieldCode}）はインデックス対象外`);
-                                    } else {
-                                        console.log(`🧭 前値なし理由: インデックスにフィールド未登録（${ledgerName}_${fieldCode}）`);
-                                    }
-                                } catch (e) { /* noop */ }
-                            }
-                        });
-                    } catch (e) { /* noop */ }
-                    // --- ここまで追加 ---
+					// --- 差分ログ（直前スナップショット基準） ---
+					try {
+						const toText = v => {
+							if (v === undefined || v === null) return '(空)';
+							if (Array.isArray(v)) return v.length === 0 ? '(空)' : v.join(',');
+							if (String(v) === '') return '(空)';
+							return String(v);
+						};
+						Object.entries(updateRecord.record).forEach(([fieldCode, body]) => {
+							const fieldCfg = updateFields[fieldCode];
+							const before = snapshotRow && fieldCfg ? snapshotRow[fieldCfg.sourceKey] : null;
+							const after = body && body.value !== undefined ? body.value : null;
+							const isEqual = (() => {
+								const norm = v => {
+									if (v === undefined || v === null) return '';
+									return Array.isArray(v) ? v.join(',') : String(v);
+								};
+								return norm(before) === norm(after);
+							})();
+							if (isEqual) return; // 前後が同じなら表示しない
+							const beforeText = toText(before);
+							const afterText = (() => {
+								if (after === undefined || after === null) return '(空)';
+								if (Array.isArray(after)) return after.length === 0 ? '(空)' : after.join(',');
+								if (String(after) === '') return '(空)';
+								return String(after);
+							})();
+							// ログ出力（台帳名 フィールド名: 変更前→変更後）
+							console.log(`${ledgerName}\t${fieldCode}:${beforeText}→${afterText} (appId=${appId}, id=${recordId})`);
+							// 表形式のために行を追加
+							diffRows.push({
+								Ledger: ledgerName,
+								Field: fieldCode,
+								Before: beforeText,
+								After: afterText,
+								appId: appId,
+								id: recordId
+							});
+							// 履歴アプリ用テキストを蓄積
+							const key = `${appId}:${recordId}`;
+							if (!diffTextByAppAndId.has(key)) diffTextByAppAndId.set(key, []);
+							diffTextByAppAndId.get(key).push(`【${fieldCode}】${beforeText}→${afterText}`);
+						});
+					} catch (e) { /* noop */ }
+					// --- ここまで ---
 
                     updateRecordsByApp[appId].push(updateRecord);
                 }
