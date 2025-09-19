@@ -780,64 +780,152 @@ class TabManager {
     }
 
     /**
-     * 履歴テーブルを作成
+     * 履歴テーブルを作成（行単位: 変更前/変更後を2行で表示）
      */
     createHistoryTable(records) {
         const table = DOMHelper.createElement('table', {}, 'history-table');
-        
-        // テーブルヘッダー
+
+        // ヘッダー
         const thead = DOMHelper.createElement('thead');
         const headerRow = DOMHelper.createElement('tr');
-        const headers = ['更新日時', '更新者 (code)', '更新者 (name)', 'バッチID', '統合キー(変更前)', '統合キー(変更後)', 'レコードID', '台帳名', '主キー', '更新内容', '結果', '詳細'];
-        
-        headers.forEach(headerText => {
+        const headers = ['更新日時', '更新者 (code)', '更新者 (name)', 'バッチID', '区分', 'PC番号', '内線番号', '座席番号', 'PCその他', '内線その他', '座席その他'];
+        headers.forEach(text => {
             const th = DOMHelper.createElement('th');
-            th.textContent = headerText;
+            th.textContent = text;
             headerRow.appendChild(th);
         });
         thead.appendChild(headerRow);
         table.appendChild(thead);
 
-        // テーブルボディ
+        // 本文
         const tbody = DOMHelper.createElement('tbody');
-        let currentBatchId = null;
-        let isAlternateRow = false;
-        
-        // 並び替え: 更新日時 desc, バッチID asc, 統合キー(変更後) asc, 台帳名 asc
-        const sortedRecords = [...records].sort((a, b) => {
-            const aTime = a[CONFIG.historyApp.fields.updatedTime]?.value || '';
-            const bTime = b[CONFIG.historyApp.fields.updatedTime]?.value || '';
-            if (aTime !== bTime) return bTime.localeCompare(aTime);
-            const aBatch = a[CONFIG.historyApp.fields.batchId]?.value || '';
-            const bBatch = b[CONFIG.historyApp.fields.batchId]?.value || '';
-            if (aBatch !== bBatch) return aBatch.localeCompare(bBatch);
-            const aIk = a[CONFIG.historyApp.fields.integrationKeyAfter]?.value || '';
-            const bIk = b[CONFIG.historyApp.fields.integrationKeyAfter]?.value || '';
-            if (aIk !== bIk) return aIk.localeCompare(bIk);
-            const aLedger = a[CONFIG.historyApp.fields.ledgerName]?.value || '';
-            const bLedger = b[CONFIG.historyApp.fields.ledgerName]?.value || '';
-            return aLedger.localeCompare(bLedger);
+
+        // ソート: 更新日時 desc, バッチID asc
+        const sorted = [...records].sort((a, b) => {
+            const at = a[CONFIG.historyApp.fields.updatedTime]?.value || '';
+            const bt = b[CONFIG.historyApp.fields.updatedTime]?.value || '';
+            if (at !== bt) return bt.localeCompare(at);
+            const ab = a[CONFIG.historyApp.fields.batchId]?.value || '';
+            const bb = b[CONFIG.historyApp.fields.batchId]?.value || '';
+            return ab.localeCompare(bb);
         });
-        
-        sortedRecords.forEach(record => {
-            const batchId = record[CONFIG.historyApp.fields.batchId]?.value;
-            
-            // バッチIDが変わったら背景色を切り替え
-            if (batchId !== currentBatchId) {
-                isAlternateRow = !isAlternateRow;
-                currentBatchId = batchId;
+
+        // 集約: 同一バッチで (前PC/前内線/前座席/後PC/後内線/後座席) が同じものは1件にまとめ、
+        // 各レコードの「その他（前/後）」を結合して1件に集約
+        const aggregatedMap = new Map();
+        const parseIk = (ikText, comp /* 'PC' | 'EXT' | 'SEAT' */) => {
+            if (!ikText) return '';
+            try {
+                const di = window.dataIntegrator || new DataIntegrator();
+                const parsed = di.parseIntegrationKey(ikText);
+                return (parsed && parsed[comp]) ? parsed[comp] : '';
+            } catch (e) { return ''; }
+        };
+        const valOf = (rec, field) => {
+            const v = rec[field];
+            return v && v.value !== undefined ? v.value : (v || '');
+        };
+        const mergeCsv = (base, add) => {
+            if (!base) return add || '';
+            if (!add) return base || '';
+            const set = new Set();
+            base.split(',').filter(Boolean).forEach(v => set.add(v));
+            add.split(',').filter(Boolean).forEach(v => set.add(v));
+            return Array.from(set).join(',');
+        };
+
+        sorted.forEach(r => {
+            const batchId = r[CONFIG.historyApp.fields.batchId]?.value || '';
+            const bPC = valOf(r, CONFIG.historyApp.fields.beforePCNumber)  || parseIk(r[CONFIG.historyApp.fields.integrationKeyBefore]?.value, 'PC');
+            const bEX = valOf(r, CONFIG.historyApp.fields.beforeExtNumber) || parseIk(r[CONFIG.historyApp.fields.integrationKeyBefore]?.value, 'EXT');
+            const bSE = valOf(r, CONFIG.historyApp.fields.beforeSeatNumber)|| parseIk(r[CONFIG.historyApp.fields.integrationKeyBefore]?.value, 'SEAT');
+            const aPC = valOf(r, CONFIG.historyApp.fields.afterPCNumber)   || parseIk(r[CONFIG.historyApp.fields.integrationKeyAfter]?.value, 'PC');
+            const aEX = valOf(r, CONFIG.historyApp.fields.afterExtNumber)  || parseIk(r[CONFIG.historyApp.fields.integrationKeyAfter]?.value, 'EXT');
+            const aSE = valOf(r, CONFIG.historyApp.fields.afterSeatNumber) || parseIk(r[CONFIG.historyApp.fields.integrationKeyAfter]?.value, 'SEAT');
+            const key = [batchId, bPC, bEX, bSE, aPC, aEX, aSE].join('\u0001');
+            const bPCO = valOf(r, CONFIG.historyApp.fields.beforePCOthers) || '';
+            const bEXO = valOf(r, CONFIG.historyApp.fields.beforeExtOthers) || '';
+            const bSEO = valOf(r, CONFIG.historyApp.fields.beforeSeatOthers) || '';
+            const aPCO = valOf(r, CONFIG.historyApp.fields.afterPCOthers) || '';
+            const aEXO = valOf(r, CONFIG.historyApp.fields.afterExtOthers) || '';
+            const aSEO = valOf(r, CONFIG.historyApp.fields.afterSeatOthers) || '';
+            if (!aggregatedMap.has(key)) {
+                aggregatedMap.set(key, { base: r, bPC, bEX, bSE, aPC, aEX, aSE, bPCO, bEXO, bSEO, aPCO, aEXO, aSEO });
+            } else {
+                const agg = aggregatedMap.get(key);
+                agg.bPCO = mergeCsv(agg.bPCO, bPCO);
+                agg.bEXO = mergeCsv(agg.bEXO, bEXO);
+                agg.bSEO = mergeCsv(agg.bSEO, bSEO);
+                agg.aPCO = mergeCsv(agg.aPCO, aPCO);
+                agg.aEXO = mergeCsv(agg.aEXO, aEXO);
+                agg.aSEO = mergeCsv(agg.aSEO, aSEO);
             }
-            
-            const row = this.createHistoryTableRow(record, isAlternateRow);
-            tbody.appendChild(row);
         });
+
+        const textOr = (val) => (val && typeof val === 'string') ? val : (val && val.value !== undefined ? val.value : (val || ''));
+
+        let currentBatchId = null;
+        let alternate = false;
+        Array.from(aggregatedMap.values()).forEach(entry => {
+            const rec = entry.base;
+            const updatedTime = rec[CONFIG.historyApp.fields.updatedTime]?.value || '';
+            const updater = rec[CONFIG.historyApp.fields.updater]?.value || {};
+            const updaterCode = updater?.code || '';
+            const updaterName = updater?.name || '';
+            const batchId = rec[CONFIG.historyApp.fields.batchId]?.value || '';
+
+            if (batchId !== currentBatchId) { alternate = !alternate; currentBatchId = batchId; }
+
+            // 1) 変更前/後のPC・内線・座席番号（集約済みの値を使用）
+            const beforePC = entry.bPC;
+            const beforeEXT = entry.bEX;
+            const beforeSEAT = entry.bSE;
+            const afterPC = entry.aPC;
+            const afterEXT = entry.aEX;
+            const afterSEAT = entry.aSE;
+
+            // 2) 「その他」カラム（履歴アプリの専用フィールドを優先。なければ changeContent 解析）
+            const beforeOthers = { pc: (entry.bPCO || '').split(',').filter(Boolean), ext: (entry.bEXO || '').split(',').filter(Boolean), seat: (entry.bSEO || '').split(',').filter(Boolean) };
+            const afterOthers  = { pc: (entry.aPCO || '').split(',').filter(Boolean), ext: (entry.aEXO || '').split(',').filter(Boolean), seat: (entry.aSEO || '').split(',').filter(Boolean) };
+
+            const join = (arr) => arr.join(',');
+
+            // 変更前行
+            const trBefore = DOMHelper.createElement('tr');
+            const td0 = DOMHelper.createElement('td'); td0.textContent = this.formatUpdatedTime(updatedTime);
+            const td1 = DOMHelper.createElement('td'); td1.textContent = updaterCode;
+            const td2 = DOMHelper.createElement('td'); td2.textContent = updaterName;
+            const td3 = DOMHelper.createElement('td'); td3.textContent = batchId;
+            const td4 = DOMHelper.createElement('td'); td4.textContent = '変更前';
+            const td5 = DOMHelper.createElement('td'); td5.textContent = beforePC || '';
+            const td6 = DOMHelper.createElement('td'); td6.textContent = beforeEXT || '';
+            const td7 = DOMHelper.createElement('td'); td7.textContent = beforeSEAT || '';
+            const td8 = DOMHelper.createElement('td'); td8.textContent = join(beforeOthers.pc);
+            const td9 = DOMHelper.createElement('td'); td9.textContent = join(beforeOthers.ext);
+            const td10 = DOMHelper.createElement('td'); td10.textContent = join(beforeOthers.seat);
+            [td0,td1,td2,td3,td4,td5,td6,td7,td8,td9,td10].forEach(td => trBefore.appendChild(td));
+            if (alternate) trBefore.style.backgroundColor = '#e6f3ff';
+            tbody.appendChild(trBefore);
+
+            // 変更後行（先頭4列は空表示。見やすさ重視）
+            const trAfter = DOMHelper.createElement('tr');
+            const a0 = DOMHelper.createElement('td'); a0.textContent = '';
+            const a1 = DOMHelper.createElement('td'); a1.textContent = '';
+            const a2 = DOMHelper.createElement('td'); a2.textContent = '';
+            const a3 = DOMHelper.createElement('td'); a3.textContent = '';
+            const a4 = DOMHelper.createElement('td'); a4.textContent = '変更後';
+            const a5 = DOMHelper.createElement('td'); a5.textContent = afterPC || '';
+            const a6 = DOMHelper.createElement('td'); a6.textContent = afterEXT || '';
+            const a7 = DOMHelper.createElement('td'); a7.textContent = afterSEAT || '';
+            const a8 = DOMHelper.createElement('td'); a8.textContent = join(afterOthers.pc);
+            const a9 = DOMHelper.createElement('td'); a9.textContent = join(afterOthers.ext);
+            const a10 = DOMHelper.createElement('td'); a10.textContent = join(afterOthers.seat);
+            [a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,a10].forEach(td => trAfter.appendChild(td));
+            if (alternate) trAfter.style.backgroundColor = '#e6f3ff';
+            tbody.appendChild(trAfter);
+        });
+
         table.appendChild(tbody);
-
-        // 並び替え後に、バッチIDが同じ連続行について、同一値のセルを結合
-        try {
-            this.mergeHistoryTableCells(table);
-        } catch (e) { /* noop */ }
-
         return table;
     }
 

@@ -874,8 +874,9 @@ class TableRenderer {
      */
     async updateAppRecordsBatch(appId, records, batchId) {
         
-        // 一括更新用のデータを準備
-        const updateRecords = records.map((record, index) => {
+        // 一括更新用のデータを準備（空更新を除外）
+        const nonEmptyRecords = (records || []).filter(r => r && r.record && Object.keys(r.record).length > 0);
+        const updateRecords = nonEmptyRecords.map((record, index) => {
             // 新しい形式 {id: 6163, record: {...}} と旧形式 {$id: {value: 6163}, ...} の両方に対応
             const recordIdValue = record.id || record.$id?.value;
             if (!recordIdValue) {
@@ -896,6 +897,10 @@ class TableRenderer {
         });
 
         try {
+            // 空更新ならスキップ（履歴も作成しない）
+            if (updateRecords.length === 0) {
+                return { skipped: true };
+            }
             
             // API実行回数をカウント
             window.apiCounter.count(appId, 'レコード一括更新');
@@ -915,7 +920,7 @@ class TableRenderer {
             }
             const ledgerHistoryMap = this.updateHistoryMap.get(appId);
             
-            records.forEach((record, index) => {
+            nonEmptyRecords.forEach((record, index) => {
                 const recordIdValue = record.id || record.$id?.value;
                 const historyKey = `${recordIdValue}_${timestamp}`;
                 
@@ -972,6 +977,66 @@ class TableRenderer {
                     }
                 } catch (e) { /* noop */ }
 
+                // 変更前/後の主キー（行アンカー: 座席番号基準で計算）
+                let beforePCNumber = '', beforeExtNumber = '', beforeSeatNumber = '';
+                let afterPCNumber = '', afterExtNumber = '', afterSeatNumber = '';
+                try {
+                    const ledgerNameHere = CONFIG.apps[appId]?.name;
+                    const snapshotRow = Array.isArray(this._originalIntegratedData)
+                        ? this._originalIntegratedData.find(r => r && String(r[`${ledgerNameHere}_$id`]) === String(recordIdValue))
+                        : null;
+                    const seatBefore = snapshotRow ? (snapshotRow['座席台帳_座席番号'] || '') : '';
+                    const extBefore  = snapshotRow ? (snapshotRow['内線台帳_内線番号'] || '') : '';
+                    const pcBefore   = snapshotRow ? (snapshotRow['PC台帳_PC番号'] || '') : '';
+                    beforePCNumber = pcBefore || '';
+                    beforeExtNumber = extBefore || '';
+                    beforeSeatNumber = seatBefore || '';
+
+                    let currentRowWithSameSeat = null;
+                    if (seatBefore) {
+                        currentRowWithSameSeat = this.currentSearchResults.find(r => String(r['座席台帳_座席番号'] || '') === String(seatBefore));
+                    }
+                    if (currentRowWithSameSeat) {
+                        afterPCNumber = currentRowWithSameSeat['PC台帳_PC番号'] || '';
+                        afterExtNumber = currentRowWithSameSeat['内線台帳_内線番号'] || '';
+                        afterSeatNumber = seatBefore;
+                    } else {
+                        // フォールバック: 当該PCレコードが属する現在行
+                        const rowAfter = this.currentSearchResults.find(r => r && String(r[`${ledgerNameHere}_$id`]) === String(recordIdValue));
+                        if (rowAfter) {
+                            afterPCNumber = rowAfter['PC台帳_PC番号'] || '';
+                            afterExtNumber = rowAfter['内線台帳_内線番号'] || '';
+                            afterSeatNumber = rowAfter['座席台帳_座席番号'] || '';
+                        }
+                    }
+                } catch (e) { /* noop */ }
+
+                // その他（台帳別）を changeContent から抽出
+                let beforePCOthers = '', beforeExtOthers = '', beforeSeatOthers = '';
+                let afterPCOthers = '', afterExtOthers = '', afterSeatOthers = '';
+                try {
+                    const lines = (changeContent || '').split('\n').map(s => s.trim()).filter(Boolean);
+                    const fieldToLedger = new Map();
+                    try { CONFIG.integratedTableConfig.columns.forEach(col => { if (col && col.fieldCode) fieldToLedger.set(col.fieldCode, col.ledger); }); } catch (ee) { /* noop */ }
+                    const push = (arr, code, val) => { if (val && val !== '(空)') arr.push(`${code}:${val}`); };
+                    const before = { pc: [], ext: [], seat: [] };
+                    const after = { pc: [], ext: [], seat: [] };
+                    lines.forEach(line => {
+                        const m = line.match(/^【(.+?)】(.*?)→(.*)$/);
+                        if (!m) return;
+                        const fieldCode = m[1];
+                        if (fieldCode === 'PC番号' || fieldCode === '内線番号' || fieldCode === '座席番号') return;
+                        const bVal = (m[2] || '').replace(/^\s*[:：]?\s*/, '').trim();
+                        const aVal = (m[3] || '').replace(/^\s*[:：]?\s*/, '').trim();
+                        const ledger = fieldToLedger.get(fieldCode) || '';
+                        if (ledger === 'PC台帳') { push(before.pc, fieldCode, bVal); push(after.pc, fieldCode, aVal); }
+                        else if (ledger === '内線台帳') { push(before.ext, fieldCode, bVal); push(after.ext, fieldCode, aVal); }
+                        else if (ledger === '座席台帳') { push(before.seat, fieldCode, bVal); push(after.seat, fieldCode, aVal); }
+                    });
+                    beforePCOthers = before.pc.join(','); beforeExtOthers = before.ext.join(','); beforeSeatOthers = before.seat.join(',');
+                    afterPCOthers = after.pc.join(','); afterExtOthers = after.ext.join(','); afterSeatOthers = after.seat.join(',');
+                } catch (e) { /* noop */ }
+
                 const historyData = {
                     appId: appId,
                     ledgerName: ledgerName,
@@ -982,6 +1047,18 @@ class TableRenderer {
                     batchId: batchId,
                     integrationKeyBefore,
                     integrationKeyAfter,
+                    beforePCNumber,
+                    beforeExtNumber,
+                    beforeSeatNumber,
+                    afterPCNumber,
+                    afterExtNumber,
+                    afterSeatNumber,
+                    beforePCOthers,
+                    beforeExtOthers,
+                    beforeSeatOthers,
+                    afterPCOthers,
+                    afterExtOthers,
+                    afterSeatOthers,
                     changeContent,
                     request: requestData,
                     response: (response && Array.isArray(response.records) && response.records[index]) ? response.records[index] : null
@@ -1011,7 +1088,7 @@ class TableRenderer {
             }
             const ledgerHistoryMap = this.updateHistoryMap.get(appId);
             
-            records.forEach((record) => {
+            nonEmptyRecords.forEach((record) => {
                 const recordIdValue = record.id || record.$id?.value;
                 const historyKey = `${recordIdValue}_${timestamp}`;
                 

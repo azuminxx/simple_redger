@@ -162,6 +162,52 @@ class ExportAndHistory {
                     if (historyData.changeContent) record[CONFIG.historyApp.fields.changeContent] = { value: historyData.changeContent };
                     if (historyData.integrationKeyAfter) record[CONFIG.historyApp.fields.integrationKeyAfter] = { value: historyData.integrationKeyAfter };
                     if (historyData.integrationKeyBefore) record[CONFIG.historyApp.fields.integrationKeyBefore] = { value: historyData.integrationKeyBefore };
+                    // 新レイアウト向け: 統合キー→主キー3種 + 「その他」3種（可能ならTableRenderer側の直接値を優先）
+                    try {
+                        const di = window.dataIntegrator || new DataIntegrator();
+                        const parsedBefore = historyData.integrationKeyBefore ? di.parseIntegrationKey(historyData.integrationKeyBefore) : { PC: '', EXT: '', SEAT: '' };
+                        const parsedAfter = historyData.integrationKeyAfter ? di.parseIntegrationKey(historyData.integrationKeyAfter) : { PC: '', EXT: '', SEAT: '' };
+                        const bPC = historyData.beforePCNumber || parsedBefore.PC || '';
+                        const bEX = historyData.beforeExtNumber || parsedBefore.EXT || '';
+                        const bSE = historyData.beforeSeatNumber || parsedBefore.SEAT || '';
+                        const aPC = historyData.afterPCNumber || parsedAfter.PC || '';
+                        const aEX = historyData.afterExtNumber || parsedAfter.EXT || '';
+                        const aSE = historyData.afterSeatNumber || parsedAfter.SEAT || '';
+                        if (CONFIG.historyApp.fields.beforePCNumber) record[CONFIG.historyApp.fields.beforePCNumber] = { value: bPC };
+                        if (CONFIG.historyApp.fields.beforeExtNumber) record[CONFIG.historyApp.fields.beforeExtNumber] = { value: bEX };
+                        if (CONFIG.historyApp.fields.beforeSeatNumber) record[CONFIG.historyApp.fields.beforeSeatNumber] = { value: bSE };
+                        if (CONFIG.historyApp.fields.afterPCNumber) record[CONFIG.historyApp.fields.afterPCNumber] = { value: aPC };
+                        if (CONFIG.historyApp.fields.afterExtNumber) record[CONFIG.historyApp.fields.afterExtNumber] = { value: aEX };
+                        if (CONFIG.historyApp.fields.afterSeatNumber) record[CONFIG.historyApp.fields.afterSeatNumber] = { value: aSE };
+
+                        // changeContent から各台帳「その他」を抽出
+                        const changeText = historyData.changeContent || '';
+                        const fieldToLedger = new Map();
+                        try {
+                            CONFIG.integratedTableConfig.columns.forEach(col => { if (col && col.fieldCode) fieldToLedger.set(col.fieldCode, col.ledger); });
+                        } catch (ee) { /* noop */ }
+                        const push = (arr, code, val) => { if (val && val !== '(空)') arr.push(`${code}:${val}`); };
+                        const before = { pc: [], ext: [], seat: [] };
+                        const after  = { pc: [], ext: [], seat: [] };
+                        changeText.split(/\r?\n/).map(s => s.trim()).filter(Boolean).forEach(line => {
+                            const m = line.match(/^【(.+?)】(.*?)→(.*)$/);
+                            if (!m) return;
+                            const fieldCode = m[1];
+                            if (fieldCode === 'PC番号' || fieldCode === '内線番号' || fieldCode === '座席番号') return;
+                            const beforeVal = (m[2] || '').replace(/^\s*[:：]?\s*/, '').trim();
+                            const afterVal  = (m[3] || '').replace(/^\s*[:：]?\s*/, '').trim();
+                            const ledger = fieldToLedger.get(fieldCode) || '';
+                            if (ledger === 'PC台帳') { push(before.pc, fieldCode, beforeVal); push(after.pc, fieldCode, afterVal); }
+                            else if (ledger === '内線台帳') { push(before.ext, fieldCode, beforeVal); push(after.ext, fieldCode, afterVal); }
+                            else if (ledger === '座席台帳') { push(before.seat, fieldCode, beforeVal); push(after.seat, fieldCode, afterVal); }
+                        });
+                        if (CONFIG.historyApp.fields.beforePCOthers)   record[CONFIG.historyApp.fields.beforePCOthers]   = { value: before.pc.join(',') };
+                        if (CONFIG.historyApp.fields.beforeExtOthers)  record[CONFIG.historyApp.fields.beforeExtOthers]  = { value: before.ext.join(',') };
+                        if (CONFIG.historyApp.fields.beforeSeatOthers) record[CONFIG.historyApp.fields.beforeSeatOthers] = { value: before.seat.join(',') };
+                        if (CONFIG.historyApp.fields.afterPCOthers)    record[CONFIG.historyApp.fields.afterPCOthers]    = { value: after.pc.join(',') };
+                        if (CONFIG.historyApp.fields.afterExtOthers)   record[CONFIG.historyApp.fields.afterExtOthers]   = { value: after.ext.join(',') };
+                        if (CONFIG.historyApp.fields.afterSeatOthers)  record[CONFIG.historyApp.fields.afterSeatOthers]  = { value: after.seat.join(',') };
+                    } catch (e) { /* noop */ }
                     if (historyData.request) record[CONFIG.historyApp.fields.request] = { value: JSON.stringify(historyData.request) };
                     if (historyData.response) record[CONFIG.historyApp.fields.response] = { value: JSON.stringify(historyData.response) };
                     if (historyData.error) record[CONFIG.historyApp.fields.error] = { value: JSON.stringify(historyData.error) };
@@ -197,6 +243,43 @@ class ExportAndHistory {
                     if (historyData.changeContent) record[CONFIG.historyApp.fields.changeContent] = { value: historyData.changeContent };
                     if (historyData.integrationKeyAfter) record[CONFIG.historyApp.fields.integrationKeyAfter] = { value: historyData.integrationKeyAfter };
                     if (historyData.integrationKeyBefore) record[CONFIG.historyApp.fields.integrationKeyBefore] = { value: historyData.integrationKeyBefore };
+                    // 新レイアウト向け: 統合キー→主キー3種 + 「その他」3種
+                    try {
+                        const di = window.dataIntegrator || new DataIntegrator();
+                        const parsedBefore = historyData.integrationKeyBefore ? di.parseIntegrationKey(historyData.integrationKeyBefore) : { PC: '', EXT: '', SEAT: '' };
+                        const parsedAfter = historyData.integrationKeyAfter ? di.parseIntegrationKey(historyData.integrationKeyAfter) : { PC: '', EXT: '', SEAT: '' };
+                        if (CONFIG.historyApp.fields.beforePCNumber) record[CONFIG.historyApp.fields.beforePCNumber] = { value: parsedBefore.PC || '' };
+                        if (CONFIG.historyApp.fields.beforeExtNumber) record[CONFIG.historyApp.fields.beforeExtNumber] = { value: parsedBefore.EXT || '' };
+                        if (CONFIG.historyApp.fields.beforeSeatNumber) record[CONFIG.historyApp.fields.beforeSeatNumber] = { value: parsedBefore.SEAT || '' };
+                        if (CONFIG.historyApp.fields.afterPCNumber) record[CONFIG.historyApp.fields.afterPCNumber] = { value: parsedAfter.PC || '' };
+                        if (CONFIG.historyApp.fields.afterExtNumber) record[CONFIG.historyApp.fields.afterExtNumber] = { value: parsedAfter.EXT || '' };
+                        if (CONFIG.historyApp.fields.afterSeatNumber) record[CONFIG.historyApp.fields.afterSeatNumber] = { value: parsedAfter.SEAT || '' };
+
+                        const changeText = historyData.changeContent || '';
+                        const fieldToLedger = new Map();
+                        try { CONFIG.integratedTableConfig.columns.forEach(col => { if (col && col.fieldCode) fieldToLedger.set(col.fieldCode, col.ledger); }); } catch (ee) { /* noop */ }
+                        const push = (arr, code, val) => { if (val && val !== '(空)') arr.push(`${code}:${val}`); };
+                        const before = { pc: [], ext: [], seat: [] };
+                        const after  = { pc: [], ext: [], seat: [] };
+                        changeText.split(/\r?\n/).map(s => s.trim()).filter(Boolean).forEach(line => {
+                            const m = line.match(/^【(.+?)】(.*?)→(.*)$/);
+                            if (!m) return;
+                            const fieldCode = m[1];
+                            if (fieldCode === 'PC番号' || fieldCode === '内線番号' || fieldCode === '座席番号') return;
+                            const beforeVal = (m[2] || '').replace(/^\s*[:：]?\s*/, '').trim();
+                            const afterVal  = (m[3] || '').replace(/^\s*[:：]?\s*/, '').trim();
+                            const ledger = fieldToLedger.get(fieldCode) || '';
+                            if (ledger === 'PC台帳') { push(before.pc, fieldCode, beforeVal); push(after.pc, fieldCode, afterVal); }
+                            else if (ledger === '内線台帳') { push(before.ext, fieldCode, beforeVal); push(after.ext, fieldCode, afterVal); }
+                            else if (ledger === '座席台帳') { push(before.seat, fieldCode, beforeVal); push(after.seat, fieldCode, afterVal); }
+                        });
+                        if (CONFIG.historyApp.fields.beforePCOthers)   record[CONFIG.historyApp.fields.beforePCOthers]   = { value: before.pc.join(',') };
+                        if (CONFIG.historyApp.fields.beforeExtOthers)  record[CONFIG.historyApp.fields.beforeExtOthers]  = { value: before.ext.join(',') };
+                        if (CONFIG.historyApp.fields.beforeSeatOthers) record[CONFIG.historyApp.fields.beforeSeatOthers] = { value: before.seat.join(',') };
+                        if (CONFIG.historyApp.fields.afterPCOthers)    record[CONFIG.historyApp.fields.afterPCOthers]    = { value: after.pc.join(',') };
+                        if (CONFIG.historyApp.fields.afterExtOthers)   record[CONFIG.historyApp.fields.afterExtOthers]   = { value: after.ext.join(',') };
+                        if (CONFIG.historyApp.fields.afterSeatOthers)  record[CONFIG.historyApp.fields.afterSeatOthers]  = { value: after.seat.join(',') };
+                    } catch (e) { /* noop */ }
                     if (historyData.request) record[CONFIG.historyApp.fields.request] = { value: JSON.stringify(historyData.request) };
                     if (historyData.response) record[CONFIG.historyApp.fields.response] = { value: JSON.stringify(historyData.response) };
                     if (historyData.error) record[CONFIG.historyApp.fields.error] = { value: JSON.stringify(historyData.error) };
