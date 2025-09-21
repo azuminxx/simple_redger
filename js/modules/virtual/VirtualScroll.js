@@ -430,6 +430,23 @@ class VirtualScroll {
         return `PC:${pc}|EXT:${ext}|SEAT:${seat}`;
     }
 
+    // 行の各台帳用「台帳別統合キー」フィールドを現在値から再計算して同期
+    syncLedgerIntegrationKeysForRow(recordIndex) {
+        try {
+            if (!window.tableRenderer || !window.tableRenderer.currentSearchResults) return;
+            const row = window.tableRenderer.currentSearchResults[recordIndex];
+            if (!row) return;
+            const ik = this.generateIntegrationKeyFromRow(row);
+            Object.values(CONFIG.apps).forEach(app => {
+                const ledger = app.name;
+                const keyField = `${ledger}_${CONFIG.integrationKey}`;
+                row[keyField] = ik;
+            });
+        } catch (e) { /* noop */ }
+    }
+
+    
+
     // 行が全て空か判定（変更フラグやシステム列は除外）
     isRowAllEmpty(row) {
         try {
@@ -444,6 +461,19 @@ class VirtualScroll {
     // 行に含まれる各台帳の統合キーから、指定コンポーネント(PC/EXT/SEAT)の多数決値を取得
     getExpectedComponentFromRow(row, component /* 'PC' | 'EXT' | 'SEAT' */) {
         try {
+            // 編集中の行/フィールドでは期待値ヒントを出さない
+            const recordIdForRow = this.getRecordIdFromRow(row);
+            const changedSetForRow = (recordIdForRow && this.changedFields && this.changedFields.get(recordIdForRow)) || new Set();
+            const isRowEditing = recordIdForRow ? (this.changeFlags && this.changeFlags.get(recordIdForRow)) : false;
+            const componentToFieldKey = { PC: 'PC台帳_PC番号', EXT: '内線台帳_内線番号', SEAT: '座席台帳_座席番号' };
+            const componentToLedger = { PC: 'PC台帳', EXT: '内線台帳', SEAT: '座席台帳' };
+            const targetFieldKey = componentToFieldKey[component];
+            const targetLedger = componentToLedger[component];
+
+            if (isRowEditing || (targetFieldKey && changedSetForRow.has(targetFieldKey))) {
+                return '';
+            }
+
             const counts = new Map();
             const bump = (v) => {
                 if (!v || String(v).trim() === '') return;
@@ -790,25 +820,26 @@ class VirtualScroll {
                         td.className = 'readonly-cell';
                     }
 
-                    // 期待値ヒント（主キーフィールドのみ・不一致時）
+                    // 期待値ヒント（主キーフィールドのみ・現在値が空のときだけ表示）
                     if (!rowIsEmpty && column.primaryKey && (column.fieldCode === 'PC番号' || column.fieldCode === '内線番号' || column.fieldCode === '座席番号')) {
                         const comp = column.fieldCode === 'PC番号' ? 'PC' : (column.fieldCode === '内線番号' ? 'EXT' : 'SEAT');
-                        const expected = this.getExpectedComponentFromRow(record, comp);
                         const actual = (value === null || value === undefined || value === '') ? '' : String(value);
                         const actualNormalized = (actual === '-' ? '' : actual);
-                        if (expected && expected !== actualNormalized) {
-                            const hint = DOMHelper.createElement('span', {}, 'expected-hint');
-                            // 候補: や括弧を付けず、薄いオレンジ色で値のみを併記
-                            hint.textContent = `${expected}`;
-                            hint.style.color = '#ffcc80';
-                            hint.style.marginLeft = '6px';
-                            hint.style.fontSize = '11px';
-                            hint.style.fontWeight = '700';
-                            hint.style.fontStyle = 'italic';
-                            td.appendChild(hint);
-                            td.classList.add('expected-mismatch');
-                            // ツールチップも値のみ
-                            if (td.title) td.title += ` / ${expected}`; else td.title = `${expected}`;
+                        // 現在値が空のときのみ、期待値を併記
+                        if (actualNormalized === '') {
+                            const expected = this.getExpectedComponentFromRow(record, comp);
+                            if (expected) {
+                                const hint = DOMHelper.createElement('span', {}, 'expected-hint');
+                                hint.textContent = `${expected}`;
+                                hint.style.color = '#ffcc80';
+                                hint.style.marginLeft = '6px';
+                                hint.style.fontSize = '11px';
+                                hint.style.fontWeight = '700';
+                                hint.style.fontStyle = 'italic';
+                                td.appendChild(hint);
+                                td.classList.add('expected-mismatch');
+                                if (td.title) td.title += ` / ${expected}`; else td.title = `${expected}`;
+                            }
                         }
                     }
                 }

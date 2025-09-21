@@ -525,15 +525,25 @@ class TableRenderer {
             // 変更されたレコードのみから各台帳ごとにレコードをグループ化
             const recordsByApp = this.groupRecordsByApp(changedIndices);
             console.log(`🔄 変更されたレコードの台帳別グループ化:`, recordsByApp);
-            // 各台帳のレコードを一括更新（レコードがある場合のみ）
+            // 各台帳のレコードを一括更新（スキップ件数も集計）
             const updatePromises = [];
+            const preSkippedAppIds = []; // グループ化結果が0件の台帳
             for (const [appId, records] of Object.entries(recordsByApp)) {
                 if (records.length > 0) {
-                    updatePromises.push(this.updateAppRecordsBatch(appId, records, batchId));
+                    updatePromises.push(
+                        this.updateAppRecordsBatch(appId, records, batchId)
+                            .then(res => ({ appId, result: res }))
+                    );
+                } else {
+                    preSkippedAppIds.push(appId);
                 }
             }
             
-            await Promise.all(updatePromises);
+            const results = await Promise.all(updatePromises);
+            const runtimeSkipped = results.filter(r => r && r.result && r.result.skipped).map(r => r.appId);
+            const runtimeUpdated  = results.filter(r => !(r && r.result && r.result.skipped)).map(r => r.appId);
+            const totalSkippedCount = preSkippedAppIds.length + runtimeSkipped.length;
+            const totalUpdatedCount = runtimeUpdated.length;
             // 送信成功後、updateHistoryMap内のpendingエントリに結果反映
             try {
                 for (const [, ledgerHistoryMap] of this.updateHistoryMap) {
@@ -574,6 +584,10 @@ class TableRenderer {
                             window.virtualScroll.originalValues.delete(oldKey);
                         }
                     }
+                    // 保存成功時のみ、台帳別統合キーを現在値で同期（セル交換直後は同期しない）
+                    if (window.virtualScroll && typeof window.virtualScroll.syncLedgerIntegrationKeysForRow === 'function') {
+                        window.virtualScroll.syncLedgerIntegrationKeysForRow(index);
+                    }
                 });
 
                 // 保存後に整合性マップを最新化し、表示も更新（廃止）
@@ -583,8 +597,16 @@ class TableRenderer {
             // 保存成功後に遅延タスクを実行（セル分離後の統合キー再生成や同期など）
             this.runPostSaveTasks();
             
-            // 成功メッセージをトーストで表示
-            this.showToast('変更が完了しました', 'success');
+            // 成功メッセージ/スキップ情報をトーストで表示
+            if (totalUpdatedCount === 0 && totalSkippedCount > 0) {
+                this.showToast('更新対象なし（空の変更のためスキップ）', 'info');
+            } else if (totalSkippedCount > 0) {
+                const appNames = (ids) => ids.map(id => CONFIG.apps[id]?.name || id).join(', ');
+                this.showToast(`変更完了（一部スキップ: ${totalSkippedCount}件）`, 'success');
+                console.info(`スキップされた台帳: ${appNames([...preSkippedAppIds, ...runtimeSkipped])}`);
+            } else {
+                this.showToast('変更が完了しました', 'success');
+            }
             
         } catch (error) {
             console.error('❌ 保存エラー:', error);
@@ -764,7 +786,10 @@ class TableRenderer {
 					} catch (e) { /* noop */ }
 					// --- ここまで ---
 
-                    updateRecordsByApp[appId].push(updateRecord);
+                    // フィールドが1つも無ければ送信対象に含めない（念のための二重防御）
+                    if (updateRecord && updateRecord.record && Object.keys(updateRecord.record).length > 0) {
+                        updateRecordsByApp[appId].push(updateRecord);
+                    }
                 }
             });
         });
@@ -901,6 +926,12 @@ class TableRenderer {
             if (updateRecords.length === 0) {
                 return { skipped: true };
             }
+            // 念のため、全レコードで body が空でないかを検証（追加のフェイルセーフ）
+            const hasValidPayload = updateRecords.some(r => r && r.record && Object.keys(r.record).length > 0);
+            if (!hasValidPayload) {
+                console.warn(`[安全装置] 空の一括更新を検出し、API呼び出しを中断しました appId=${appId}`);
+                return { skipped: true };
+            }
             
             // API実行回数をカウント
             window.apiCounter.count(appId, 'レコード一括更新');
@@ -992,49 +1023,61 @@ class TableRenderer {
                     beforeExtNumber = extBefore || '';
                     beforeSeatNumber = seatBefore || '';
 
-                    let currentRowWithSameSeat = null;
-                    if (seatBefore) {
-                        currentRowWithSameSeat = this.currentSearchResults.find(r => String(r['座席台帳_座席番号'] || '') === String(seatBefore));
+                    // 変更後は、当該レコードIDに対応する現在の統合行から取得する
+                    const rowAfter = this.currentSearchResults.find(r => r && String(r[`${ledgerNameHere}_$id`]) === String(recordIdValue));
+                    if (rowAfter) {
+                        afterPCNumber = rowAfter['PC台帳_PC番号'] || '';
+                        afterExtNumber = rowAfter['内線台帳_内線番号'] || '';
+                        afterSeatNumber = rowAfter['座席台帳_座席番号'] || '';
                     }
-                    if (currentRowWithSameSeat) {
-                        afterPCNumber = currentRowWithSameSeat['PC台帳_PC番号'] || '';
-                        afterExtNumber = currentRowWithSameSeat['内線台帳_内線番号'] || '';
-                        afterSeatNumber = seatBefore;
-                    } else {
-                        // フォールバック: 当該PCレコードが属する現在行
-                        const rowAfter = this.currentSearchResults.find(r => r && String(r[`${ledgerNameHere}_$id`]) === String(recordIdValue));
-                        if (rowAfter) {
-                            afterPCNumber = rowAfter['PC台帳_PC番号'] || '';
-                            afterExtNumber = rowAfter['内線台帳_内線番号'] || '';
-                            afterSeatNumber = rowAfter['座席台帳_座席番号'] || '';
-                        }
-                    }
+                    // 送信ペイロードが持つ確定後の値で上書き（UI反映タイミング差の影響を排除）
+                    try {
+                        const recPayload = updateRecords[index] && updateRecords[index].record ? updateRecords[index].record : {};
+                        if (recPayload['PC番号'] && recPayload['PC番号'].value !== undefined) afterPCNumber = recPayload['PC番号'].value;
+                        if (recPayload['内線番号'] && recPayload['内線番号'].value !== undefined) afterExtNumber = recPayload['内線番号'].value;
+                        if (recPayload['座席番号'] && recPayload['座席番号'].value !== undefined) afterSeatNumber = recPayload['座席番号'].value;
+                        // その上で、このレコードで変更していない主キー軸は before に揃える
+                        const changedCodes = new Set(Object.keys(recPayload));
+                        if (!changedCodes.has('PC番号')) afterPCNumber = beforePCNumber;
+                        if (!changedCodes.has('内線番号')) afterExtNumber = beforeExtNumber;
+                        if (!changedCodes.has('座席番号')) afterSeatNumber = beforeSeatNumber;
+                    } catch (ee) { /* noop */ }
                 } catch (e) { /* noop */ }
 
-                // その他（台帳別）を changeContent から抽出
+                // 変更対象フィールドを解析し、主キーが未変更の軸は after を before に揃える
+                // 併せて「その他」カラムも作成
                 let beforePCOthers = '', beforeExtOthers = '', beforeSeatOthers = '';
                 let afterPCOthers = '', afterExtOthers = '', afterSeatOthers = '';
                 try {
                     const lines = (changeContent || '').split('\n').map(s => s.trim()).filter(Boolean);
+                    const changedSet = new Set();
                     const fieldToLedger = new Map();
                     try { CONFIG.integratedTableConfig.columns.forEach(col => { if (col && col.fieldCode) fieldToLedger.set(col.fieldCode, col.ledger); }); } catch (ee) { /* noop */ }
                     const push = (arr, code, val) => { if (val && val !== '(空)') arr.push(`${code}:${val}`); };
-                    const before = { pc: [], ext: [], seat: [] };
-                    const after = { pc: [], ext: [], seat: [] };
+                    const othersBefore = { pc: [], ext: [], seat: [] };
+                    const othersAfter  = { pc: [], ext: [], seat: [] };
                     lines.forEach(line => {
                         const m = line.match(/^【(.+?)】(.*?)→(.*)$/);
                         if (!m) return;
                         const fieldCode = m[1];
-                        if (fieldCode === 'PC番号' || fieldCode === '内線番号' || fieldCode === '座席番号') return;
                         const bVal = (m[2] || '').replace(/^\s*[:：]?\s*/, '').trim();
                         const aVal = (m[3] || '').replace(/^\s*[:：]?\s*/, '').trim();
+                        // 変更フィールドを記録
+                        changedSet.add(fieldCode);
+                        // その他抽出（主キーは除外）
+                        if (fieldCode === 'PC番号' || fieldCode === '内線番号' || fieldCode === '座席番号') return;
                         const ledger = fieldToLedger.get(fieldCode) || '';
-                        if (ledger === 'PC台帳') { push(before.pc, fieldCode, bVal); push(after.pc, fieldCode, aVal); }
-                        else if (ledger === '内線台帳') { push(before.ext, fieldCode, bVal); push(after.ext, fieldCode, aVal); }
-                        else if (ledger === '座席台帳') { push(before.seat, fieldCode, bVal); push(after.seat, fieldCode, aVal); }
+                        if (ledger === 'PC台帳') { push(othersBefore.pc, fieldCode, bVal); push(othersAfter.pc, fieldCode, aVal); }
+                        else if (ledger === '内線台帳') { push(othersBefore.ext, fieldCode, bVal); push(othersAfter.ext, fieldCode, aVal); }
+                        else if (ledger === '座席台帳') { push(othersBefore.seat, fieldCode, bVal); push(othersAfter.seat, fieldCode, aVal); }
                     });
-                    beforePCOthers = before.pc.join(','); beforeExtOthers = before.ext.join(','); beforeSeatOthers = before.seat.join(',');
-                    afterPCOthers = after.pc.join(','); afterExtOthers = after.ext.join(','); afterSeatOthers = after.seat.join(',');
+                    // 主キーが変更対象に含まれていない軸は after を before に揃える（保険）
+                    if (!changedSet.has('PC番号'))   afterPCNumber = afterPCNumber; // recPayload 優先のため上書きは行わない
+                    if (!changedSet.has('内線番号')) afterExtNumber = afterExtNumber;
+                    if (!changedSet.has('座席番号')) afterSeatNumber = afterSeatNumber;
+                    // その他の文字列を結合
+                    beforePCOthers = othersBefore.pc.join(','); beforeExtOthers = othersBefore.ext.join(','); beforeSeatOthers = othersBefore.seat.join(',');
+                    afterPCOthers  = othersAfter.pc.join(',');  afterExtOthers  = othersAfter.ext.join(',');  afterSeatOthers  = othersAfter.seat.join(',');
                 } catch (e) { /* noop */ }
 
                 const historyData = {

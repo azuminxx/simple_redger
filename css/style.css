@@ -120,6 +120,45 @@
     text-align: left;
 }
 
+/* 履歴テーブル：台帳リンク3列の固定幅と自動縮小 */
+.history-table th.col-pc,
+.history-table td.col-pc,
+.history-table th.col-ext,
+.history-table td.col-ext,
+.history-table th.col-seat,
+.history-table td.col-seat {
+    width: 50px;
+    min-width: 50px;
+    max-width: 50px;
+    white-space: nowrap;
+}
+
+.history-table td.col-pc a,
+.history-table td.col-ext a,
+.history-table td.col-seat a {
+    display: inline-block;
+    max-width: 100%;
+    font-size: 12px;
+    line-height: 1.1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* はみ出す場合の微縮小（2段階） */
+.history-table td.col-pc a:has(span.shrink),
+.history-table td.col-ext a:has(span.shrink),
+.history-table td.col-seat a:has(span.shrink) {
+    font-size: 11px;
+}
+
+/* ヘッダー固定 */
+.history-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+
 .history-table th {
     background-color: #f8f9fa;
     font-weight: 600;
@@ -148,6 +187,32 @@
 .detail-btn:hover {
     background-color: #0056b3;
 }
+
+/* === 履歴テーブル視認性UP === */
+/* 左端ガイド（行クラスでON） */
+.history-table tr.row-before { border-left: 4px solid #c7cdd8; background: #f8fafc; }
+.history-table tr.row-after  { border-left: 4px solid #2f80ed44; background: #f7fbff; }
+
+/* (空)のバッジ */
+.history-table .pill {
+    display: inline-block;
+    padding: 0 6px;
+    border-radius: 10px;
+    background: #eef1f4;
+    color: #6b7280;
+    font-size: 12px;
+}
+
+/* 変更後の値を少し強調 */
+.history-table .v-after { font-weight: 700; color: #1f2937; }
+.history-table .diff-arrow { padding: 0 3px; color: #6b7280; }
+.history-table .diff-after { font-weight: 700; color: #c81e1e; }
+/* 旧値の強調を取り消し（通常色・通常太さに戻す） */
+.history-table .diff-before { color: inherit; font-weight: inherit; }
+.history-table .old-strike { text-decoration: line-through; color: #9ca3af; margin-right: 2px; }
+
+/* ペア行のホバー連動 */
+.history-table tr.pair-hover { outline: 2px solid #cfe8ff; outline-offset: -2px; }
 
 /* 検索フォーム */
 .search-form {
