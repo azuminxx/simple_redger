@@ -4,6 +4,7 @@
 class TabManager {
     constructor() {
         this.currentActiveTab = null;
+        this.seatMap = null;
     }
 
     /**
@@ -102,6 +103,19 @@ class TabManager {
             lendingContent.appendChild(errorMessage);
         }
         tabContainer.appendChild(lendingContent);
+
+        // 座席表タブのタブコンテンツを追加（Konva）
+        const seatmapContent = DOMHelper.createElement('div', { id: 'tab-seatmap' }, 'tab-content');
+        try {
+            this.seatMap = new SeatMap();
+            const seatmapView = this.seatMap.buildTabContent();
+            seatmapContent.appendChild(seatmapView);
+        } catch (e) {
+            const errorMessage = DOMHelper.createElement('div', {}, 'error-message');
+            errorMessage.textContent = '座席表タブの初期化に失敗しました';
+            seatmapContent.appendChild(errorMessage);
+        }
+        tabContainer.appendChild(seatmapContent);
 
         // 更新履歴タブのタブコンテンツを追加
         const historyContent = DOMHelper.createElement('div', { id: 'tab-history' }, 'tab-content');
@@ -227,7 +241,7 @@ class TabManager {
         inconsistencyContent.appendChild(inconsistencyTable);
         tabContainer.appendChild(inconsistencyContent);
 
-        // 座席表タブは廃止
+        // 座席表タブ 追加済み
 
         return tabContainer;
     }
@@ -253,7 +267,14 @@ class TabManager {
             tabMenu.appendChild(tabButton);
         });
 
-        // 更新履歴タブ（座席台帳のすぐ隣）
+        // 座席表タブ（座席台帳のすぐ隣）
+        const seatmapTabButton = DOMHelper.createElement('button', {}, 'tab-button seatmap-tab');
+        seatmapTabButton.setAttribute('data-app', 'seatmap');
+        seatmapTabButton.textContent = '🗺️ 座席表';
+        seatmapTabButton.addEventListener('click', () => this.switchTab('seatmap'));
+        tabMenu.appendChild(seatmapTabButton);
+
+        // 更新履歴タブ（座席表の隣）
         const historyTabButton = DOMHelper.createElement('button', {}, 'tab-button history-tab');
         historyTabButton.setAttribute('data-app', 'history');
         historyTabButton.textContent = '📋 更新履歴';
@@ -281,7 +302,7 @@ class TabManager {
         settingsTabButton.addEventListener('click', () => this.switchTab('settings'));
         tabMenu.appendChild(settingsTabButton);
 
-        // 座席表タブは廃止
+        // 座席表タブ 追加済み
 
         return tabMenu;
     }
@@ -402,7 +423,10 @@ class TabManager {
             this.openSearchMenuIfClosed();
         }
 
-        // 座席表タブ廃止に伴い、初期化/破棄処理は不要
+        // 座席表タブ: 表示時にsearch-resultsは非表示（toggleSearchResultsVisibilityで制御）
+        if (appId === 'seatmap') {
+            // 必要があればここで追加の初期化を行う
+        }
 
         // search-results要素の表示・非表示を切り替え
         this.toggleSearchResultsVisibility(appId);

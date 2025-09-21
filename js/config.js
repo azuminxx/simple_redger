@@ -472,5 +472,10 @@ const CONFIG = {
     async generateIntegratedTableColumns() {
         // 静的設定をそのまま返す（動的生成は不要）
         return this.integratedTableConfig.columns;
+    },
+
+    // 座席表用: 拠点+階 選択肢
+    seatMap: {
+        siteFloorOptions: ['埼玉01F', '埼玉02F', '埼玉03F', '埼玉04F', '池袋19F']
     }
 }; 
