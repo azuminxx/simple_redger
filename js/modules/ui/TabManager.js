@@ -267,31 +267,31 @@ class TabManager {
             tabMenu.appendChild(tabButton);
         });
 
-        // 座席表タブ（座席台帳のすぐ隣）
-        const seatmapTabButton = DOMHelper.createElement('button', {}, 'tab-button seatmap-tab');
-        seatmapTabButton.setAttribute('data-app', 'seatmap');
-        seatmapTabButton.textContent = '🗺️ 座席表';
-        seatmapTabButton.addEventListener('click', () => this.switchTab('seatmap'));
-        tabMenu.appendChild(seatmapTabButton);
-
-        // 更新履歴タブ（座席表の隣）
+        // 更新履歴タブ
         const historyTabButton = DOMHelper.createElement('button', {}, 'tab-button history-tab');
         historyTabButton.setAttribute('data-app', 'history');
         historyTabButton.textContent = '📋 更新履歴';
         historyTabButton.addEventListener('click', () => this.switchTab('history'));
         tabMenu.appendChild(historyTabButton);
 
+        // 座席表タブ（更新履歴の右隣）
+        const seatmapTabButton = DOMHelper.createElement('button', {}, 'tab-button seatmap-tab');
+        seatmapTabButton.setAttribute('data-app', 'seatmap');
+        seatmapTabButton.textContent = '🗺️ 座席表';
+        seatmapTabButton.addEventListener('click', () => this.switchTab('seatmap'));
+        tabMenu.appendChild(seatmapTabButton);
+
         // 貸出管理タブ（更新履歴の直後）
         const lendingTabButton = DOMHelper.createElement('button', {}, 'tab-button lending-tab');
         lendingTabButton.setAttribute('data-app', 'lending');
-        lendingTabButton.textContent = '📦 貸出管理（テスト中）';
+        lendingTabButton.textContent = '📦 貸出管理';
         lendingTabButton.addEventListener('click', () => this.switchTab('lending'));
         tabMenu.appendChild(lendingTabButton);
 
         // 不整合タブ（更新履歴の隣）
         const inconsistencyTabButton = DOMHelper.createElement('button', {}, 'tab-button inconsistency-tab');
         inconsistencyTabButton.setAttribute('data-app', 'inconsistency');
-        inconsistencyTabButton.textContent = '⚠️ 不整合（テスト中）';
+        inconsistencyTabButton.textContent = '⚠️ 不整合';
         inconsistencyTabButton.addEventListener('click', () => this.switchTab('inconsistency'));
         tabMenu.appendChild(inconsistencyTabButton);
 
