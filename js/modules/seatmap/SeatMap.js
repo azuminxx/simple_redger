@@ -1096,10 +1096,13 @@
 					if (bg) { bg.moveToBottom(); }
 				} catch(_) { /* noop */ }
 			} else if (type === 'line') {
-				const x2 = Number(meta.settings.x2) || meta.width || 120;
-				const y2 = Number(meta.settings.y2) || 0;
+				// x2/y2 は 0 も有効値。"||" でのフォールバックは避ける
+				const hasX2 = meta.settings && meta.settings.x2 !== undefined && meta.settings.x2 !== null && !isNaN(Number(meta.settings.x2));
+				const hasY2 = meta.settings && meta.settings.y2 !== undefined && meta.settings.y2 !== null && !isNaN(Number(meta.settings.y2));
+				const x2 = hasX2 ? Number(meta.settings.x2) : (Number.isFinite(meta.width) ? Number(meta.width) : 120);
+				const y2 = hasY2 ? Number(meta.settings.y2) : 0;
 				const stroke = meta.settings.stroke || '#1E88E5';
-				const strokeWidth = Number(meta.settings.strokeWidth) || 3;
+				const strokeWidth = (meta.settings && meta.settings.strokeWidth != null) ? Number(meta.settings.strokeWidth) : 3;
 				const ln = new Konva.Line({ points: [0, 0, x2, y2], stroke, strokeWidth, hitStrokeWidth: 12 });
 				group.add(ln);
 				// 直接クリックでも選択・パネル表示できるように
@@ -1114,7 +1117,17 @@
 						this.layer && this.layer.batchDraw();
 					} catch(_) { /* noop */ }
 				});
-				handleB.on('dragend', () => { this._syncSeatMeta(group); });
+				handleB.on('dragend', () => {
+					try {
+						const p = handleB.position();
+						const settings = group.getAttr('partSettings') || {};
+						settings.type = 'line';
+						settings.x2 = Math.round(p.x);
+						settings.y2 = Math.round(p.y);
+						group.setAttr('partSettings', settings);
+					} catch(_) { /* noop */ }
+					this._syncSeatMeta(group);
+				});
 				group.add(handleB);
 			} else {
 				// fallback: rect
@@ -1789,9 +1802,13 @@
 				if (partType === 'line') {
 					// ラインは幅/高さは便宜上の外接矩形サイズとして保存
 					const pts = line ? line.points() : [0, 0, 0, 0];
-					const x2 = (pts[2] || 0) * scaleX;
-					const y2 = (pts[3] || 0) * scaleY;
+					const x2 = (typeof pts[2] === 'number' ? pts[2] : 0) * scaleX;
+					const y2 = (typeof pts[3] === 'number' ? pts[3] : 0) * scaleY;
 					if (line) line.points([0, 0, x2, y2]);
+					// 末端ハンドルも同期
+					try { const hb = group.findOne('.line-handle-b'); if (hb) hb.position({ x: x2, y: y2 }); } catch(_) { /* noop */ }
+					// 設定へ保存（0 も有効値）
+					try { const s = group.getAttr('partSettings') || {}; s.type = 'line'; s.x2 = Math.round(x2); s.y2 = Math.round(y2); group.setAttr('partSettings', s); } catch(_) { /* noop */ }
 					width = Math.max(1, Math.abs(Math.round(x2)));
 					height = Math.max(1, Math.abs(Math.round(y2)));
 				} else if (partType === 'text') {
