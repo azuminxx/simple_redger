@@ -1422,7 +1422,7 @@ td.editable-cell select,
 
 .seatlist-wrapper { display: flex; flex-direction: column; gap: 6px; height: 100%; }
 .seatlist-header { font-weight: 600; color: #495057; }
-.seatlist-filter input { width: 100%; box-sizing: border-box; height: 30px; padding: 4px 8px; border: 1px solid #ced4da; border-radius: 3px; }
+.seatlist-filter input { width: 100%; box-sizing: border-box; height: 28px; padding: 4px 8px; font-size: 12px; border: 1px solid #ced4da; border-radius: 3px; }
 .seatlist-list { display: flex; flex-direction: column; gap: 4px; overflow: auto; flex: 1 1 auto; min-height: 0; }
 .seatlist-empty { color: #6c757d; font-style: italic; padding: 10px; text-align: center; }
 .seat-item { border: 1px solid #e5e7eb; border-radius: 4px; padding: 6px 8px; background: #fff; cursor: grab; }

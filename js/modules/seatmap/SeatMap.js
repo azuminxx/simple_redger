@@ -24,7 +24,7 @@
 			this.isEditing = false;
 			this.gridLayer = null;
 			this.gridSize = 10;
-			this.snapStep = 10;
+			this.snapStep = 5;
 			this.hudLayer = null;
 			this.sizeLabelById = new Map();
 			this.loadingEl = null;
@@ -48,6 +48,11 @@
 			this.textAlignButtons = [];
 			this.textVAlignButtons = [];
 			this._selectedShapeGroup = null;
+			this._selectedLineGroup = null;
+			this._selectedTextGroup = null;
+			this.textValueInputEl = null;
+			this._seatListCtxMenuEl = null;
+			this._onDocClickCtxMenu = null;
 		}
 
 		buildTabContent() {
@@ -109,6 +114,13 @@
 			layout.appendChild(right);
 			this.stageContainer = stageDiv;
 			this.propsPanelEl = props;
+			// 編集OFF初期は左リストを非表示にし、右ステージを全幅に
+			try {
+				if (!this.isEditing && this.leftListContainer) {
+					this.leftListContainer.style.display = 'none';
+					layout.style.gridTemplateColumns = '1fr';
+				}
+			} catch(_) { /* noop */ }
 
 			root.appendChild(layout);
 			this.container = root;
@@ -198,6 +210,7 @@
 			lineWidth.disabled = true;
 			lineWidth.title = '線太さ（選択時のみ）';
 			lineWidth.className = 'seatmap-select';
+			lineWidth.style.width = '60px';
 			this.lineWidthInputEl = lineWidth;
 			lineWidth.addEventListener('input', () => this._applyLineWidthFromControls());
 
@@ -231,6 +244,7 @@
 			fontSizeInput.value = '14';
 			fontSizeInput.disabled = true;
 			fontSizeInput.className = 'seatmap-select';
+			fontSizeInput.style.width = '60px';
 			this.fontSizeInputEl = fontSizeInput;
 			fontSizeInput.addEventListener('input', () => this._applyTextFontSizeFromControls());
 
@@ -415,6 +429,21 @@
 			// 2行目: 編集系をグループ化
 			const editTitle = document.createElement('span'); editTitle.className = 'seatmap-edit-group-title'; editTitle.textContent = '編集';
 			row2.appendChild(editTitle);
+			// テキスト内容
+			const textValueLabel = document.createElement('span');
+			textValueLabel.textContent = 'テキスト:';
+			textValueLabel.style.marginLeft = '8px';
+			textValueLabel.style.marginRight = '4px';
+			const textValueInput = document.createElement('input');
+			textValueInput.type = 'text';
+			textValueInput.className = 'seatmap-select';
+			textValueInput.placeholder = '選択中テキストの内容';
+			textValueInput.disabled = true;
+			textValueInput.style.width = '120px';
+			this.textValueInputEl = textValueInput;
+			textValueInput.addEventListener('input', () => this._applyTextValueFromControls());
+			row2.appendChild(textValueLabel);
+			row2.appendChild(textValueInput);
 			row2.appendChild(lineWidthLabel);
 			row2.appendChild(lineWidth);
 			row2.appendChild(colorBtn);
@@ -438,6 +467,7 @@
 
 			wrap.appendChild(row1);
 			wrap.appendChild(row2);
+			// テキスト入力欄の幅は固定値（動的計測は行わない）
 			// パーツ追加ボタンは上記グループに移動済み
 			// 初期状態（編集OFF）では編集系を非表示
 			this._updateEditControlsVisibility(false);
@@ -475,6 +505,21 @@
 			this.leftListEl = list;
 			// 初期表示は空。表示ボタン押下後に実データを描画
 
+			// 右クリックメニュー（パーツのみ）
+			list.addEventListener('contextmenu', (e) => {
+				try {
+					const item = e.target && e.target.closest && e.target.closest('.seat-item');
+					if (!item) return;
+					const json = item.getAttribute('data-seat') || '';
+					if (!json) return;
+					let payload = null; try { payload = JSON.parse(json); } catch(_) { payload = null; }
+					const ot = payload && String(payload.objectType || '');
+					if (ot !== '図形' && ot !== 'テキスト' && ot !== '線') return; // パーツ以外は対象外
+					e.preventDefault();
+					this._openSeatListContextMenu(e, item, payload);
+				} catch(_) { /* noop */ }
+			});
+
 			// フィルタイベント
 			this.filterInputEl.addEventListener('input', () => this._applyListFilter());
 
@@ -482,6 +527,78 @@
 			wrapper.appendChild(filterWrap);
 			wrapper.appendChild(list);
 			return wrapper;
+		}
+
+		_openSeatListContextMenu(e, itemEl, payload) {
+			try {
+				// 既存を閉じる
+				this._closeSeatListContextMenu();
+				const menu = document.createElement('div');
+				menu.className = 'seatmap-ctx-menu';
+				menu.style.position = 'absolute';
+				menu.style.left = Math.round((e && e.clientX ? e.clientX : 0) + window.scrollX) + 'px';
+				menu.style.top = Math.round((e && e.clientY ? e.clientY : 0) + window.scrollY) + 'px';
+				menu.style.background = '#fff';
+				menu.style.border = '1px solid #e5e7eb';
+				menu.style.borderRadius = '6px';
+				menu.style.boxShadow = '0 4px 10px rgba(0,0,0,0.08)';
+				menu.style.zIndex = '50';
+				menu.style.minWidth = '160px';
+				menu.style.fontSize = '12px';
+				const del = document.createElement('div');
+				del.textContent = '削除（完全削除）';
+				del.style.padding = '8px 10px';
+				del.style.cursor = 'pointer';
+				del.addEventListener('mouseenter', () => { del.style.background = '#f2f5f9'; });
+				del.addEventListener('mouseleave', () => { del.style.background = '#fff'; });
+				del.addEventListener('click', async () => {
+					try {
+						const recordId = String(payload && payload.recordId || '');
+						if (!recordId) return;
+						if (!confirm('このパーツを完全に削除します。よろしいですか？')) return;
+						const appId = CONFIG.getAppIdByLedgerName('座席台帳') || 8;
+						await kintone.api(kintone.api.url('/k/v1/records', true), 'DELETE', { app: String(appId), ids: [ String(recordId) ] });
+						// 左リストから削除
+						try { if (itemEl && itemEl.parentNode) itemEl.parentNode.removeChild(itemEl); } catch(_) { /* noop */ }
+						// 画面上のノードがあれば除去
+						try {
+							const node = this.seatIdToNode.get(String(recordId));
+							if (node) { this.seatIdToNode.delete(String(recordId)); node.destroy(); }
+						} catch(_) { /* noop */ }
+						this.pendingChanges.delete(String(recordId));
+					} catch (err) {
+						console.error('完全削除エラー', err);
+						alert('削除に失敗しました');
+					} finally {
+						this._closeSeatListContextMenu();
+					}
+				});
+				menu.appendChild(del);
+				document.body.appendChild(menu);
+				this._seatListCtxMenuEl = menu;
+				this._onDocClickCtxMenu = (ev) => {
+					try {
+						if (!this._seatListCtxMenuEl) return;
+						if (!this._seatListCtxMenuEl.contains(ev.target)) {
+							this._closeSeatListContextMenu();
+						}
+					} catch(_) { /* noop */ }
+				};
+				document.addEventListener('mousedown', this._onDocClickCtxMenu, true);
+			} catch(_) { /* noop */ }
+		}
+
+		_closeSeatListContextMenu() {
+			try {
+				if (this._seatListCtxMenuEl && this._seatListCtxMenuEl.parentNode) {
+					this._seatListCtxMenuEl.parentNode.removeChild(this._seatListCtxMenuEl);
+				}
+				this._seatListCtxMenuEl = null;
+				if (this._onDocClickCtxMenu) {
+					document.removeEventListener('mousedown', this._onDocClickCtxMenu, true);
+					this._onDocClickCtxMenu = null;
+				}
+			} catch(_) { /* noop */ }
 		}
 
 		_showLoading(text) {
@@ -960,6 +1077,23 @@
 							this.transformer.nodes([]);
 							this._hideAllSizeLabels();
 							this._hidePropsPanel();
+						// 全ラインの先端ハンドルを非表示
+						try { this.seatIdToNode.forEach(g => { const hb = g.findOne('.line-handle-b'); if (hb) hb.visible(false); }); } catch(_) { /* noop */ }
+						// UIを無効化
+						try {
+							if (this.lineWidthInputEl) this.lineWidthInputEl.disabled = true;
+							if (this.lineColorBtnEl) this.lineColorBtnEl.disabled = true;
+							if (this.textBgColorBtnEl) this.textBgColorBtnEl.disabled = true;
+							if (this.fontSizeInputEl) this.fontSizeInputEl.disabled = true;
+							if (this.fontBoldCheckboxEl) this.fontBoldCheckboxEl.disabled = true;
+							if (this.fontFamilySelectEl) this.fontFamilySelectEl.disabled = true;
+							this.textAlignButtons.forEach(b => b.disabled = true);
+							this.textVAlignButtons.forEach(b => b.disabled = true);
+						} catch(_) { /* noop */ }
+							// 選択参照を全クリア（誤適用防止）
+							this._selectedLineGroup = null;
+							this._selectedTextGroup = null;
+							this._selectedShapeGroup = null;
 							this.layer.draw();
 						}
 					} catch(_) { /* noop */ }
@@ -1027,13 +1161,45 @@
 						}
 					}
 				} catch(_) { /* noop */ }
+				// 座席選択時は色・フォント系の対象は存在しないため、選択参照とUIをリセット
+				this._selectedLineGroup = null;
+				this._selectedTextGroup = null;
+				this._selectedShapeGroup = null;
+				try {
+					if (this.lineWidthInputEl) this.lineWidthInputEl.disabled = true;
+					if (this.lineColorBtnEl) this.lineColorBtnEl.disabled = true;
+					if (this.textBgColorBtnEl) this.textBgColorBtnEl.disabled = true;
+					if (this.textValueInputEl) this.textValueInputEl.disabled = true;
+					if (this.fontSizeInputEl) this.fontSizeInputEl.disabled = true;
+					if (this.fontBoldCheckboxEl) this.fontBoldCheckboxEl.disabled = true;
+					if (this.fontFamilySelectEl) this.fontFamilySelectEl.disabled = true;
+					this.textAlignButtons.forEach(b => b.disabled = true);
+					this.textVAlignButtons.forEach(b => b.disabled = true);
+					// 全ラインのハンドルは非表示
+					this.seatIdToNode.forEach(g => { const hb = g.findOne('.line-handle-b'); if (hb) hb.visible(false); });
+				} catch(_) { /* noop */ }
+				this._hideAllSizeLabels();
 				this._showSizeLabel(group);
 				this._showPropsPanelFor(group);
 				this.layer.draw();
 			});
 			// ドラッグ/リサイズ後にメタ更新
 			group.on('dragmove', () => { this._applySnap(group); this._updateSizeLabel(group); });
-			group.on('dragend', () => { this._applySnap(group); this._syncSeatMeta(group); this._updateSizeLabel(group); });
+			group.on('dragend', (e) => {
+				try {
+					// ドロップ先が左リスト領域なら未配置へ移動（表示=false）
+					const left = this.leftListContainer || this.leftListEl;
+					const evt = (e && e.evt) ? e.evt : null;
+					if (left && evt && typeof evt.clientX === 'number' && typeof evt.clientY === 'number') {
+						const rect = left.getBoundingClientRect();
+						if (evt.clientX >= rect.left && evt.clientX <= rect.right && evt.clientY >= rect.top && evt.clientY <= rect.bottom) {
+							this._moveGroupToLeftList(group);
+							return;
+						}
+					}
+				} catch(_) { /* noop */ }
+				this._applySnap(group); this._syncSeatMeta(group); this._updateSizeLabel(group);
+			});
 			group.on('transform', () => { this._updateSizeLabel(group); });
 			group.on('transformend', () => { this._syncSeatMeta(group); this._updateSizeLabel(group); });
 			this.transformer.on('transform', () => { const nodes = this.transformer.nodes(); nodes && nodes.forEach(n => this._updateSizeLabel(n)); });
@@ -1090,6 +1256,8 @@
 				const vAlign = (meta.settings && meta.settings.verticalAlign) ? meta.settings.verticalAlign : 'middle';
 				const t = new Konva.Text({ x: 0, y: 0, width: meta.width, height: meta.height, text, fontSize, fill: color, align, verticalAlign: vAlign, fontStyle, fontFamily });
 				group.add(t);
+				// ダブルクリックで編集モード（コントロールの入力にフォーカス）
+				try { t.on('dblclick', (e) => { try { e && (e.cancelBubble = true); group.fire('dblclick'); } catch(_) { /* noop */ } }); } catch(_) { /* noop */ }
 				// 背景Rectがある場合にテキストの後ろに回す
 				try {
 					const bg = group.findOne('.text-bg-rect');
@@ -1155,6 +1323,12 @@
 					const ln = group.findOne('Line');
 					if (ln) { ln.stroke(ln.stroke() || '#1E88E5'); }
 				} catch(_) { /* noop */ }
+				// 前のサイズラベルを隠してから現在のみに表示
+				this._hideAllSizeLabels();
+				// 旧選択参照をクリア（色適用の漏れを防止）
+				this._selectedLineGroup = null;
+				this._selectedTextGroup = null;
+				this._selectedShapeGroup = null;
 				// リサイズ可能設定
 				const t = (group.getAttr('partSettings') && group.getAttr('partSettings').type) || '';
 				if (t === 'line') {
@@ -1164,11 +1338,12 @@
 					// 上部メニュー（線プロパティ）を有効化し、現在値を反映
 					try {
 						const ln = group.findOne('Line');
-						if (this.lineWidthInputEl) { this.lineWidthInputEl.disabled = false; this.lineWidthInputEl.value = String((ln && ln.strokeWidth && ln.strokeWidth()) || 3); }
-						if (this.lineColorBtnEl) { this.lineColorBtnEl.disabled = false; }
+					if (this.lineWidthInputEl) { this.lineWidthInputEl.disabled = false; this.lineWidthInputEl.value = String((ln && ln.strokeWidth && ln.strokeWidth()) || 3); }
+					if (this.lineColorBtnEl) { this.lineColorBtnEl.disabled = false; }
 					if (this.textBgColorBtnEl) { this.textBgColorBtnEl.disabled = true; }
 					this._selectedShapeGroup = null;
-						this._selectedLineGroup = group;
+					this._selectedTextGroup = null;
+					this._selectedLineGroup = group;
 					} catch(_) { /* noop */ }
 				} else if (t === 'text') {
 					// テキスト: ハンドルは四隅・縁。上部メニューをフォント設定に流用
@@ -1182,8 +1357,9 @@
 					try {
 						const tx = group.findOne('Text');
 						if (this.lineWidthInputEl) { this.lineWidthInputEl.disabled = true; }
-						if (this.fontSizeInputEl) { this.fontSizeInputEl.disabled = false; this.fontSizeInputEl.value = String((tx && tx.fontSize && tx.fontSize()) || 14); }
-						if (this.fontBoldCheckboxEl) { this.fontBoldCheckboxEl.disabled = false; this.fontBoldCheckboxEl.checked = (tx && tx.fontStyle && String(tx.fontStyle()).includes('bold')) || false; }
+						if (this.textValueInputEl) { this.textValueInputEl.disabled = false; this.textValueInputEl.value = String((tx && tx.text && tx.text()) || ''); }
+					if (this.fontSizeInputEl) { this.fontSizeInputEl.disabled = false; this.fontSizeInputEl.value = String((tx && tx.fontSize && tx.fontSize()) || 14); }
+					if (this.fontBoldCheckboxEl) { this.fontBoldCheckboxEl.disabled = false; this.fontBoldCheckboxEl.checked = (tx && tx.fontStyle && String(tx.fontStyle()).includes('bold')) || false; }
 					if (this.fontFamilySelectEl) { this.fontFamilySelectEl.disabled = false; const ff = (tx && tx.fontFamily && tx.fontFamily()) || 'system-ui'; this.fontFamilySelectEl.value = ff; }
 					if (this.lineColorBtnEl) { this.lineColorBtnEl.disabled = false; }
 					if (this.textBgColorBtnEl) { this.textBgColorBtnEl.disabled = false; }
@@ -1198,6 +1374,7 @@
 						this.textVAlignButtons.forEach(b => { if (b && b.dataset && b.dataset.valign === va) b.classList.add('active'); });
 					} catch(_) { /* noop */ }
 					this._selectedShapeGroup = null;
+					this._selectedLineGroup = null;
 					this._selectedTextGroup = group;
 					} catch(_) { /* noop */ }
 					// ラインハンドルは全て非表示
@@ -1222,6 +1399,7 @@
 						}
 						if (this.lineColorBtnEl) this.lineColorBtnEl.disabled = false; // 図形の枠線色
 						if (this.textBgColorBtnEl) this.textBgColorBtnEl.disabled = false; // 図形の塗り
+						if (this.textValueInputEl) this.textValueInputEl.disabled = true; // テキスト入力は無効
 						if (this.fontSizeInputEl) this.fontSizeInputEl.disabled = true;
 						if (this.fontBoldCheckboxEl) this.fontBoldCheckboxEl.disabled = true;
 						if (this.fontFamilySelectEl) this.fontFamilySelectEl.disabled = true;
@@ -1253,6 +1431,23 @@
 					} catch(_) { /* noop */ }
 					this._updateSizeLabel(n);
 				});
+			});
+			// パーツ（テキスト）: ダブルクリックで入力欄へフォーカス
+			group.on('dblclick', () => {
+				try {
+					if (!this.isEditing) return;
+					const tsettings = group.getAttr('partSettings') || {};
+					if (tsettings.type !== 'text') return;
+					// 選択状態にしてから入力欄をフォーカス
+					try { group.fire('click'); } catch(_) { /* noop */ }
+					if (this.textValueInputEl) {
+						this.textValueInputEl.disabled = false;
+						const tx = group.findOne('Text');
+						if (tx && tx.text) this.textValueInputEl.value = String(tx.text());
+						this.textValueInputEl.focus();
+						try { this.textValueInputEl.select && this.textValueInputEl.select(); } catch(_) { /* noop */ }
+					}
+				} catch(_) { /* noop */ }
 			});
 			this.transformer.on('transformend', () => { const nodes = this.transformer.nodes(); nodes && nodes.forEach(n => { this._syncSeatMeta(n); this._updateSizeLabel(n); }); });
 			return group;
@@ -1547,6 +1742,30 @@
 			} catch(_) { /* noop */ }
 		}
 
+		_applyTextValueFromControls() {
+			try {
+				if (!this.textValueInputEl || !this._selectedTextGroup) return;
+				const value = String(this.textValueInputEl.value || '');
+				const tx = this._selectedTextGroup.findOne('Text');
+				if (!tx) return;
+				tx.text(value);
+				// 設定へ保存
+				const settings = this._selectedTextGroup.getAttr('partSettings') || {};
+				settings.value = value;
+				this._selectedTextGroup.setAttr('partSettings', settings);
+				// 背景Rectがあれば位置・サイズはTextノードに合わせておく
+				try {
+					const bg = this._selectedTextGroup.findOne('.text-bg-rect');
+					if (bg) {
+						bg.position({ x: tx.x(), y: tx.y() });
+						bg.size({ width: tx.width(), height: tx.height() });
+					}
+				} catch(_) { /* noop */ }
+				this.pendingChanges.set(String(this._selectedTextGroup.getAttr('recordId')), this._buildPendingFromGroup(this._selectedTextGroup));
+				this.layer && this.layer.batchDraw();
+			} catch(_) { /* noop */ }
+		}
+
 		_toggleColorPalette(ev) {
 			try {
 				if (!this.lineColorBtnEl) return;
@@ -1641,7 +1860,8 @@
 				else if (ellipse) { width = Math.round((ellipse.radiusX() || 0) * 2); height = Math.round((ellipse.radiusY() || 0) * 2); }
 				else if (ln) { const p = ln.points(); width = Math.max(1, Math.abs(Math.round(p[2] || 0))); height = Math.max(1, Math.abs(Math.round(p[3] || 0))); }
 				else { const t = group.findOne('Text'); if (t) { width = Math.round(t.width()); height = Math.round(t.height()); } }
-				return { x: Math.round(pos.x), y: Math.round(pos.y), width, height, display: true };
+				const hidden = !!group.getAttr('hiddenOnMap');
+				return { x: Math.round(pos.x), y: Math.round(pos.y), width, height, display: !hidden };
 			} catch(_) { return { x: 0, y: 0, width: 0, height: 0, display: true }; }
 		}
 
@@ -1655,45 +1875,8 @@
 						if (!group || !group.getAttr) return;
 						const recordId = String(group.getAttr('recordId'));
 						if (!recordId) return;
-						// 現在の位置とサイズを取得（保険）
-						const pos = group.position();
-						const rect = group.findOne('Rect');
-						const scaleX = group.scaleX() || 1;
-						const scaleY = group.scaleY() || 1;
-						const width = Math.max(10, Math.round((rect && rect.width ? rect.width() : this.fixedSeatSize) * scaleX));
-						const height = Math.max(10, Math.round((rect && rect.height ? rect.height() : this.fixedSeatSize) * scaleY));
-						const step = this.snapStep || 10;
-						const x = Math.round(pos.x / step) * step;
-						const y = Math.round(pos.y / step) * step;
-
-						// 保存差分: 表示フラグをfalseに
-						this.pendingChanges.set(recordId, { x, y, width, height, display: false });
-
-						// 左リストへ戻す（既に存在しない場合のみ追加）
-						if (this.leftListEl && !this.leftListEl.querySelector(`.seat-item[data-seat-id="${recordId}"]`)) {
-							const seatNumber = String(group.getAttr('seatNumber') || '');
-							const extNumber = String(group.getAttr('extNumber') || '');
-							const pcNumber = String(group.getAttr('pcNumber') || '');
-							const deptName = String(group.getAttr('deptName') || '');
-							const item = document.createElement('div');
-							item.className = 'seat-item';
-							item.draggable = true;
-							item.setAttribute('data-seat-id', recordId);
-							item.setAttribute('data-seat-number', seatNumber);
-							item.setAttribute('data-seat-dept', deptName);
-							item.setAttribute('data-seat', JSON.stringify({ recordId, seatNumber, extNumber, pcNumber, deptName }));
-							item.textContent = deptName ? `${seatNumber}（${deptName}）` : `${seatNumber}`;
-							this.leftListEl.appendChild(item);
-							this._applyListFilter();
-						}
-
-						// ノードを削除
-						const id = String(recordId);
-						if (this.sizeLabelById && this.sizeLabelById.has(id)) {
-							try { const lbl = this.sizeLabelById.get(id); lbl && lbl.visible(false); } catch(_) { /* noop */ }
-						}
-						this.seatIdToNode.delete(id);
-						group.destroy();
+						// DEL: いったん非表示として左リストへ（保存時に完全削除）
+						this._moveGroupToLeftList(group);
 					} catch(_) { /* noop */ }
 				});
 				this.transformer.nodes([]);
@@ -1777,6 +1960,45 @@
 				}
 				if (this.layer) this.layer.batchDraw();
 			} catch (_) { /* noop */ }
+		}
+
+		_moveGroupToLeftList(group) {
+			try {
+				const recordId = String(group.getAttr('recordId'));
+				if (!recordId) return;
+				// 現在の位置・サイズ（保険）と display=false を保存キューへ
+				const meta = this._buildPendingFromGroup(group);
+				this.pendingChanges.set(recordId, { ...meta, display: false });
+				// 左リストへ（既に無ければ追加）
+				if (this.leftListEl && !this.leftListEl.querySelector(`.seat-item[data-seat-id="${recordId}"]`)) {
+					const seatNumber = String(group.getAttr('seatNumber') || '');
+					const extNumber = String(group.getAttr('extNumber') || '');
+					const pcNumber = String(group.getAttr('pcNumber') || '');
+					const deptName = String(group.getAttr('deptName') || '');
+					const objectType = String(group.getAttr('objectType') || '');
+					const settings = group.getAttr('partSettings') || {};
+					const widthVal = meta.width || 0;
+					const heightVal = meta.height || 0;
+					const payload = { recordId, seatNumber, extNumber, pcNumber, deptName, objectType, partSettings: JSON.stringify(settings), width: widthVal, height: heightVal };
+					const item = document.createElement('div');
+					item.className = 'seat-item';
+					item.draggable = true;
+					item.setAttribute('data-seat-id', recordId);
+					item.setAttribute('data-seat-number', seatNumber);
+					item.setAttribute('data-seat-dept', deptName);
+					item.setAttribute('data-seat', JSON.stringify(payload));
+					item.textContent = deptName ? `${seatNumber}（${deptName}）` : `${seatNumber || objectType || 'パーツ'}`;
+					this.leftListEl.appendChild(item);
+					this._applyListFilter();
+				}
+				// ノードを削除し、選択・ラベルも解除
+				const id = String(recordId);
+				if (this.sizeLabelById && this.sizeLabelById.has(id)) {
+					try { const lbl = this.sizeLabelById.get(id); lbl && lbl.visible(false); } catch(_) { /* noop */ }
+				}
+				this.seatIdToNode.delete(id);
+				group.destroy();
+			} catch(_) { /* noop */ }
 		}
 
 		_syncSeatMeta(group) {
@@ -1894,6 +2116,12 @@
 			this.seatIdToNode.forEach(node => node.draggable(true));
 			if (this.deleteButtonEl) this.deleteButtonEl.disabled = false;
 			this._updateEditControlsVisibility(true);
+			// 左リストを表示し、2カラムに戻す
+			try {
+				const layout = this.container && this.container.querySelector && this.container.querySelector('.seatmap-layout');
+				if (this.leftListContainer) this.leftListContainer.style.display = '';
+				if (layout) layout.style.gridTemplateColumns = '160px 1fr';
+			} catch(_) { /* noop */ }
 			// Delete/Backspace で選択座席を削除
 			if (!this._onKeyDownDelete) {
 				this._onKeyDownDelete = (e) => {
@@ -1919,6 +2147,12 @@
 			this.seatIdToNode.forEach(node => node.draggable(false));
 			if (this.deleteButtonEl) this.deleteButtonEl.disabled = true;
 			this._updateEditControlsVisibility(false);
+			// 左リストを非表示にし、右ステージを全幅に
+			try {
+				const layout = this.container && this.container.querySelector && this.container.querySelector('.seatmap-layout');
+				if (this.leftListContainer) this.leftListContainer.style.display = 'none';
+				if (layout) layout.style.gridTemplateColumns = '1fr';
+			} catch(_) { /* noop */ }
 			// キーハンドラ解除
 			if (this._onKeyDownDelete) {
 				document.removeEventListener('keydown', this._onKeyDownDelete);
@@ -2013,8 +2247,8 @@
 				if (!site || !Number.isFinite(floor)) { alert('拠点+階を選択してください'); return; }
 
 				const appId = CONFIG.getAppIdByLedgerName('座席台帳') || 8;
-				const prefix = objectType === '図形' ? 'S-' : (objectType === 'テキスト' ? 'T-' : 'L-');
-				const nextSeatNumber = await this._generateNextPartNumber(prefix, site, floor, objectType);
+				const typeLabel = objectType === 'テキスト' ? '文字' : String(objectType || 'オブジェクト');
+				const nextSeatNumber = await this._generateNextPartNumber(typeLabel, site, floor, objectType);
 
 				// デフォルト設定
 				let defaults = {};
@@ -2027,10 +2261,24 @@
 				}
 
 				// 初期座標・寸法（暫定）
-				const pos = { x: 20, y: 20 };
 				const size = (objectType === '図形') ? { width: 120, height: 80 }
 					: (objectType === 'テキスト') ? { width: 120, height: 30 }
 					: { width: 0, height: 0 };
+				// 現在の表示領域の中央に配置
+				let pos = { x: 20, y: 20 };
+				try {
+					if (this.stage) {
+						const inv = this.stage.getAbsoluteTransform().copy().invert();
+						const tl = inv.point({ x: 0, y: 0 });
+						const br = inv.point({ x: this.stage.width(), y: this.stage.height() });
+						const cx = (tl.x + br.x) / 2;
+						const cy = (tl.y + br.y) / 2;
+						// 線は見た目の便宜サイズでセンタリング（addPart の既定値に合わせる）
+						const cw = (objectType === '線') ? 120 : (Number(size.width) || 120);
+						const ch = (objectType === '線') ? 60 : (Number(size.height) || 60);
+						pos = { x: Math.round(cx - cw / 2), y: Math.round(cy - ch / 2) };
+					}
+				} catch(_) { /* noop */ }
 
 				const record = {
 					'座席拠点': { value: site },
@@ -2047,34 +2295,49 @@
 
 				const res = await kintone.api(kintone.api.url('/k/v1/record', true), 'POST', { app: String(appId), record });
 				// 画面へ即時反映
-				this.addPart({ recordId: res && res.id, objectType, settings: defaults, width: size.width, height: size.height }, pos, { markPending: false });
+				const node = this.addPart({ recordId: res && res.id, objectType, settings: defaults, width: size.width, height: size.height }, pos, { markPending: false });
+				try { node && node.fire && node.fire('click'); } catch(_) { /* noop */ }
 				this.layer && this.layer.batchDraw();
-				alert(`${objectType}パーツを保存して表示しました（${nextSeatNumber}）`);
 			} catch (e) {
 				console.error('パーツ保存エラー', e);
 				alert('パーツの保存に失敗しました');
 			}
 		}
 
-		async _generateNextPartNumber(prefix, site, floor, objectType) {
+		async _generateNextPartNumber(typeLabel, site, floor, objectType) {
 			try {
 				const appId = CONFIG.getAppIdByLedgerName('座席台帳') || 8;
 				const conds = [];
+				const floor2 = Number.isFinite(floor) ? String(Number(floor)).padStart(2, '0') : '';
+				const siteFloorToken = site && floor2 ? `${site}${floor2}F` : '';
 				if (site) conds.push(`座席拠点 in ("${site}")`);
 				if (Number.isFinite(floor)) conds.push(`階 = ${Number(floor)}`);
-				conds.push(`座席番号 like "${prefix}"`);
+				// 形式: Object-種別-拠点階-連番
+				const basePrefix = `Object-${typeLabel}-`;
+				if (siteFloorToken) conds.push(`座席番号 like "${basePrefix}${siteFloorToken}-"`);
+				else conds.push(`座席番号 like "${basePrefix}"`);
 				if (objectType) conds.push(`オブジェクト種別 in ("${objectType}")`);
 				const query = conds.join(' and ') + ' order by 座席番号 desc limit 1';
 				const res = await kintone.api(kintone.api.url('/k/v1/records', true), 'GET', { app: String(appId), query });
 				const last = (res.records && res.records[0] && res.records[0]['座席番号'] && res.records[0]['座席番号'].value) || '';
 				let next = 1;
-				const m = String(last).match(/^([A-Z]-)(\d{1,})$/);
-				if (m && m[1] === prefix) {
-					next = (parseInt(m[2], 10) || 0) + 1;
-				}
-				return prefix + String(next).padStart(5, '0');
+				try {
+					const esc = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+					const base = `Object-${typeLabel}-`;
+					const pattern = siteFloorToken
+						? new RegExp(`^${esc(base + siteFloorToken + '-')}(\\d{1,})$`)
+						: new RegExp(`^${esc(base)}(\\d{1,})$`);
+					const m = String(last).match(pattern);
+					if (m && m[1]) next = (parseInt(m[1], 10) || 0) + 1;
+				} catch(_) { /* noop */ }
+				const serial = String(next).padStart(5, '0');
+				const base = `Object-${typeLabel}-`;
+				return siteFloorToken ? `${base}${siteFloorToken}-${serial}` : `${base}${serial}`;
 			} catch (e) {
-				return prefix + '00001';
+				const floor2 = Number.isFinite(floor) ? String(Number(floor)).padStart(2, '0') : '';
+				const siteFloorToken = site && floor2 ? `${site}${floor2}F` : '';
+				const base = `Object-${typeLabel}-`;
+				return siteFloorToken ? `${base}${siteFloorToken}-00001` : `${base}00001`;
 			}
 		}
 
