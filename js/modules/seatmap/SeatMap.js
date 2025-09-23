@@ -34,6 +34,14 @@
 			this.pendingChanges = new Map(); // recordId -> { x,y,w,h,display }
 			this.fixedSeatSize = 100;
 			this.snapEnabled = true;
+			this.seatRows = 7; // 座席内部の行数
+			// 追加表示（他台帳）: CONFIGから読み込み（ハードコード無し）
+			this.extraOptions = (CONFIG.seatMap && CONFIG.seatMap.extraOptions) || [];
+			// keyは `台帳名_フィールドコード` で正規化（未設定・不一致でも内部ではこの形式に統一）
+			try { this.extraOptions = (this.extraOptions || []).map(opt => ({ ...opt, key: String(opt.key || `${opt.ledger}_${opt.field}`) })); } catch(_) { /* noop */ }
+			this.selectedExtraFields = []; // 最大3件、key配列（表示順）
+			this._pcByNumber = new Map();
+			this._extByNumber = new Map();
 			this.propsPanelEl = null;
 			this.lineWidthInputEl = null;
 			this.lineColorSelectEl = null; // legacy (not used)
@@ -53,6 +61,15 @@
 			this.textValueInputEl = null;
 			this._seatListCtxMenuEl = null;
 			this._onDocClickCtxMenu = null;
+			// 検索ナビ用
+			this._searchResults = [];
+			this._searchIndex = -1;
+			this.searchCountEl = null;
+			this.searchNextBtnEl = null;
+			this._searchFocusOverlay = null;
+			this._searchFocusTimer = null;
+			this.row1El = null;
+			this.searchBtnEl = null;
 		}
 
 		buildTabContent() {
@@ -133,6 +150,7 @@
 			wrap.className = 'seatmap-controls-inner';
 			this.controlsRootEl = wrap;
 			const row1 = document.createElement('div'); row1.className = 'seatmap-controls-row';
+			this.row1El = row1;
 			const row2 = document.createElement('div'); row2.className = 'seatmap-controls-row seatmap-edit-group';
 			row2.classList.add('edit-only');
 			this.row2El = row2;
@@ -156,6 +174,7 @@
 			searchBtn.className = 'seatmap-btn primary';
 			searchBtn.textContent = '検索';
 			searchBtn.addEventListener('click', () => this.highlightTexts(searchInput.value || ''));
+			this.searchBtnEl = searchBtn;
 
 			const showBtn = document.createElement('button');
 			showBtn.className = 'seatmap-btn primary';
@@ -403,6 +422,37 @@
 			row1.appendChild(showBtn);
 			row1.appendChild(searchInput);
 			row1.appendChild(searchBtn);
+			// --- 追加情報（チェックボックス 最大3件）を2行目に表示 ---
+			const rowExtra = document.createElement('div'); rowExtra.className = 'seatmap-controls-row';
+			const extraGroup = document.createElement('div'); extraGroup.className = 'seatmap-part-group';
+			const extraTitle = document.createElement('span'); extraTitle.className = 'seatmap-edit-group-title'; extraTitle.textContent = '追加情報';
+			extraGroup.appendChild(extraTitle);
+			const extrasWrap = document.createElement('div'); extrasWrap.style.display = 'inline-flex'; extrasWrap.style.alignItems = 'center'; extrasWrap.style.gap = '6px';
+			this.extraCheckboxes = new Map();
+			const onToggle = (opt, cb) => {
+				const id = String(opt.key || opt.id);
+				if (cb.checked) {
+					if (Array.isArray(this.selectedExtraFields) && this.selectedExtraFields.length >= 3) { cb.checked = false; alert('最大3件まで選択できます'); return; }
+					if (!this.selectedExtraFields.includes(id)) this.selectedExtraFields.push(id);
+				} else {
+					this.selectedExtraFields = (this.selectedExtraFields || []).filter(x => x !== id);
+				}
+				this._refreshExtraDisplayAll();
+			};
+			(this.extraOptions || []).forEach(opt => {
+				const cb = document.createElement('input'); cb.type = 'checkbox'; cb.id = 'extra-'+String(opt.key || opt.id); cb.addEventListener('change', () => onToggle(opt, cb));
+				const lb = document.createElement('label'); lb.htmlFor = cb.id; lb.textContent = String(opt.label || opt.field || opt.key || opt.id);
+				extrasWrap.appendChild(cb); extrasWrap.appendChild(lb);
+				this.extraCheckboxes.set(String(opt.key || opt.id), cb);
+			});
+			const clearBtn = document.createElement('button'); clearBtn.className = 'seatmap-btn'; clearBtn.textContent = 'クリア'; clearBtn.addEventListener('click', () => {
+				this.selectedExtraFields = [];
+				try { this.extraCheckboxes && this.extraCheckboxes.forEach(b => b.checked = false); } catch(_) {}
+				this._refreshExtraDisplayAll();
+			});
+			extrasWrap.appendChild(clearBtn);
+			extraGroup.appendChild(extrasWrap);
+			rowExtra.appendChild(extraGroup);
 			row1.appendChild(editToggle);
 			// 以下は編集ONのときのみ表示
 			deleteBtn.classList.add('edit-only');
@@ -466,6 +516,8 @@
 			row2.appendChild(alignBottomBtn);
 
 			wrap.appendChild(row1);
+			// 2行目: 追加情報グループを先頭に、その後に編集系グループ（編集ONのみ表示）
+			wrap.appendChild(rowExtra);
 			wrap.appendChild(row2);
 			// テキスト入力欄の幅は固定値（動的計測は行わない）
 			// パーツ追加ボタンは上記グループに移動済み
@@ -601,6 +653,132 @@
 			} catch(_) { /* noop */ }
 		}
 
+		_refreshExtraDisplayAll() {
+			try {
+				this.seatIdToNode.forEach(group => { try { this._applyExtraDisplayToGroup(group); } catch(_) {} });
+				this.layer && this.layer.batchDraw();
+			} catch(_) { /* noop */ }
+		}
+
+		_applyExtraDisplayToGroup(group) {
+			try {
+				if (!(group && group.hasName && group.hasName('seat-node'))) return;
+				const rows = group.find('.extra-text-row');
+				if (!rows || rows.length === 0) return;
+				// 初期化: 空に戻す
+				for (let i = 0; i < rows.length; i++) { try { rows[i].text(''); } catch(_) {} }
+				if (!Array.isArray(this.selectedExtraFields) || this.selectedExtraFields.length === 0) return;
+				// 元データキー
+				const pcNo = String(group.getAttr('pcNumber') || '');
+				const extNo = String(group.getAttr('extNumber') || '');
+				for (let i = 0; i < Math.min(3, rows.length, this.selectedExtraFields.length); i++) {
+					const id = this.selectedExtraFields[i];
+					const opt = (this.extraOptions || []).find(o => String(o.key || o.id) === String(id));
+					if (!opt) continue;
+					const rec = this._getLedgerRecordForGroup(group, opt.ledger);
+					let val = '';
+					try { val = rec && rec[opt.field] && rec[opt.field].value ? String(rec[opt.field].value) : ''; } catch(_) { val = ''; }
+					rows[i].text(val);
+				}
+			} catch(_) { /* noop */ }
+		}
+
+		_getLedgerRecordForGroup(group, ledgerName) {
+			try {
+				const ln = String(ledgerName || '');
+				if (ln === 'PC台帳') {
+					const key = String(group.getAttr('pcNumber') || '');
+					return key ? this._pcByNumber.get(key) : null;
+				} else if (ln === '内線台帳' || ln === '電話台帳') {
+					const key = String(group.getAttr('extNumber') || '');
+					return key ? this._extByNumber.get(key) : null;
+				}
+				return null;
+			} catch(_) { return null; }
+		}
+
+		_openCustomExtraDialog() {
+			try {
+				const help = '設定する台帳は PC台帳 / 内線台帳 のいずれか、フィールドはフィールドコードを指定してください。空欄でスキップできます。';
+				alert(help);
+				const defs = [];
+				for (let i = 0; i < 3; i++) {
+					const ledger = prompt(`下${3 - i}行目（上から${(this.seatRows||7)-3+i+1}行目） 台帳名を入力 (PC台帳/内線台帳)。空欄でスキップ`, defs[i] && defs[i].ledger ? defs[i].ledger : '');
+					if (!ledger) { defs.push({}); continue; }
+					const field = prompt('フィールドコードを入力', defs[i] && defs[i].field ? defs[i].field : '');
+					defs.push({ ledger: ledger.trim(), field: (field||'').trim() });
+				}
+				this.customExtraFields = defs;
+				this.extraDisplayMode = 'custom';
+				this._refreshExtraDisplayAll();
+			} catch(_) { /* noop */ }
+		}
+
+		async _prefetchLedgers(siteFloor) {
+			try {
+				const { site, floor } = this._parseSiteFloor(siteFloor);
+				// PC台帳・内線台帳の簡易取得（同じ拠点+階でフィルタ）。但し本関数は未使用へ（別関数で安全に対象PC/内線のみ取得）
+				this._pcByNumber.clear();
+				this._extByNumber.clear();
+				const pcApp = CONFIG.getAppIdByLedgerName('PC台帳');
+				const extApp = CONFIG.getAppIdByLedgerName('内線台帳');
+				if (pcApp) {
+					const conds = [];
+					if (site) conds.push(`拠点 in ("${site}")`);
+					if (Number.isFinite(floor)) conds.push(`階 = ${Number(floor)}`);
+					const query = conds.join(' and ');
+					const pcs = await kintone.api(kintone.api.url('/k/v1/records', true), 'GET', { app: String(pcApp), query });
+					(pcs.records || []).forEach(r => {
+						const num = (r['PC番号'] && r['PC番号'].value) || '';
+						if (num) this._pcByNumber.set(String(num), r);
+					});
+				}
+				if (extApp) {
+					const conds = [];
+					if (site) conds.push(`拠点 in ("${site}")`);
+					if (Number.isFinite(floor)) conds.push(`階 = ${Number(floor)}`);
+					const query = conds.join(' and ');
+					const exts = await kintone.api(kintone.api.url('/k/v1/records', true), 'GET', { app: String(extApp), query });
+					(exts.records || []).forEach(r => {
+						const num = (r['内線番号'] && r['内線番号'].value) || '';
+						if (num) this._extByNumber.set(String(num), r);
+					});
+				}
+			} catch(_) { /* noop */ }
+		}
+
+		async _prefetchLedgersFromSeats() {
+			try {
+				this._pcByNumber.clear();
+				this._extByNumber.clear();
+				// 画面上の座席からPC/内線の一覧を集計
+				const pcSet = new Set();
+				const extSet = new Set();
+				this.seatIdToNode.forEach(group => {
+					if (group && group.hasName && group.hasName('seat-node')) {
+						const pc = String(group.getAttr('pcNumber') || '').trim();
+						const ext = String(group.getAttr('extNumber') || '').trim();
+						if (pc) pcSet.add(pc);
+						if (ext) extSet.add(ext);
+					}
+				});
+				const pcApp = CONFIG.getAppIdByLedgerName('PC台帳');
+				const extApp = CONFIG.getAppIdByLedgerName('内線台帳');
+				if (pcApp && pcSet.size > 0) {
+					const ors = Array.from(pcSet).map(v => `PC番号 in ("${String(v).replace(/"/g, '\"')}")`);
+					const query = ors.join(' or ');
+					const res = await kintone.api(kintone.api.url('/k/v1/records', true), 'GET', { app: String(pcApp), query });
+					(res.records || []).forEach(r => { const num = (r['PC番号'] && r['PC番号'].value) || ''; if (num) this._pcByNumber.set(String(num), r); });
+				}
+				if (extApp && extSet.size > 0) {
+					const ors = Array.from(extSet).map(v => `内線番号 in ("${String(v).replace(/"/g, '\"')}")`);
+					const query = ors.join(' or ');
+					const res = await kintone.api(kintone.api.url('/k/v1/records', true), 'GET', { app: String(extApp), query });
+					(res.records || []).forEach(r => { const num = (r['内線番号'] && r['内線番号'].value) || ''; if (num) this._extByNumber.set(String(num), r); });
+				}
+			} catch(_) { /* noop */ }
+		}
+
 		_showLoading(text) {
 			try {
 				if (!this.stageContainer) return;
@@ -636,6 +814,8 @@
 			// 右MAP（配置済み=true）を再描画
 			const { site, floor } = this._parseSiteFloor(siteFloor);
 			await this._loadMapSeats(site, floor);
+			// 表示対象のPC/内線番号から台帳を先読み
+			try { await this._prefetchLedgersFromSeats(); this._refreshExtraDisplayAll(); } catch(_) { /* noop */ }
 			this._alignViewTopLeft(0.8);
 			this.initialized = true;
 			this._hideLoading();
@@ -758,6 +938,8 @@
 			});
 			this.layer.add(node);
 			this.seatIdToNode.set(recordId, node);
+			// 追加表示の初期反映
+			try { this._applyExtraDisplayToGroup(node); } catch(_) { /* noop */ }
 			const markPending = !opts || opts.markPending !== false;
 			if (markPending) {
 				this.pendingChanges.set(recordId, { x, y, width, height, display: true });
@@ -785,6 +967,8 @@
 			});
 			this.layer.add(node);
 			this.seatIdToNode.set(recordId, node);
+			// 追加表示の初期反映
+			try { this._applyExtraDisplayToGroup(node); } catch(_) { /* noop */ }
 			const markPending = !opts || opts.markPending !== false;
 			if (markPending) {
 				this.pendingChanges.set(recordId, { x, y, width, height, display: true });
@@ -999,7 +1183,7 @@
 			stage.draggable(true);
 		}
 
-		highlightTexts(query) {
+			highlightTexts(query) {
 			try {
 				const q = String(query || '').trim();
 				const tokens = q.split(/[\s,、]+/).map(s => s.trim()).filter(Boolean);
@@ -1025,7 +1209,82 @@
 					}
 				});
 				this.layer && this.layer.batchDraw();
+				// ヒットを収集
+				this._searchResults = [];
+				this.seatIdToNode.forEach(group => {
+					const texts = group.find('Text');
+					for (let i = 0; i < texts.length; i++) {
+						const txt = texts[i];
+						const val = String(txt.text() || '').toLowerCase();
+						if (lowerTokens.length > 0 && lowerTokens.some(tok => val.includes(tok))) {
+							this._searchResults.push({ group, textNode: txt });
+							break; // グループ単位で一度だけ
+						}
+					}
+				});
+				this._searchIndex = this._searchResults.length > 0 ? 0 : -1;
+				// 件数UI更新
+				try {
+					if (!this.searchCountEl) {
+						this.searchCountEl = document.createElement('span');
+						this.searchCountEl.style.marginLeft = '6px';
+						this.searchNextBtnEl = document.createElement('button');
+						this.searchNextBtnEl.className = 'seatmap-btn';
+						this.searchNextBtnEl.textContent = '次へ';
+						this.searchNextBtnEl.style.marginLeft = '4px';
+						this.searchNextBtnEl.addEventListener('click', () => this.focusNextSearchHit());
+						// 検索ボタンの直後に挿入
+						if (this.searchBtnEl && this.searchBtnEl.parentNode) {
+							this.searchBtnEl.parentNode.insertBefore(this.searchCountEl, this.searchBtnEl.nextSibling);
+							this.searchCountEl.parentNode.insertBefore(this.searchNextBtnEl, this.searchCountEl.nextSibling);
+						}
+					}
+					this.searchCountEl.textContent = this._searchResults.length > 0 ? `${Math.min(1, this._searchResults.length)}/${this._searchResults.length}件` : '0/0件';
+					this.searchNextBtnEl.disabled = !(this._searchResults.length > 1);
+				} catch(_) { /* noop */ }
+				// 1件なら即フォーカス
+				if (this._searchResults.length === 1) {
+					this._focusSearchHit(0);
+				}
 			} catch (_) { /* noop */ }
+		}
+
+		_focusSearchHit(index) {
+			try {
+				if (!this.stage || !this.layer) return;
+				if (!Array.isArray(this._searchResults) || index < 0 || index >= this._searchResults.length) return;
+				const { group } = this._searchResults[index];
+				// 中央へ移動
+				const bbox = group.getClientRect({ relativeTo: this.layer });
+				const stageRect = { w: this.stage.width(), h: this.stage.height() };
+				const center = { x: bbox.x + bbox.width / 2, y: bbox.y + bbox.height / 2 };
+				const scale = this.stage.scaleX() || 1;
+				this.stage.position({ x: stageRect.w / 2 - center.x * scale, y: stageRect.h / 2 - center.y * scale });
+				this.stage.batchDraw();
+				// 軽い選択表示
+				try { group.fire && group.fire('click'); } catch(_) { /* noop */ }
+				// フォーカス枠（HUDの一時的ハイライト）
+				try {
+					if (!this.hudLayer) { this.hudLayer = new Konva.Layer({ listening: false }); this.stage.add(this.hudLayer); }
+					if (this._searchFocusOverlay) { this._searchFocusOverlay.destroy(); this._searchFocusOverlay = null; }
+					const pad = 6;
+					const r = new Konva.Rect({ x: bbox.x - pad, y: bbox.y - pad, width: bbox.width + pad * 2, height: bbox.height + pad * 2, stroke: '#ff9800', strokeWidth: 3, dash: [6, 4], listening: false });
+					this.hudLayer.add(r);
+					this._searchFocusOverlay = r;
+					this.hudLayer.batchDraw();
+					if (this._searchFocusTimer) { clearTimeout(this._searchFocusTimer); this._searchFocusTimer = null; }
+					this._searchFocusTimer = setTimeout(() => { try { if (this._searchFocusOverlay) { this._searchFocusOverlay.destroy(); this._searchFocusOverlay = null; this.hudLayer && this.hudLayer.batchDraw(); } } catch(_) { /* noop */ } }, 1600);
+				} catch(_) { /* noop */ }
+			} catch(_) { /* noop */ }
+		}
+
+		focusNextSearchHit() {
+			try {
+				if (!Array.isArray(this._searchResults) || this._searchResults.length === 0) return;
+				this._searchIndex = (this._searchIndex + 1) % this._searchResults.length;
+				this._focusSearchHit(this._searchIndex);
+				if (this.searchCountEl) this.searchCountEl.textContent = `${this._searchIndex + 1}/${this._searchResults.length}件`;
+			} catch(_) { /* noop */ }
 		}
 
 		_ensureStage() {
@@ -1113,23 +1372,34 @@
 			const rect = new Konva.Rect({ width: meta.width, height: meta.height, cornerRadius: 0, stroke: '#333', strokeWidth: 2, fill: '#fff' });
 			group.add(rect);
 			// 行ハイライト用の背景（テキストの背面・区切り線の背面）
-			const rowH = meta.height / 6;
-			for (let i = 0; i < 6; i++) {
+			const rows = this.seatRows || 6;
+			const rowH = meta.height / rows;
+			for (let i = 0; i < rows; i++) {
 				group.add(new Konva.Rect({ name: 'row-bg', x: 0, y: i * rowH, width: meta.width, height: rowH, fill: '#fff59d', opacity: 0.7, visible: false, listening: false }));
 			}
-			// 内部水平線（1/6〜5/6）で6行分割（初期配置、後でレイアウト関数で補正）
-			[1,2,3,4,5].map(i => rowH * i).forEach(y => {
+			// 内部水平線（行数-1本）
+			Array.from({ length: Math.max(0, rows - 1) }, (_, idx) => (idx + 1) * rowH).forEach(y => {
 				group.add(new Konva.Line({ points: [0, y, meta.width, y], stroke: '#888', strokeWidth: 1 }));
 			});
-			// テキスト（中央寄せ）: 1:座席番号 2:内線番号 3:PC番号 4:部署 5:空 6:空
+			// テキスト（中央寄せ）: 上から順に rows 行
 			const textOpts = { align: 'center', verticalAlign: 'middle', fontSize: 12, fill: '#111' };
-			const t1 = new Konva.Text({ ...textOpts, x: 0, y: 0 * rowH, width: meta.width, height: rowH, text: meta.seatNumber || '' });
-			const t2 = new Konva.Text({ ...textOpts, x: 0, y: 1 * rowH, width: meta.width, height: rowH, text: meta.extNumber || '' });
-			const t3 = new Konva.Text({ ...textOpts, x: 0, y: 2 * rowH, width: meta.width, height: rowH, text: meta.pcNumber || '' });
-			const t4 = new Konva.Text({ ...textOpts, x: 0, y: 3 * rowH, width: meta.width, height: rowH, text: meta.deptName || '' });
-			const t5 = new Konva.Text({ ...textOpts, x: 0, y: 4 * rowH, width: meta.width, height: rowH, text: '' });
-			const t6 = new Konva.Text({ ...textOpts, x: 0, y: 5 * rowH, width: meta.width, height: rowH, text: '' });
-			group.add(t1); group.add(t2); group.add(t3); group.add(t4); group.add(t5); group.add(t6);
+			const texts = [];
+			for (let i = 0; i < rows; i++) {
+				const textVal = i === 0 ? (meta.seatNumber || '')
+					: i === 1 ? (meta.extNumber || '')
+					: i === 2 ? (meta.pcNumber || '')
+					: i === 3 ? (meta.deptName || '')
+					: '';
+				texts.push(new Konva.Text({ ...textOpts, x: 0, y: i * rowH, width: meta.width, height: rowH, text: textVal }));
+			}
+			texts.forEach(t => group.add(t));
+			// 末尾3行は追加表示用に名前付与（アクセスしやすく）
+			try {
+				for (let i = Math.max(0, rows - 3); i < rows; i++) {
+					const t = texts[i];
+					if (t) t.name('extra-text-row');
+				}
+			} catch(_) { /* noop */ }
 
 			// 初回の内部レイアウト（枠線太さを考慮）
 			this._layoutSeatInternals(group);
@@ -1467,7 +1737,8 @@
 				const strokeW = Number(seatRect.strokeWidth && seatRect.strokeWidth()) || 0;
 				const pad = Math.ceil(strokeW / 2);
 				const maxWidth = Math.max(10, seatRect.width() - pad * 2);
-				const rowH = Math.max(8, (seatRect.height() - pad * 2) / 6);
+				const rows = this.seatRows || 6;
+				const rowH = Math.max(8, (seatRect.height() - pad * 2) / rows);
 				const texts = group.find('Text') || [];
 				texts.forEach(t => this._fitTextToRow(t, maxWidth, rowH));
 			} catch (_) { /* noop */ }
@@ -1482,26 +1753,28 @@
 				const pad = Math.ceil(strokeW / 2);
 				const width = Math.max(10, rect.width() - pad * 2);
 				const height = Math.max(10, rect.height() - pad * 2);
-				const rowH = height / 6;
+				const rows = this.seatRows || 6;
+				const rowH = height / rows;
 				// 行区切り線
 				const lines = group.find('Line');
-				if (lines && lines.length >= 5) {
-					[1,2,3,4,5].forEach((i, idx) => {
+				if (lines && lines.length) {
+					for (let idx = 0; idx < lines.length; idx++) {
+						const i = idx + 1;
 						const y = pad + rowH * i;
 						lines[idx].points([pad, y, pad + width, y]);
-					});
+					}
 				}
 				// 背景強調行
 				const bgs = group.find('.row-bg');
-				if (bgs && bgs.length >= 6) {
-					for (let i = 0; i < 6; i++) {
+				if (bgs && bgs.length) {
+					for (let i = 0; i < bgs.length; i++) {
 						bgs[i].setAttrs({ x: pad, y: pad + i * rowH, width, height: rowH });
 					}
 				}
 				// テキスト行
 				const texts = group.find('Text');
-				if (texts && texts.length >= 6) {
-					for (let i = 0; i < 6; i++) {
+				if (texts && texts.length) {
+					for (let i = 0; i < texts.length; i++) {
 						texts[i].setAttrs({ x: pad, y: pad + i * rowH, width, height: rowH });
 					}
 				}
@@ -2068,14 +2341,16 @@
 					}
 				}
 				group.scale({ x: 1, y: 1 });
-				// 内部線とテキストも更新（6行対応）
+				// 内部線とテキストも更新（行数対応）
 				const lines = group.find('Line');
-				const rowH = height / 6;
-				if (lines && lines.length >= 5) {
-					[1,2,3,4,5].forEach((i, idx) => {
+				const rows = this.seatRows || 6;
+				const rowH = height / rows;
+				if (lines && lines.length) {
+					for (let idx = 0; idx < lines.length; idx++) {
+						const i = idx + 1;
 						const y = rowH * i;
 						lines[idx].points([0, y, width, y]);
-					});
+					}
 				}
 				// 座席ノードは枠線太さを考慮して再配置
 				if (group.hasName && group.hasName('seat-node')) {
@@ -2083,14 +2358,14 @@
 				} else {
 					// 既存の（座席以外）
 					const bgs = group.find('.row-bg');
-					if (bgs && bgs.length >= 6) {
-						for (let i = 0; i < 6; i++) {
+					if (bgs && bgs.length) {
+						for (let i = 0; i < bgs.length; i++) {
 							bgs[i].setAttrs({ x: 0, y: i * rowH, width, height: rowH });
 						}
 					}
 					const texts = group.find('Text');
-					if (texts && texts.length >= 6) {
-						for (let i = 0; i < 6; i++) {
+					if (texts && texts.length) {
+						for (let i = 0; i < texts.length; i++) {
 							texts[i].setAttrs({ x: 0, y: i * rowH, width, height: rowH });
 						}
 					}

@@ -476,6 +476,12 @@ const CONFIG = {
 
     // 座席表用: 拠点+階 選択肢
     seatMap: {
-        siteFloorOptions: ['埼玉01F', '埼玉02F', '埼玉03F', '埼玉04F', '池袋19F']
+        siteFloorOptions: ['埼玉01F', '埼玉02F', '埼玉03F', '埼玉04F', '池袋19F'],
+        // 座席下3行に表示できる追加情報（チェックボックス候補）。keyは一意識別子
+        // ledger: 'PC台帳' | '内線台帳' など、field: フィールドコード, label: UI用表示名
+        extraOptions: [
+            { key: '内線台帳_電話機種別', ledger: '内線台帳', field: '電話機種別', label: '電話機種別' },
+            { key: 'PC台帳_PC用途', ledger: 'PC台帳', field: 'PC用途', label: 'PC用途' }
+        ]
     }
 }; 
