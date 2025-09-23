@@ -66,6 +66,7 @@
 			this._searchIndex = -1;
 			this.searchCountEl = null;
 			this.searchNextBtnEl = null;
+			this.searchClearBtnEl = null;
 			this._searchFocusOverlay = null;
 			this._searchFocusTimer = null;
 			this.row1El = null;
@@ -170,10 +171,13 @@
 			searchInput.type = 'text';
 			searchInput.placeholder = '文字列検索（座席/内線/PC/部署） 複数可: スペース/カンマ/タブ/改行';
 			searchInput.className = 'seatmap-select search-multi';
+			searchInput.style.width = '200px';
+            // Enterキーで検索実行後、「次へ」をフォーカス
+            searchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); this.highlightTexts(searchInput.value || ''); try { this.searchNextBtnEl && this.searchNextBtnEl.focus(); } catch(_) { /* noop */ } } });
 			const searchBtn = document.createElement('button');
 			searchBtn.className = 'seatmap-btn primary';
 			searchBtn.textContent = '検索';
-			searchBtn.addEventListener('click', () => this.highlightTexts(searchInput.value || ''));
+            searchBtn.addEventListener('click', () => { this.highlightTexts(searchInput.value || ''); try { this.searchNextBtnEl && this.searchNextBtnEl.focus(); } catch(_) { /* noop */ } });
 			this.searchBtnEl = searchBtn;
 
 			const showBtn = document.createElement('button');
@@ -210,6 +214,14 @@
 					editToggle.textContent = '編集ON';
 				}
 			});
+			// 右寄せ（ウィンドウ基準）で表示（行の折返しに影響されない）
+			try {
+				editToggle.style.position = 'fixed';
+				editToggle.style.right = '12px';
+				editToggle.style.top = '82px'; // 1行目の高さ付近（必要なら調整）
+				editToggle.style.zIndex = '1000';
+				this.editToggleBtnEl = editToggle;
+			} catch(_) { /* noop */ }
 
 			const saveBtn = document.createElement('button');
 			saveBtn.className = 'seatmap-btn success';
@@ -401,29 +413,40 @@
 			// --- パーツ追加（保存）: まずは保存を優先。表示は後続で実装 ---
 			const addShapeBtn = document.createElement('button');
 			addShapeBtn.className = 'seatmap-btn';
-			addShapeBtn.textContent = '＋図形';
+			addShapeBtn.textContent = '🔳';
 			addShapeBtn.title = '図形（矩形）のパーツを保存します';
 			addShapeBtn.addEventListener('click', () => this.createPartRecord('図形'));
 
 			const addTextBtn = document.createElement('button');
 			addTextBtn.className = 'seatmap-btn';
-			addTextBtn.textContent = '＋テキスト';
+			addTextBtn.textContent = '🅰️';
 			addTextBtn.title = 'テキストのパーツを保存します';
 			addTextBtn.addEventListener('click', () => this.createPartRecord('テキスト'));
 
 			const addLineBtn = document.createElement('button');
 			addLineBtn.className = 'seatmap-btn';
-			addLineBtn.textContent = '＋線';
+			addLineBtn.textContent = '➖';
 			addLineBtn.title = '線のパーツを保存します';
 			addLineBtn.addEventListener('click', () => this.createPartRecord('線'));
 
-			row1.appendChild(siteSelect);
+			// フロア選択グループ
+			const floorGrp = document.createElement('div'); floorGrp.className = 'seatmap-part-group';
+			const floorTitle = document.createElement('span'); floorTitle.className = 'seatmap-edit-group-title'; floorTitle.textContent = 'フロア選択';
+			floorGrp.appendChild(floorTitle);
+			floorGrp.appendChild(siteSelect);
 			// floor入力は削除
-			row1.appendChild(showBtn);
-			row1.appendChild(searchInput);
-			row1.appendChild(searchBtn);
+			floorGrp.appendChild(showBtn);
+			row1.appendChild(floorGrp);
+			// ページ内検索グループ
+			const pageSearchGrp = document.createElement('div'); pageSearchGrp.className = 'seatmap-part-group';
+			const pageSearchTitle = document.createElement('span'); pageSearchTitle.className = 'seatmap-edit-group-title'; pageSearchTitle.textContent = 'ページ内検索';
+			pageSearchGrp.appendChild(pageSearchTitle);
+			pageSearchGrp.appendChild(searchInput);
+			pageSearchGrp.appendChild(searchBtn);
+			row1.appendChild(pageSearchGrp);
 			// --- 追加情報（チェックボックス 最大3件）を2行目に表示 ---
 			const rowExtra = document.createElement('div'); rowExtra.className = 'seatmap-controls-row';
+			this.rowExtraEl = rowExtra;
 			const extraGroup = document.createElement('div'); extraGroup.className = 'seatmap-part-group';
 			const extraTitle = document.createElement('span'); extraTitle.className = 'seatmap-edit-group-title'; extraTitle.textContent = '追加情報';
 			extraGroup.appendChild(extraTitle);
@@ -453,32 +476,58 @@
 			extrasWrap.appendChild(clearBtn);
 			extraGroup.appendChild(extrasWrap);
 			rowExtra.appendChild(extraGroup);
-			row1.appendChild(editToggle);
 			// 以下は編集ONのときのみ表示
 			deleteBtn.classList.add('edit-only');
 			saveBtn.classList.add('edit-only');
 			zoomOutBtn.classList.add('edit-only');
 			zoomInBtn.classList.add('edit-only');
 			resetBtn.classList.add('edit-only');
-			row1.appendChild(deleteBtn);
-			row1.appendChild(saveBtn);
-			row1.appendChild(zoomOutBtn);
-			row1.appendChild(zoomInBtn);
-			row1.appendChild(resetBtn);
+			// アクション（保存/削除）グループ
+			const actionGrp = document.createElement('div'); actionGrp.className = 'seatmap-part-group'; actionGrp.classList.add('edit-only');
+			const actionTitle = document.createElement('span'); actionTitle.className = 'seatmap-edit-group-title'; actionTitle.textContent = 'アクション';
+			actionGrp.appendChild(actionTitle);
+			// 並び順: 保存 → 削除
+			actionGrp.appendChild(saveBtn);
+			// 削除はわかりやすい色
+			try { deleteBtn.classList.add('danger'); } catch(_) { /* noop */ }
+			actionGrp.appendChild(deleteBtn);
+			row1.appendChild(actionGrp);
+			// 表示グループ（ズーム/リセット）
+			const viewGrp = document.createElement('div'); viewGrp.className = 'seatmap-part-group'; viewGrp.classList.add('edit-only');
+			const viewTitle = document.createElement('span'); viewTitle.className = 'seatmap-edit-group-title'; viewTitle.textContent = '表示';
+			viewGrp.appendChild(viewTitle);
+			viewGrp.appendChild(zoomOutBtn);
+			viewGrp.appendChild(zoomInBtn);
+			viewGrp.appendChild(resetBtn);
+			row1.appendChild(viewGrp);
 
 			// 図形パーツの追加操作を1段目の最後でグループ化
 			const partGrp = document.createElement('div'); partGrp.className = 'seatmap-part-group';
 			partGrp.classList.add('edit-only');
-			const partTitle = document.createElement('span'); partTitle.className = 'seatmap-edit-group-title'; partTitle.textContent = 'パーツ追加';
+			const partTitle = document.createElement('span'); partTitle.className = 'seatmap-edit-group-title'; partTitle.textContent = '挿入';
 			partGrp.appendChild(partTitle);
 			partGrp.appendChild(addShapeBtn);
 			partGrp.appendChild(addTextBtn);
 			partGrp.appendChild(addLineBtn);
 			row1.appendChild(partGrp);
+            // 右端固定スペーサ + 編集ON/OFFボタン
+            const rightSpacer = document.createElement('div');
+            rightSpacer.style.flex = '1 1 auto';
+            row1.appendChild(rightSpacer);
+            row1.appendChild(editToggle);
 
 			// 2行目: 編集系をグループ化
 			const editTitle = document.createElement('span'); editTitle.className = 'seatmap-edit-group-title'; editTitle.textContent = '編集';
 			row2.appendChild(editTitle);
+			// パーツ複製ボタン
+			const dupBtn = document.createElement('button');
+			dupBtn.className = 'seatmap-btn';
+			dupBtn.textContent = '複製';
+			dupBtn.title = '選択中のパーツを複製';
+			dupBtn.disabled = true;
+			dupBtn.addEventListener('click', () => this.duplicateSelectedParts());
+			this.duplicateButtonEl = dupBtn;
+			row2.appendChild(dupBtn);
 			// テキスト内容
 			const textValueLabel = document.createElement('span');
 			textValueLabel.textContent = 'テキスト:';
@@ -516,9 +565,10 @@
 			row2.appendChild(alignBottomBtn);
 
 			wrap.appendChild(row1);
-			// 2行目: 追加情報グループを先頭に、その後に編集系グループ（編集ONのみ表示）
-			wrap.appendChild(rowExtra);
+			// 2行目: 編集系グループ（編集ONのみ表示）
 			wrap.appendChild(row2);
+			// 3行目: 追加情報グループ（編集行の下）
+			wrap.appendChild(rowExtra);
 			// テキスト入力欄の幅は固定値（動的計測は行わない）
 			// パーツ追加ボタンは上記グループに移動済み
 			// 初期状態（編集OFF）では編集系を非表示
@@ -532,6 +582,7 @@
 				if (!root) return;
 				const targets = root.querySelectorAll('.edit-only');
 				targets.forEach(el => { el.style.display = show ? '' : 'none'; });
+				if (this.duplicateButtonEl) this.duplicateButtonEl.disabled = !show;
 			} catch(_) { /* noop */ }
 		}
 
@@ -1237,6 +1288,36 @@
 						if (this.searchBtnEl && this.searchBtnEl.parentNode) {
 							this.searchBtnEl.parentNode.insertBefore(this.searchCountEl, this.searchBtnEl.nextSibling);
 							this.searchCountEl.parentNode.insertBefore(this.searchNextBtnEl, this.searchCountEl.nextSibling);
+							// クリアボタンも設置（次への次）
+							this.searchClearBtnEl = document.createElement('button');
+							this.searchClearBtnEl.className = 'seatmap-btn';
+							this.searchClearBtnEl.textContent = 'クリア';
+							this.searchClearBtnEl.style.marginLeft = '4px';
+							this.searchClearBtnEl.addEventListener('click', () => {
+								try {
+									if (this.searchCountEl) this.searchCountEl.textContent = '0/0件';
+									if (this.searchNextBtnEl) this.searchNextBtnEl.disabled = true;
+									this._searchResults = [];
+									this._searchIndex = -1;
+									if (this.searchBtnEl) {
+										const input = this.searchBtnEl.previousElementSibling;
+										if (input && input.tagName === 'INPUT') input.value = '';
+									}
+									// ハイライト解除
+									this.seatIdToNode.forEach(group => {
+										const texts = group.find('Text');
+										const bgs = group.find('.row-bg');
+										for (let i = 0; i < texts.length; i++) {
+											const t = texts[i];
+											t.fill('#111');
+											t.fontStyle('normal');
+											if (bgs[i]) bgs[i].visible(false);
+										}
+									});
+									this.layer && this.layer.batchDraw();
+								} catch(_) { /* noop */ }
+							});
+							this.searchCountEl.parentNode.insertBefore(this.searchClearBtnEl, this.searchNextBtnEl.nextSibling);
 						}
 					}
 					this.searchCountEl.textContent = this._searchResults.length > 0 ? `${Math.min(1, this._searchResults.length)}/${this._searchResults.length}件` : '0/0件';
@@ -1526,6 +1607,8 @@
 				const vAlign = (meta.settings && meta.settings.verticalAlign) ? meta.settings.verticalAlign : 'middle';
 				const t = new Konva.Text({ x: 0, y: 0, width: meta.width, height: meta.height, text, fontSize, fill: color, align, verticalAlign: vAlign, fontStyle, fontFamily });
 				group.add(t);
+				// はみ出し防止: グループにクリップを設定
+				try { group.clip({ x: 0, y: 0, width: Math.max(1, Math.round(meta.width)), height: Math.max(1, Math.round(meta.height)) }); } catch(_) { /* noop */ }
 				// ダブルクリックで編集モード（コントロールの入力にフォーカス）
 				try { t.on('dblclick', (e) => { try { e && (e.cancelBubble = true); group.fire('dblclick'); } catch(_) { /* noop */ } }); } catch(_) { /* noop */ }
 				// 背景Rectがある場合にテキストの後ろに回す
@@ -2157,6 +2240,58 @@
 			} catch (_) { /* noop */ }
 		}
 
+		async duplicateSelectedParts() {
+			try {
+				if (!this.isEditing || !this.transformer) return;
+				const selectedNodes = this.transformer.nodes() || [];
+				if (!selectedNodes.length) return;
+				// 拠点+階 必須
+				const token = this.siteSelectEl ? String(this.siteSelectEl.value || '') : '';
+				const parsed = this._parseSiteFloorToken(token);
+				const site = parsed.site || '';
+				const floor = parsed.floor;
+				if (!site || !Number.isFinite(floor)) { alert('複製には拠点+階の選択が必要です'); return; }
+				const appId = CONFIG.getAppIdByLedgerName('座席台帳') || 8;
+				for (const group of selectedNodes) {
+					try {
+						if (!group || !group.getAttr) continue;
+						if (group.hasName && group.hasName('seat-node')) continue; // 座席は対象外
+						const settings = JSON.parse(JSON.stringify(group.getAttr('partSettings') || {}));
+						const type = settings.type || (group.findOne('Text') ? 'text' : group.findOne('Line') ? 'line' : 'shape');
+						const objectType = (type === 'text') ? 'テキスト' : (type === 'line') ? '線' : '図形';
+						const typeLabel = (objectType === 'テキスト') ? '文字' : objectType;
+						const pos = group.position();
+						const offset = 10;
+						// 寸法
+						let w = 120, h = 60;
+						const rect = group.findOne('Rect'); if (rect) { w = Math.round(rect.width()); h = Math.round(rect.height()); }
+						const ellipse = group.findOne('Ellipse'); if (ellipse) { w = Math.round((ellipse.radiusX()||0)*2); h = Math.round((ellipse.radiusY()||0)*2); }
+						const ln = group.findOne('Line'); if (ln) { const p = ln.points(); w = Math.max(1, Math.abs(Math.round(p[2]||0))); h = Math.max(1, Math.abs(Math.round(p[3]||0))); }
+						// 座席番号を採番
+						const nextSeatNumber = await this._generateNextPartNumber(typeLabel, site, floor, objectType);
+						// レコード作成
+						const record = {
+							'座席拠点': { value: site },
+							'階': { value: Number(floor) },
+							'座席番号': { value: nextSeatNumber },
+							'座標X': { value: Number(Math.round(pos.x + offset)) },
+							'座標Y': { value: Number(Math.round(pos.y + offset)) },
+							'幅':   { value: Number(w) },
+							'高さ': { value: Number(h) },
+							'座席表表示': { value: 'true' },
+							'オブジェクト種別': { value: objectType },
+							'パーツ設定JSON': { value: JSON.stringify(settings) }
+						};
+						const res = await kintone.api(kintone.api.url('/k/v1/record', true), 'POST', { app: String(appId), record });
+						// 画面へ追加
+						const newGroup = this.addPart({ recordId: res && res.id, objectType, settings, width: w, height: h }, { x: Math.round(pos.x + offset), y: Math.round(pos.y + offset) }, { markPending: false });
+						try { this.transformer.nodes([newGroup]); this._showSizeLabel(newGroup); } catch(_) { /* noop */ }
+					} catch(err) { console.error('複製エラー', err); }
+				}
+				this.layer && this.layer.batchDraw();
+			} catch(_) { /* noop */ }
+		}
+
 		_applySnap(group) {
 			try {
 				if (!this.snapEnabled) return;
@@ -2326,6 +2461,8 @@
 					width = Math.max(10, Math.round(rect.width() * scaleX));
 					height = Math.max(10, Math.round(rect.height() * scaleY));
 					rect.width(width); rect.height(height);
+					// クリップ更新
+					try { if (!(group.getAttr('partSettings')||{}).type || (group.getAttr('partSettings')||{}).type === 'shape') { /* noop */ } } catch(_) { /* noop */ }
 				} else if (ellipse) {
 					const rx = Math.max(5, Math.round(ellipse.radiusX() * scaleX));
 					const ry = Math.max(5, Math.round(ellipse.radiusY() * scaleY));
@@ -2338,6 +2475,8 @@
 						width = Math.max(10, Math.round((t.width && t.width()) ? t.width() * scaleX : (group.width && group.width()) ? group.width() * scaleX : 120));
 						height = Math.max(10, Math.round((t.height && t.height()) ? t.height() * scaleY : (group.height && group.height()) ? group.height() * scaleY : 30));
 						t.width(width); t.height(height);
+						// クリップ更新
+						try { group.clip({ x: 0, y: 0, width, height }); } catch(_) { /* noop */ }
 					}
 				}
 				group.scale({ x: 1, y: 1 });
@@ -2391,6 +2530,19 @@
 			this.seatIdToNode.forEach(node => node.draggable(true));
 			if (this.deleteButtonEl) this.deleteButtonEl.disabled = false;
 			this._updateEditControlsVisibility(true);
+			// 追加情報（rowExtra）は編集行の下へ
+			try {
+				const root = this.controlsRootEl;
+				if (root && this.rowExtraEl) {
+					root.removeChild(this.rowExtraEl);
+					const rows = root.querySelectorAll('.seatmap-controls-row');
+					if (rows && rows.length >= 2) {
+						rows[1].after(this.rowExtraEl);
+					} else {
+						root.appendChild(this.rowExtraEl);
+					}
+				}
+			} catch(_) { /* noop */ }
 			// 左リストを表示し、2カラムに戻す
 			try {
 				const layout = this.container && this.container.querySelector && this.container.querySelector('.seatmap-layout');
@@ -2422,6 +2574,14 @@
 			this.seatIdToNode.forEach(node => node.draggable(false));
 			if (this.deleteButtonEl) this.deleteButtonEl.disabled = true;
 			this._updateEditControlsVisibility(false);
+			// 追加情報は編集OFFでも3行目に残す
+			try {
+				const root = this.controlsRootEl;
+				if (root && this.rowExtraEl) {
+					root.removeChild(this.rowExtraEl);
+					root.appendChild(this.rowExtraEl);
+				}
+			} catch(_) { /* noop */ }
 			// 左リストを非表示にし、右ステージを全幅に
 			try {
 				const layout = this.container && this.container.querySelector && this.container.querySelector('.seatmap-layout');
