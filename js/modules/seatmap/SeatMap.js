@@ -46,6 +46,7 @@
 			this.lineWidthInputEl = null;
 			this.lineColorSelectEl = null; // legacy (not used)
 			this.lineColorBtnEl = null;
+			this.textColorBtnEl = null;
 			this.lineColorPaletteEl = null;
 			this._onDocClickPalette = null;
 			this.textBgColorBtnEl = null;
@@ -183,11 +184,14 @@
 			const showBtn = document.createElement('button');
 			showBtn.className = 'seatmap-btn primary';
 			showBtn.textContent = '表示';
-			showBtn.addEventListener('click', () => {
-				const token = this.siteSelectEl ? this.siteSelectEl.value : '';
-				const parsed = this._parseSiteFloorToken(token);
-				this.loadAndRender(parsed);
-			});
+            showBtn.addEventListener('click', () => {
+                const token = this.siteSelectEl ? this.siteSelectEl.value : '';
+                const parsed = this._parseSiteFloorToken(token);
+                const isValid = !!(parsed.site && Number.isFinite(parsed.floor));
+                // 有効な拠点+階のときに表示、無効（拠点+階）のときは非表示
+                this._setOptionalUiVisible(isValid);
+                this.loadAndRender(parsed);
+            });
 
 			const editToggle = document.createElement('button');
 			editToggle.className = 'seatmap-btn danger';
@@ -245,14 +249,22 @@
 			this.lineWidthInputEl = lineWidth;
 			lineWidth.addEventListener('input', () => this._applyLineWidthFromControls());
 
-			// カラーパレット（12x12）トリガーボタン（線/テキスト色）
+			// カラーパレット（12x12）トリガーボタン: 線色 / 文字色 を分離
 			const colorBtn = document.createElement('button');
 			colorBtn.className = 'seatmap-btn';
-			colorBtn.textContent = '線・文字色…';
+			colorBtn.textContent = '線色…';
 			colorBtn.disabled = true;
-			colorBtn.title = '文字色/線色（選択時のみ）';
+			colorBtn.title = '線色（選択時のみ）';
 			this.lineColorBtnEl = colorBtn;
-			colorBtn.addEventListener('click', (ev) => { this._paletteApplyTarget = 'color'; this._toggleColorPalette(ev); });
+			colorBtn.addEventListener('click', (ev) => { this._paletteApplyTarget = 'stroke'; this._toggleColorPalette(ev); });
+
+			const textColorBtn = document.createElement('button');
+			textColorBtn.className = 'seatmap-btn';
+			textColorBtn.textContent = '文字色…';
+			textColorBtn.disabled = true;
+			textColorBtn.title = '文字色（テキスト/図形ラベル 選択時のみ）';
+			this.textColorBtnEl = textColorBtn;
+			textColorBtn.addEventListener('click', (ev) => { this._paletteApplyTarget = 'text'; this._toggleColorPalette(ev); });
 
 			// テキスト背景色ボタン
 			const textBgColorBtn = document.createElement('button');
@@ -444,6 +456,9 @@
 			pageSearchGrp.appendChild(searchInput);
 			pageSearchGrp.appendChild(searchBtn);
 			row1.appendChild(pageSearchGrp);
+			// 参照保持
+			this.floorGrpEl = floorGrp;
+			this.pageSearchGrpEl = pageSearchGrp;
 			// --- 追加情報（チェックボックス 最大3件）を2行目に表示 ---
 			const rowExtra = document.createElement('div'); rowExtra.className = 'seatmap-controls-row';
 			this.rowExtraEl = rowExtra;
@@ -533,19 +548,23 @@
 			textValueLabel.textContent = 'テキスト:';
 			textValueLabel.style.marginLeft = '8px';
 			textValueLabel.style.marginRight = '4px';
-			const textValueInput = document.createElement('input');
-			textValueInput.type = 'text';
+			const textValueInput = document.createElement('textarea');
+			textValueInput.rows = 2;
 			textValueInput.className = 'seatmap-select';
 			textValueInput.placeholder = '選択中テキストの内容';
 			textValueInput.disabled = true;
 			textValueInput.style.width = '120px';
+			textValueInput.style.height = '48px';
 			this.textValueInputEl = textValueInput;
 			textValueInput.addEventListener('input', () => this._applyTextValueFromControls());
+			// Shift+Enterで改行、Enter単体はデフォルト（送信など）は抑止
+			textValueInput.addEventListener('keydown', (e) => { try { if (e.key === 'Enter' && e.shiftKey) { /* ブラウザがtextareaなので自然に改行される */ return; } if (e.key === 'Enter') { e.stopPropagation(); } } catch(_) { /* noop */ } });
 			row2.appendChild(textValueLabel);
 			row2.appendChild(textValueInput);
 			row2.appendChild(lineWidthLabel);
 			row2.appendChild(lineWidth);
 			row2.appendChild(colorBtn);
+			row2.appendChild(textColorBtn);
 			row2.appendChild(textBgColorBtn);
 			row2.appendChild(fontSizeLabel);
 			row2.appendChild(fontSizeInput);
@@ -573,7 +592,17 @@
 			// パーツ追加ボタンは上記グループに移動済み
 			// 初期状態（編集OFF）では編集系を非表示
 			this._updateEditControlsVisibility(false);
+			// 初期表示: フロア選択のみ表示し、ページ内検索/追加情報/編集ONを非表示
+			this._setOptionalUiVisible(false);
 			return wrap;
+		}
+
+		_setOptionalUiVisible(show) {
+			try {
+				if (this.pageSearchGrpEl) this.pageSearchGrpEl.style.display = show ? '' : 'none';
+				if (this.rowExtraEl) this.rowExtraEl.style.display = show ? '' : 'none';
+				if (this.editToggleBtnEl) this.editToggleBtnEl.style.display = show ? '' : 'none';
+			} catch(_) { /* noop */ }
 		}
 
 		_updateEditControlsVisibility(show) {
@@ -860,11 +889,18 @@
 			this._bindDomDnd();
 			// 前回のMAPをクリア
 			this._clearMap();
-			// 左リスト（未配置）を更新
-			await this._loadLeftSeatList(siteFloor);
-			// 右MAP（配置済み=true）を再描画
-			const { site, floor } = this._parseSiteFloor(siteFloor);
-			await this._loadMapSeats(site, floor);
+			// フロア選択の有効性を先に判定
+			const parsed = this._parseSiteFloor(siteFloor);
+			const isValid = !!(parsed.site && Number.isFinite(parsed.floor));
+			if (isValid) {
+				// 左リスト（未配置）を更新
+				await this._loadLeftSeatList(siteFloor);
+				// 右MAP（配置済み=true）を再描画
+				await this._loadMapSeats(parsed.site, parsed.floor);
+			} else {
+				// 無効選択時は何も表示しない
+				try { this._renderSeatList([]); } catch(_) { /* noop */ }
+			}
 			// 表示対象のPC/内線番号から台帳を先読み
 			try { await this._prefetchLedgersFromSeats(); this._refreshExtraDisplayAll(); } catch(_) { /* noop */ }
 			this._alignViewTopLeft(0.8);
@@ -1419,16 +1455,27 @@
 							this._hidePropsPanel();
 						// 全ラインの先端ハンドルを非表示
 						try { this.seatIdToNode.forEach(g => { const hb = g.findOne('.line-handle-b'); if (hb) hb.visible(false); }); } catch(_) { /* noop */ }
-						// UIを無効化
+						// UIを無効化 + デフォルト値へ戻す
 						try {
-							if (this.lineWidthInputEl) this.lineWidthInputEl.disabled = true;
+							// パレット状態をクリア
+							this._pendingPickedColor = null;
+							this._paletteApplyTarget = null;
+							try { this._closePalette(); } catch(_) { /* noop */ }
+							// テキスト入力（未選択時は入力不可）
+							if (this.textValueInputEl) { this.textValueInputEl.disabled = true; this.textValueInputEl.value = ''; this.textValueInputEl.placeholder = 'オブジェクト選択時に編集'; }
+							// 数値入力
+							if (this.lineWidthInputEl) { this.lineWidthInputEl.disabled = true; this.lineWidthInputEl.value = '3'; }
+							if (this.fontSizeInputEl) { this.fontSizeInputEl.disabled = true; this.fontSizeInputEl.value = '14'; }
+							// チェック/セレクト
+							if (this.fontBoldCheckboxEl) { this.fontBoldCheckboxEl.disabled = true; this.fontBoldCheckboxEl.checked = false; }
+							if (this.fontFamilySelectEl) { this.fontFamilySelectEl.disabled = true; this.fontFamilySelectEl.value = 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, Helvetica, sans-serif'; }
+							// ボタン群
 							if (this.lineColorBtnEl) this.lineColorBtnEl.disabled = true;
+							if (this.textColorBtnEl) this.textColorBtnEl.disabled = true;
 							if (this.textBgColorBtnEl) this.textBgColorBtnEl.disabled = true;
-							if (this.fontSizeInputEl) this.fontSizeInputEl.disabled = true;
-							if (this.fontBoldCheckboxEl) this.fontBoldCheckboxEl.disabled = true;
-							if (this.fontFamilySelectEl) this.fontFamilySelectEl.disabled = true;
-							this.textAlignButtons.forEach(b => b.disabled = true);
-							this.textVAlignButtons.forEach(b => b.disabled = true);
+							// 揃えボタン
+							this.textAlignButtons.forEach(b => { b.disabled = true; try { b.classList.remove('active'); } catch(_) {} });
+							this.textVAlignButtons.forEach(b => { b.disabled = true; try { b.classList.remove('active'); } catch(_) {} });
 						} catch(_) { /* noop */ }
 							// 選択参照を全クリア（誤適用防止）
 							this._selectedLineGroup = null;
@@ -1463,7 +1510,7 @@
 				group.add(new Konva.Line({ points: [0, y, meta.width, y], stroke: '#888', strokeWidth: 1 }));
 			});
 			// テキスト（中央寄せ）: 上から順に rows 行
-			const textOpts = { align: 'center', verticalAlign: 'middle', fontSize: 12, fill: '#111' };
+			const textOpts = { align: 'center', verticalAlign: 'middle', fontSize: 12, fill: '#111', wrap: 'word', ellipsis: false };
 			const texts = [];
 			for (let i = 0; i < rows; i++) {
 				const textVal = i === 0 ? (meta.seatNumber || '')
@@ -1517,8 +1564,9 @@
 				this._selectedTextGroup = null;
 				this._selectedShapeGroup = null;
 				try {
-					if (this.lineWidthInputEl) this.lineWidthInputEl.disabled = true;
+				if (this.lineWidthInputEl) this.lineWidthInputEl.disabled = true;
 					if (this.lineColorBtnEl) this.lineColorBtnEl.disabled = true;
+					if (this.textColorBtnEl) this.textColorBtnEl.disabled = true;
 					if (this.textBgColorBtnEl) this.textBgColorBtnEl.disabled = true;
 					if (this.textValueInputEl) this.textValueInputEl.disabled = true;
 					if (this.fontSizeInputEl) this.fontSizeInputEl.disabled = true;
@@ -1527,7 +1575,7 @@
 					this.textAlignButtons.forEach(b => b.disabled = true);
 					this.textVAlignButtons.forEach(b => b.disabled = true);
 					// 全ラインのハンドルは非表示
-					this.seatIdToNode.forEach(g => { const hb = g.findOne('.line-handle-b'); if (hb) hb.visible(false); });
+					this.seatIdToNode.forEach(g => { const hb = g.findOne('.line-handle-b'); if (hb) hb.visible(false); const ha = g.findOne('.line-handle-a'); if (ha) ha.visible(false); });
 				} catch(_) { /* noop */ }
 				this._hideAllSizeLabels();
 				this._showSizeLabel(group);
@@ -1590,8 +1638,36 @@
 				if (kind === 'ellipse') {
 					group.add(new Konva.Ellipse({ x: meta.width/2, y: meta.height/2, radius: { x: meta.width/2, y: meta.height/2 }, fill, stroke, strokeWidth }));
 				} else {
-					group.add(new Konva.Rect({ width: meta.width, height: meta.height, cornerRadius: 0, fill, stroke, strokeWidth }));
+					const cr = Number(meta.settings.cornerRadius) || 0;
+					group.add(new Konva.Rect({ width: meta.width, height: meta.height, cornerRadius: cr, fill, stroke, strokeWidth }));
 				}
+				// ラベル（任意）
+				try {
+					const label = (meta.settings && meta.settings.label) || {};
+					const textVal = String(label.value || '');
+					const pad = Number(label.padding != null ? label.padding : 4);
+					const t = new Konva.Text({
+						name: 'shape-label',
+						x: pad,
+						y: pad,
+						width: Math.max(1, (meta.width - pad * 2)),
+						height: Math.max(1, (meta.height - pad * 2)),
+					text: textVal,
+					wrap: 'word',
+					ellipsis: false,
+						fontSize: Number(label.fontSize) || 14,
+						fill: label.color || '#333',
+						align: label.align || 'center',
+						verticalAlign: label.verticalAlign || 'middle',
+						fontStyle: label.bold ? 'bold' : 'normal',
+						fontFamily: label.fontFamily || 'system-ui',
+						wrap: 'word',
+						lineHeight: 1.2
+					});
+					group.add(t);
+					// クリップで枠内に収める
+					group.clip({ x: 0, y: 0, width: Math.max(1, meta.width), height: Math.max(1, meta.height) });
+				} catch(_) { /* noop */ }
 			} else if (type === 'text') {
 				const text = meta.settings.value || '';
 				const fontSize = Number(meta.settings.fontSize) || 14;
@@ -1605,7 +1681,7 @@
 				}
 				const align = (meta.settings && meta.settings.align) ? meta.settings.align : 'left';
 				const vAlign = (meta.settings && meta.settings.verticalAlign) ? meta.settings.verticalAlign : 'middle';
-				const t = new Konva.Text({ x: 0, y: 0, width: meta.width, height: meta.height, text, fontSize, fill: color, align, verticalAlign: vAlign, fontStyle, fontFamily });
+				const t = new Konva.Text({ x: 0, y: 0, width: meta.width, height: meta.height, text, fontSize, fill: color, align, verticalAlign: vAlign, fontStyle, fontFamily, wrap: 'word', ellipsis: false });
 				group.add(t);
 				// はみ出し防止: グループにクリップを設定
 				try { group.clip({ x: 0, y: 0, width: Math.max(1, Math.round(meta.width)), height: Math.max(1, Math.round(meta.height)) }); } catch(_) { /* noop */ }
@@ -1628,7 +1704,28 @@
 				group.add(ln);
 				// 直接クリックでも選択・パネル表示できるように
 				ln.on('click tap', (e) => { try { e && (e.cancelBubble = true); group.fire('click'); } catch(_) { /* noop */ } });
-				// 末端ハンドル（B）のみドラッグ可能
+				// 先端ハンドル（A）/ 末端ハンドル（B）
+				const handleA = new Konva.Circle({ x: 0, y: 0, radius: 6, fill: '#1976d2', stroke: '#ffffff', strokeWidth: 1, draggable: true, name: 'line-handle-a', visible: false });
+				handleA.on('dragmove', () => {
+					try {
+						const p = handleA.position();
+						// 現在のB端座標（グループ内）
+						const pts = ln.points();
+						const ex = typeof pts[2] === 'number' ? pts[2] : 0;
+						const ey = typeof pts[3] === 'number' ? pts[3] : 0;
+						// グループをドラッグ量分だけ移動し、A端は(0,0)に戻す
+						group.position({ x: group.x() + p.x, y: group.y() + p.y });
+						handleA.position({ x: 0, y: 0 });
+						// B端は相対的に反対方向へ移動（線の向きを維持しつつスタートを動かす）
+						const nex = ex - p.x;
+						const ney = ey - p.y;
+						ln.points([0, 0, nex, ney]);
+						handleB.position({ x: nex, y: ney });
+						this._updateSizeLabel(group);
+						this.layer && this.layer.batchDraw();
+					} catch(_) { /* noop */ }
+				});
+				handleA.on('dragend', () => { try { handleA.position({ x: 0, y: 0 }); const p2 = ln.points(); const settings = group.getAttr('partSettings') || {}; settings.type='line'; settings.x2 = Math.round(p2[2]||0); settings.y2 = Math.round(p2[3]||0); group.setAttr('partSettings', settings);} catch(_){} this._syncSeatMeta(group); });
 				const handleB = new Konva.Circle({ x: x2, y: y2, radius: 6, fill: '#1976d2', stroke: '#ffffff', strokeWidth: 1, draggable: true, name: 'line-handle-b', visible: false });
 				handleB.on('dragmove', () => {
 					try {
@@ -1649,6 +1746,7 @@
 					} catch(_) { /* noop */ }
 					this._syncSeatMeta(group);
 				});
+				group.add(handleA);
 				group.add(handleB);
 			} else {
 				// fallback: rect
@@ -1688,11 +1786,13 @@
 					// ラインは末端ハンドルを表示し、Transformerのアンカーは無効
 					try { this.transformer.enabledAnchors([]); } catch(_) { /* noop */ }
 					const hb = group.findOne('.line-handle-b'); if (hb) hb.visible(true);
+					const ha = group.findOne('.line-handle-a'); if (ha) ha.visible(true);
 					// 上部メニュー（線プロパティ）を有効化し、現在値を反映
 					try {
 						const ln = group.findOne('Line');
 					if (this.lineWidthInputEl) { this.lineWidthInputEl.disabled = false; this.lineWidthInputEl.value = String((ln && ln.strokeWidth && ln.strokeWidth()) || 3); }
 					if (this.lineColorBtnEl) { this.lineColorBtnEl.disabled = false; }
+					if (this.textColorBtnEl) { this.textColorBtnEl.disabled = true; }
 					if (this.textBgColorBtnEl) { this.textBgColorBtnEl.disabled = true; }
 					this._selectedShapeGroup = null;
 					this._selectedTextGroup = null;
@@ -1715,6 +1815,7 @@
 					if (this.fontBoldCheckboxEl) { this.fontBoldCheckboxEl.disabled = false; this.fontBoldCheckboxEl.checked = (tx && tx.fontStyle && String(tx.fontStyle()).includes('bold')) || false; }
 					if (this.fontFamilySelectEl) { this.fontFamilySelectEl.disabled = false; const ff = (tx && tx.fontFamily && tx.fontFamily()) || 'system-ui'; this.fontFamilySelectEl.value = ff; }
 					if (this.lineColorBtnEl) { this.lineColorBtnEl.disabled = false; }
+					if (this.textColorBtnEl) { this.textColorBtnEl.disabled = false; }
 					if (this.textBgColorBtnEl) { this.textBgColorBtnEl.disabled = false; }
 					// 揃えボタンの活性化と現在値の反映
 					try {
@@ -1731,7 +1832,7 @@
 					this._selectedTextGroup = group;
 					} catch(_) { /* noop */ }
 					// ラインハンドルは全て非表示
-					try { const hb = group.findOne('.line-handle-b'); if (hb) hb.visible(false); } catch(_) { /* noop */ }
+					try { const hb = group.findOne('.line-handle-b'); if (hb) hb.visible(false); const ha = group.findOne('.line-handle-a'); if (ha) ha.visible(false); } catch(_) { /* noop */ }
 				} else {
 					try {
 						this.transformer.enabledAnchors([
@@ -1740,7 +1841,7 @@
 							'bottom-left','bottom-center','bottom-right'
 						]);
 					} catch(_) { /* noop */ }
-					// 図形選択時: 文字系無効、色ボタンは有効（図形色変更）
+                    // 図形選択時: ラベルがあれば文字系も編集可能、色/塗り/線太さは常に編集可
 					try {
 						// 図形: 枠線色は「線・文字色…」、塗りは「背景色…」、線太さは有効
 						if (this.lineWidthInputEl) {
@@ -1750,15 +1851,26 @@
 							const sw = (r && r.strokeWidth && r.strokeWidth()) || (e && e.strokeWidth && e.strokeWidth()) || 2;
 							this.lineWidthInputEl.value = String(sw);
 						}
-						if (this.lineColorBtnEl) this.lineColorBtnEl.disabled = false; // 図形の枠線色
-						if (this.textBgColorBtnEl) this.textBgColorBtnEl.disabled = false; // 図形の塗り
-						if (this.textValueInputEl) this.textValueInputEl.disabled = true; // テキスト入力は無効
-						if (this.fontSizeInputEl) this.fontSizeInputEl.disabled = true;
-						if (this.fontBoldCheckboxEl) this.fontBoldCheckboxEl.disabled = true;
-						if (this.fontFamilySelectEl) this.fontFamilySelectEl.disabled = true;
-						this.textAlignButtons.forEach(b => b.disabled = true);
-						this.textVAlignButtons.forEach(b => b.disabled = true);
-						this._selectedLineGroup = null; this._selectedTextGroup = null; this._selectedShapeGroup = group;
+					if (this.lineColorBtnEl) this.lineColorBtnEl.disabled = false; // 図形の枠線色
+					if (this.textColorBtnEl) this.textColorBtnEl.disabled = (group.findOne('.shape-label') ? false : true); // 図形ラベル文字色
+					if (this.textBgColorBtnEl) this.textBgColorBtnEl.disabled = false; // 図形の塗り
+                        const lbl = group.findOne('.shape-label');
+                        if (lbl) {
+                            if (this.textValueInputEl) { this.textValueInputEl.disabled = false; this.textValueInputEl.value = String(lbl.text && lbl.text() || ''); }
+                            if (this.fontSizeInputEl) { this.fontSizeInputEl.disabled = false; this.fontSizeInputEl.value = String(lbl.fontSize && lbl.fontSize() || 14); }
+                            if (this.fontBoldCheckboxEl) { this.fontBoldCheckboxEl.disabled = false; this.fontBoldCheckboxEl.checked = (lbl.fontStyle && String(lbl.fontStyle()).includes('bold')) || false; }
+                            if (this.fontFamilySelectEl) { this.fontFamilySelectEl.disabled = false; this.fontFamilySelectEl.value = lbl.fontFamily && lbl.fontFamily() || 'system-ui'; }
+                            this.textAlignButtons.forEach(b => b.disabled = false);
+                            this.textVAlignButtons.forEach(b => b.disabled = false);
+                        } else {
+                            if (this.textValueInputEl) this.textValueInputEl.disabled = true;
+                            if (this.fontSizeInputEl) this.fontSizeInputEl.disabled = true;
+                            if (this.fontBoldCheckboxEl) this.fontBoldCheckboxEl.disabled = true;
+                            if (this.fontFamilySelectEl) this.fontFamilySelectEl.disabled = true;
+                            this.textAlignButtons.forEach(b => b.disabled = true);
+                            this.textVAlignButtons.forEach(b => b.disabled = true);
+                        }
+                        this._selectedLineGroup = null; this._selectedTextGroup = null; this._selectedShapeGroup = group;
 					} catch(_) { /* noop */ }
 				}
 				this._showSizeLabel(group);
@@ -1779,6 +1891,22 @@
 							} else if (anchor.includes('center')) {
 								// 上下ハンドル: 縦のみ
 								n.scaleX(1);
+							}
+						}
+					} catch(_) { /* noop */ }
+					// テキストパーツ: リサイズ中も背景矩形を追従
+					try {
+						const s = n.getAttr && (n.getAttr('partSettings') || {});
+						if (s && s.type === 'text') {
+							const tx = n.findOne && n.findOne('Text');
+							const bg = n.findOne && n.findOne('.text-bg-rect');
+							if (tx && bg) {
+								const sx = n.scaleX && (n.scaleX() || 1);
+								const sy = n.scaleY && (n.scaleY() || 1);
+								const w = Math.max(1, Math.round((tx.width && tx.width()) ? tx.width() * sx : 0));
+								const h = Math.max(1, Math.round((tx.height && tx.height()) ? tx.height() * sy : 0));
+								bg.position({ x: tx.x(), y: tx.y() });
+								bg.size({ width: w, height: h });
 							}
 						}
 					} catch(_) { /* noop */ }
@@ -1985,12 +2113,21 @@
 						this.pendingChanges.set(String(this._selectedLineGroup.getAttr('recordId')), this._buildPendingFromGroup(this._selectedLineGroup));
 					}
 				}
-				if (this._selectedTextGroup && (!this._paletteApplyTarget || this._paletteApplyTarget === 'color')) {
+				if (this._selectedTextGroup && (!this._paletteApplyTarget || this._paletteApplyTarget === 'text')) {
 					const tx = this._selectedTextGroup.findOne('Text');
 					if (tx) {
 						tx.fill(color);
 						const settings = this._selectedTextGroup.getAttr('partSettings') || {}; settings.color = color; this._selectedTextGroup.setAttr('partSettings', settings);
 						this.pendingChanges.set(String(this._selectedTextGroup.getAttr('recordId')), this._buildPendingFromGroup(this._selectedTextGroup));
+					}
+				}
+				// 図形ラベルの文字色
+				if (this._paletteApplyTarget === 'text' && this._selectedShapeGroup) {
+					const lbl = this._selectedShapeGroup.findOne('.shape-label');
+					if (lbl) {
+						lbl.fill(color);
+						const s = this._selectedShapeGroup.getAttr('partSettings') || {}; s.label = s.label || {}; s.label.color = color; this._selectedShapeGroup.setAttr('partSettings', s);
+						this.pendingChanges.set(String(this._selectedShapeGroup.getAttr('recordId')), this._buildPendingFromGroup(this._selectedShapeGroup));
 					}
 				}
 				this.layer && this.layer.batchDraw();
@@ -2027,57 +2164,109 @@
 						this.pendingChanges.set(String(this._selectedTextGroup.getAttr('recordId')), this._buildPendingFromGroup(this._selectedTextGroup));
 					}
 				}
+				// 図形ラベルの背景色（未使用だが将来拡張を見越し、textBg指定時は無視）
 				this.layer && this.layer.batchDraw();
 			} catch(_) { /* noop */ }
 		}
 
 		_applyTextFontSizeFromControls() {
 			try {
-				if (!this.fontSizeInputEl || !this._selectedTextGroup) return;
+				if (!this.fontSizeInputEl) return;
 				const v = Math.max(8, Math.min(72, Number(this.fontSizeInputEl.value || 14)));
-				const tx = this._selectedTextGroup.findOne('Text');
-				if (!tx) return;
-				tx.fontSize(v);
-				const settings = this._selectedTextGroup.getAttr('partSettings') || {}; settings.fontSize = v; this._selectedTextGroup.setAttr('partSettings', settings);
-				this.pendingChanges.set(String(this._selectedTextGroup.getAttr('recordId')), this._buildPendingFromGroup(this._selectedTextGroup));
-				this.layer && this.layer.batchDraw();
+				// テキストパーツ
+				if (this._selectedTextGroup) {
+					const tx = this._selectedTextGroup.findOne('Text');
+					if (!tx) return;
+					tx.fontSize(v);
+					const settings = this._selectedTextGroup.getAttr('partSettings') || {}; settings.fontSize = v; this._selectedTextGroup.setAttr('partSettings', settings);
+					try { this._syncSeatMeta(this._selectedTextGroup); } catch(_) { /* noop */ }
+					this.pendingChanges.set(String(this._selectedTextGroup.getAttr('recordId')), this._buildPendingFromGroup(this._selectedTextGroup));
+					this.layer && this.layer.batchDraw();
+					return;
+				}
+				// 図形ラベル
+				if (this._selectedShapeGroup) {
+					const lbl = this._selectedShapeGroup.findOne('.shape-label');
+					if (!lbl) return;
+					lbl.fontSize(v);
+					const s = this._selectedShapeGroup.getAttr('partSettings') || {}; s.label = s.label || {}; s.label.fontSize = v; this._selectedShapeGroup.setAttr('partSettings', s);
+					try { this._syncSeatMeta(this._selectedShapeGroup); } catch(_) { /* noop */ }
+					this.pendingChanges.set(String(this._selectedShapeGroup.getAttr('recordId')), this._buildPendingFromGroup(this._selectedShapeGroup));
+					this.layer && this.layer.batchDraw();
+				}
 			} catch(_) { /* noop */ }
 		}
 
 		_applyTextBoldFromControls() {
 			try {
-				if (!this.fontBoldCheckboxEl || !this._selectedTextGroup) return;
+				if (!this.fontBoldCheckboxEl) return;
 				const on = !!this.fontBoldCheckboxEl.checked;
-				const tx = this._selectedTextGroup.findOne('Text');
-				if (!tx) return;
-				tx.fontStyle(on ? 'bold' : 'normal');
-				const settings = this._selectedTextGroup.getAttr('partSettings') || {}; settings.bold = on; this._selectedTextGroup.setAttr('partSettings', settings);
-				this.pendingChanges.set(String(this._selectedTextGroup.getAttr('recordId')), this._buildPendingFromGroup(this._selectedTextGroup));
-				this.layer && this.layer.batchDraw();
+				if (this._selectedTextGroup) {
+					const tx = this._selectedTextGroup.findOne('Text');
+					if (!tx) return;
+					tx.fontStyle(on ? 'bold' : 'normal');
+					const settings = this._selectedTextGroup.getAttr('partSettings') || {}; settings.bold = on; this._selectedTextGroup.setAttr('partSettings', settings);
+					this.pendingChanges.set(String(this._selectedTextGroup.getAttr('recordId')), this._buildPendingFromGroup(this._selectedTextGroup));
+					this.layer && this.layer.batchDraw();
+					return;
+				}
+				if (this._selectedShapeGroup) {
+					const lbl = this._selectedShapeGroup.findOne('.shape-label');
+					if (!lbl) return;
+					lbl.fontStyle(on ? 'bold' : 'normal');
+					const s = this._selectedShapeGroup.getAttr('partSettings') || {}; s.label = s.label || {}; s.label.bold = on; this._selectedShapeGroup.setAttr('partSettings', s);
+					this.pendingChanges.set(String(this._selectedShapeGroup.getAttr('recordId')), this._buildPendingFromGroup(this._selectedShapeGroup));
+					this.layer && this.layer.batchDraw();
+				}
 			} catch(_) { /* noop */ }
 		}
 
 		_applyTextFontFamilyFromControls() {
 			try {
-				if (!this.fontFamilySelectEl || !this._selectedTextGroup) return;
+				if (!this.fontFamilySelectEl) return;
 				const ff = String(this.fontFamilySelectEl.value || 'system-ui');
-				const tx = this._selectedTextGroup.findOne('Text');
-				if (!tx) return;
-				tx.fontFamily(ff);
-				const settings = this._selectedTextGroup.getAttr('partSettings') || {}; settings.fontFamily = ff; this._selectedTextGroup.setAttr('partSettings', settings);
-				this.pendingChanges.set(String(this._selectedTextGroup.getAttr('recordId')), this._buildPendingFromGroup(this._selectedTextGroup));
-				this.layer && this.layer.batchDraw();
+				if (this._selectedTextGroup) {
+					const tx = this._selectedTextGroup.findOne('Text');
+					if (!tx) return;
+					tx.fontFamily(ff);
+					const settings = this._selectedTextGroup.getAttr('partSettings') || {}; settings.fontFamily = ff; this._selectedTextGroup.setAttr('partSettings', settings);
+					this.pendingChanges.set(String(this._selectedTextGroup.getAttr('recordId')), this._buildPendingFromGroup(this._selectedTextGroup));
+					this.layer && this.layer.batchDraw();
+					return;
+				}
+				if (this._selectedShapeGroup) {
+					const lbl = this._selectedShapeGroup.findOne('.shape-label');
+					if (!lbl) return;
+					lbl.fontFamily(ff);
+					const s = this._selectedShapeGroup.getAttr('partSettings') || {}; s.label = s.label || {}; s.label.fontFamily = ff; this._selectedShapeGroup.setAttr('partSettings', s);
+					this.pendingChanges.set(String(this._selectedShapeGroup.getAttr('recordId')), this._buildPendingFromGroup(this._selectedShapeGroup));
+					this.layer && this.layer.batchDraw();
+				}
 			} catch(_) { /* noop */ }
 		}
 
 		_applyTextAlignFromControls(align) {
 			try {
-				if (!this._selectedTextGroup) return;
-				const tx = this._selectedTextGroup.findOne('Text');
-				if (!tx) return;
-				tx.align(align);
-				const settings = this._selectedTextGroup.getAttr('partSettings') || {}; settings.align = align; this._selectedTextGroup.setAttr('partSettings', settings);
-				this.pendingChanges.set(String(this._selectedTextGroup.getAttr('recordId')), this._buildPendingFromGroup(this._selectedTextGroup));
+				if (this._selectedTextGroup) {
+					const tx = this._selectedTextGroup.findOne('Text');
+					if (!tx) return;
+					tx.align(align);
+					const settings = this._selectedTextGroup.getAttr('partSettings') || {}; settings.align = align; this._selectedTextGroup.setAttr('partSettings', settings);
+					try { this._syncSeatMeta(this._selectedTextGroup); } catch(_) { /* noop */ }
+					this.pendingChanges.set(String(this._selectedTextGroup.getAttr('recordId')), this._buildPendingFromGroup(this._selectedTextGroup));
+					// トグル状態を更新
+					try { this.textAlignButtons.forEach(b => { if (!b) return; if (b.dataset && b.dataset.align === align) b.classList.add('active'); else b.classList.remove('active'); }); } catch(_) { /* noop */ }
+					this.layer && this.layer.batchDraw();
+					return;
+				}
+				if (this._selectedShapeGroup) {
+					const lbl = this._selectedShapeGroup.findOne('.shape-label');
+					if (!lbl) return;
+					lbl.align(align);
+					const s = this._selectedShapeGroup.getAttr('partSettings') || {}; s.label = s.label || {}; s.label.align = align; this._selectedShapeGroup.setAttr('partSettings', s);
+					try { this._syncSeatMeta(this._selectedShapeGroup); } catch(_) { /* noop */ }
+					this.pendingChanges.set(String(this._selectedShapeGroup.getAttr('recordId')), this._buildPendingFromGroup(this._selectedShapeGroup));
+				}
 				// トグル状態を更新
 				try { this.textAlignButtons.forEach(b => { if (!b) return; if (b.dataset && b.dataset.align === align) b.classList.add('active'); else b.classList.remove('active'); }); } catch(_) { /* noop */ }
 				this.layer && this.layer.batchDraw();
@@ -2086,12 +2275,26 @@
 
 		_applyTextVerticalAlignFromControls(vAlign) {
 			try {
-				if (!this._selectedTextGroup) return;
-				const tx = this._selectedTextGroup.findOne('Text');
-				if (!tx) return;
-				tx.verticalAlign(vAlign);
-				const settings = this._selectedTextGroup.getAttr('partSettings') || {}; settings.verticalAlign = vAlign; this._selectedTextGroup.setAttr('partSettings', settings);
-				this.pendingChanges.set(String(this._selectedTextGroup.getAttr('recordId')), this._buildPendingFromGroup(this._selectedTextGroup));
+				if (this._selectedTextGroup) {
+					const tx = this._selectedTextGroup.findOne('Text');
+					if (!tx) return;
+					tx.verticalAlign(vAlign);
+					const settings = this._selectedTextGroup.getAttr('partSettings') || {}; settings.verticalAlign = vAlign; this._selectedTextGroup.setAttr('partSettings', settings);
+					try { this._syncSeatMeta(this._selectedTextGroup); } catch(_) { /* noop */ }
+					this.pendingChanges.set(String(this._selectedTextGroup.getAttr('recordId')), this._buildPendingFromGroup(this._selectedTextGroup));
+					// トグル状態を更新
+					try { this.textVAlignButtons.forEach(b => { if (!b) return; if (b.dataset && b.dataset.valign === vAlign) b.classList.add('active'); else b.classList.remove('active'); }); } catch(_) { /* noop */ }
+					this.layer && this.layer.batchDraw();
+					return;
+				}
+				if (this._selectedShapeGroup) {
+					const lbl = this._selectedShapeGroup.findOne('.shape-label');
+					if (!lbl) return;
+					lbl.verticalAlign(vAlign);
+					const s = this._selectedShapeGroup.getAttr('partSettings') || {}; s.label = s.label || {}; s.label.verticalAlign = vAlign; this._selectedShapeGroup.setAttr('partSettings', s);
+					try { this._syncSeatMeta(this._selectedShapeGroup); } catch(_) { /* noop */ }
+					this.pendingChanges.set(String(this._selectedShapeGroup.getAttr('recordId')), this._buildPendingFromGroup(this._selectedShapeGroup));
+				}
 				// トグル状態を更新
 				try { this.textVAlignButtons.forEach(b => { if (!b) return; if (b.dataset && b.dataset.valign === vAlign) b.classList.add('active'); else b.classList.remove('active'); }); } catch(_) { /* noop */ }
 				this.layer && this.layer.batchDraw();
@@ -2100,10 +2303,12 @@
 
 		_applyTextValueFromControls() {
 			try {
-				if (!this.textValueInputEl || !this._selectedTextGroup) return;
+				if (!this.textValueInputEl) return;
 				const value = String(this.textValueInputEl.value || '');
-				const tx = this._selectedTextGroup.findOne('Text');
-				if (!tx) return;
+				// テキストパーツ
+				if (this._selectedTextGroup) {
+					const tx = this._selectedTextGroup.findOne('Text');
+					if (!tx) return;
 				tx.text(value);
 				// 設定へ保存
 				const settings = this._selectedTextGroup.getAttr('partSettings') || {};
@@ -2117,8 +2322,25 @@
 						bg.size({ width: tx.width(), height: tx.height() });
 					}
 				} catch(_) { /* noop */ }
+				// テキスト内容変更に伴い、トランスフォーマとメタを同期
+				try { this._syncSeatMeta(this._selectedTextGroup); } catch(_) { /* noop */ }
+				try { this.transformer && this.transformer.nodes && this.transformer.nodes([this._selectedTextGroup]); } catch(_) { /* noop */ }
 				this.pendingChanges.set(String(this._selectedTextGroup.getAttr('recordId')), this._buildPendingFromGroup(this._selectedTextGroup));
 				this.layer && this.layer.batchDraw();
+				return;
+				}
+				// 図形ラベル
+				if (this._selectedShapeGroup) {
+					const lbl = this._selectedShapeGroup.findOne('.shape-label');
+					if (!lbl) return;
+					lbl.text(value);
+					const s = this._selectedShapeGroup.getAttr('partSettings') || {}; s.label = s.label || {}; s.label.value = value; this._selectedShapeGroup.setAttr('partSettings', s);
+					// ラベル変更でもトランスフォーマとメタを同期
+					try { this._syncSeatMeta(this._selectedShapeGroup); } catch(_) { /* noop */ }
+					try { this.transformer && this.transformer.nodes && this.transformer.nodes([this._selectedShapeGroup]); } catch(_) { /* noop */ }
+					this.pendingChanges.set(String(this._selectedShapeGroup.getAttr('recordId')), this._buildPendingFromGroup(this._selectedShapeGroup));
+					this.layer && this.layer.batchDraw();
+				}
 			} catch(_) { /* noop */ }
 		}
 
@@ -2172,7 +2394,7 @@
 					palette.appendChild(sw);
 				});
 				// 配置（ボタンの下）
-				const anchorBtn = (this._paletteApplyTarget === 'textBg') ? this.textBgColorBtnEl : this.lineColorBtnEl;
+				const anchorBtn = (this._paletteApplyTarget === 'textBg') ? this.textBgColorBtnEl : (this._paletteApplyTarget === 'text' ? this.textColorBtnEl : this.lineColorBtnEl);
 				const rect = anchorBtn.getBoundingClientRect();
 				palette.style.left = Math.round(rect.left) + 'px';
 				palette.style.top = Math.round(rect.bottom + 6 + window.scrollY) + 'px';
@@ -2183,7 +2405,7 @@
 				this._onDocClickPalette = (e) => {
 					try {
 						if (!this.lineColorPaletteEl) return;
-						if (!this.lineColorPaletteEl.contains(e.target) && e.target !== this.lineColorBtnEl && e.target !== this.textBgColorBtnEl) {
+						if (!this.lineColorPaletteEl.contains(e.target) && e.target !== this.lineColorBtnEl && e.target !== this.textColorBtnEl && e.target !== this.textBgColorBtnEl) {
 							this._closePalette();
 						}
 					} catch(_) { /* noop */ }
@@ -2435,8 +2657,8 @@
 					const x2 = (typeof pts[2] === 'number' ? pts[2] : 0) * scaleX;
 					const y2 = (typeof pts[3] === 'number' ? pts[3] : 0) * scaleY;
 					if (line) line.points([0, 0, x2, y2]);
-					// 末端ハンドルも同期
-					try { const hb = group.findOne('.line-handle-b'); if (hb) hb.position({ x: x2, y: y2 }); } catch(_) { /* noop */ }
+					// ハンドル位置も同期
+					try { const hb = group.findOne('.line-handle-b'); if (hb) hb.position({ x: x2, y: y2 }); const ha = group.findOne('.line-handle-a'); if (ha) ha.position({ x: 0, y: 0 }); } catch(_) { /* noop */ }
 					// 設定へ保存（0 も有効値）
 					try { const s = group.getAttr('partSettings') || {}; s.type = 'line'; s.x2 = Math.round(x2); s.y2 = Math.round(y2); group.setAttr('partSettings', s); } catch(_) { /* noop */ }
 					width = Math.max(1, Math.abs(Math.round(x2)));
@@ -2460,14 +2682,34 @@
 				} else if (rect) {
 					width = Math.max(10, Math.round(rect.width() * scaleX));
 					height = Math.max(10, Math.round(rect.height() * scaleY));
-					rect.width(width); rect.height(height);
-					// クリップ更新
-					try { if (!(group.getAttr('partSettings')||{}).type || (group.getAttr('partSettings')||{}).type === 'shape') { /* noop */ } } catch(_) { /* noop */ }
+                    rect.width(width); rect.height(height);
+                    // 図形ラベルとクリップを更新
+                    try {
+                        const s = group.getAttr('partSettings') || {};
+                        const pad = Number(s.label && s.label.padding != null ? s.label.padding : 4);
+                        const lbl = group.findOne('.shape-label');
+                        if (lbl) {
+                            lbl.position({ x: pad, y: pad });
+                            lbl.size({ width: Math.max(1, width - pad * 2), height: Math.max(1, height - pad * 2) });
+                        }
+                        try { group.clip({ x: 0, y: 0, width, height }); } catch(_) { /* noop */ }
+                    } catch(_) { /* noop */ }
 				} else if (ellipse) {
 					const rx = Math.max(5, Math.round(ellipse.radiusX() * scaleX));
 					const ry = Math.max(5, Math.round(ellipse.radiusY() * scaleY));
 					ellipse.radius({ x: rx, y: ry });
-					width = rx * 2; height = ry * 2;
+                    width = rx * 2; height = ry * 2;
+                    // 図形ラベルとクリップを更新
+                    try {
+                        const s = group.getAttr('partSettings') || {};
+                        const pad = Number(s.label && s.label.padding != null ? s.label.padding : 4);
+                        const lbl = group.findOne('.shape-label');
+                        if (lbl) {
+                            lbl.position({ x: pad, y: pad });
+                            lbl.size({ width: Math.max(1, width - pad * 2), height: Math.max(1, height - pad * 2) });
+                        }
+                        try { group.clip({ x: 0, y: 0, width, height }); } catch(_) { /* noop */ }
+                    } catch(_) { /* noop */ }
 				} else {
 					// テキスト
 					const t = group.findOne('Text');
@@ -2480,12 +2722,12 @@
 					}
 				}
 				group.scale({ x: 1, y: 1 });
-				// 内部線とテキストも更新（行数対応）
+				// 内部線（座席の仕切り線）のみ更新。線パーツ（1本）には適用しない
 				const lines = group.find('Line');
 				const rows = this.seatRows || 6;
 				const rowH = height / rows;
-				if (lines && lines.length) {
-					for (let idx = 0; idx < lines.length; idx++) {
+				if ((group.hasName && group.hasName('seat-node')) || (lines && lines.length >= 5)) {
+					for (let idx = 0; idx < Math.min(lines.length, rows - 1); idx++) {
 						const i = idx + 1;
 						const y = rowH * i;
 						lines[idx].points([0, y, width, y]);
@@ -2495,17 +2737,19 @@
 				if (group.hasName && group.hasName('seat-node')) {
 					this._layoutSeatInternals(group);
 				} else {
-					// 既存の（座席以外）
-					const bgs = group.find('.row-bg');
-					if (bgs && bgs.length) {
-						for (let i = 0; i < bgs.length; i++) {
-							bgs[i].setAttrs({ x: 0, y: i * rowH, width, height: rowH });
+					// 既存の（座席以外）。テキスト/線パーツには適用しない
+					if (partType !== 'text' && partType !== 'line') {
+						const bgs = group.find('.row-bg');
+						if (bgs && bgs.length) {
+							for (let i = 0; i < bgs.length; i++) {
+								bgs[i].setAttrs({ x: 0, y: i * rowH, width, height: rowH });
+							}
 						}
-					}
-					const texts = group.find('Text');
-					if (texts && texts.length) {
-						for (let i = 0; i < texts.length; i++) {
-							texts[i].setAttrs({ x: 0, y: i * rowH, width, height: rowH });
+						const texts = group.find('Text');
+						if (texts && texts.length >= 6) {
+							for (let i = 0; i < 6; i++) {
+								texts[i].setAttrs({ x: 0, y: i * rowH, width, height: rowH });
+							}
 						}
 					}
 				}
@@ -2542,6 +2786,10 @@
 						root.appendChild(this.rowExtraEl);
 					}
 				}
+				// 編集ON時に非表示だったUIを表示
+				if (this.pageSearchGrpEl) this.pageSearchGrpEl.style.display = '';
+				if (this.rowExtraEl) this.rowExtraEl.style.display = '';
+				if (this.editToggleBtnEl) this.editToggleBtnEl.style.display = '';
 			} catch(_) { /* noop */ }
 			// 左リストを表示し、2カラムに戻す
 			try {
@@ -2566,7 +2814,7 @@
 				document.addEventListener('keydown', this._onKeyDownDelete);
 			}
 		}
-		exitEditMode() {
+			exitEditMode() {
 			this.isEditing = false;
 			this.transformer.nodes([]);
 			this._hideGrid();
@@ -2581,6 +2829,7 @@
 					root.removeChild(this.rowExtraEl);
 					root.appendChild(this.rowExtraEl);
 				}
+				// 編集OFF時の表示/非表示制御は行わない（表示条件はフロア選択の判定に委ねる）
 			} catch(_) { /* noop */ }
 			// 左リストを非表示にし、右ステージを全幅に
 			try {
