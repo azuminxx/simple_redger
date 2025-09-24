@@ -1426,5 +1426,6 @@ td.editable-cell select,
 .seatlist-list { display: flex; flex-direction: column; gap: 4px; overflow: auto; flex: 1 1 auto; min-height: 0; }
 .seatlist-empty { color: #6c757d; font-style: italic; padding: 10px; text-align: center; }
 .seat-item { border: 1px solid #e5e7eb; border-radius: 4px; padding: 6px 8px; background: #fff; cursor: grab; }
+.seat-item.selected { outline: 2px solid #4da3ff; outline-offset: 0; background: #f0f7ff; }
 .seat-item:active { cursor: grabbing; }
 

@@ -618,6 +618,14 @@
 		_buildSeatListSkeleton() {
 			const wrapper = document.createElement('div');
 			wrapper.className = 'seatlist-wrapper';
+			// プレビュー領域
+			const preview = document.createElement('div');
+			preview.className = 'seatlist-preview';
+			preview.style.cssText = 'margin:8px; border:1px solid #e5e7eb; border-radius:6px; padding:6px; background:#fff;';
+			const pvTitle = document.createElement('div'); pvTitle.textContent = 'プレビュー'; pvTitle.style.cssText = 'font-size:12px; color:#666; margin-bottom:4px;';
+			const pvBox = document.createElement('div'); pvBox.style.cssText = 'width:140px; height:100px; background:#f9fafb; border:1px dashed #cbd5e1; position:relative; overflow:hidden;';
+			preview.appendChild(pvTitle); preview.appendChild(pvBox);
+			this.listPreviewBoxEl = pvBox;
 
 			const header = document.createElement('div');
 			header.className = 'seatlist-header';
@@ -656,6 +664,7 @@
 			this.filterInputEl.addEventListener('input', () => this._applyListFilter());
 
 			wrapper.appendChild(header);
+			wrapper.appendChild(preview);
 			wrapper.appendChild(filterWrap);
 			wrapper.appendChild(list);
 			return wrapper;
@@ -1139,6 +1148,8 @@
 			if (!this.leftListEl) return;
 			// クリア
 			while (this.leftListEl.firstChild) this.leftListEl.removeChild(this.leftListEl.firstChild);
+			// プレビュー初期化
+			try { this._renderListPreview(null); } catch(_) { /* noop */ }
 			if (!records || records.length === 0) {
 				const empty = document.createElement('div');
 				empty.className = 'seatlist-empty';
@@ -1168,9 +1179,18 @@
 				const recordId = getVal(rec['$id']);
 				const objectType = getVal(rec['オブジェクト種別']);
 				const partJSON = getVal(rec['パーツ設定JSON']);
-				const widthVal = Number(getVal(rec['幅']) || 0) || undefined;
-				const heightVal = Number(getVal(rec['高さ']) || 0) || undefined;
-				const payload = {
+                let widthVal = Number(getVal(rec['幅']) || 0) || undefined;
+                let heightVal = Number(getVal(rec['高さ']) || 0) || undefined;
+                // 座席アイテム（オブジェクト種別なし等）で幅/高さが未設定の場合は 100x100 を既定に
+                try {
+                    const ot = String(objectType || '').trim();
+                    const isSeat = !ot || (ot !== '図形' && ot !== 'テキスト' && ot !== '線');
+                    if (isSeat) {
+                        if (!Number.isFinite(widthVal)) widthVal = 100; else if (!widthVal) widthVal = 100;
+                        if (!Number.isFinite(heightVal)) heightVal = 100; else if (!heightVal) heightVal = 100;
+                    }
+                } catch(_) { /* noop */ }
+                const payload = {
 					recordId,
 					seatNumber,
 					extNumber: ext,
@@ -1179,18 +1199,69 @@
 					objectType: objectType || '',
 					partSettings: partJSON || '',
 					width: widthVal,
-					height: heightVal
+                    height: heightVal
 				};
 				item.setAttribute('data-seat', JSON.stringify(payload));
 				item.setAttribute('data-seat-id', String(recordId || ''));
 				item.textContent = dept ? `${seatNumber}（${dept}）` : `${seatNumber}`;
 				item.setAttribute('data-seat-number', seatNumber || '');
 				item.setAttribute('data-seat-dept', dept || '');
+            // クリックで選択表示 & プレビュー
+            item.addEventListener('click', () => {
+					try {
+						const prev = this.leftListEl.querySelector('.seat-item.selected');
+						if (prev) prev.classList.remove('selected');
+						item.classList.add('selected');
+						const settings = payload.partSettings ? (JSON.parse(payload.partSettings || '{}') || {}) : {};
+						const width = Number(payload.width) || 120;
+						const height = Number(payload.height) || 60;
+                        this._renderListPreview({
+                            objectType: payload.objectType,
+                            settings,
+                            width,
+                            height,
+                            seatNumber: payload.seatNumber,
+                            extNumber: payload.extNumber,
+                            pcNumber: payload.pcNumber,
+                            deptName: payload.deptName
+                        });
+                    // インデックス保存
+                    try { this._leftListIndex = Array.prototype.indexOf.call(this.leftListEl.children, item); } catch(_) {}
+					} catch(_) { /* noop */ }
+				});
 				this.leftListEl.appendChild(item);
 			});
 			this._applyListFilter();
+        // 上下キーで選択移動
+        try {
+            if (!this._listKeyHandlerBound) {
+                this._leftListIndex = -1;
+                this.leftListEl.addEventListener('keydown', (e) => this._onLeftListKeydown(e));
+                this._listKeyHandlerBound = true;
+            }
+            this.leftListEl.tabIndex = 0; // フォーカス可能に
+        } catch(_) { /* noop */ }
 			function getVal(field) { return field && field.value !== undefined ? field.value : (field || ''); }
 		}
+
+    _onLeftListKeydown(e) {
+        try {
+            if (!this.leftListEl) return;
+            const items = Array.from(this.leftListEl.querySelectorAll('.seat-item'));
+            if (!items.length) return;
+            if (e.key === 'ArrowDown' || e.key === 'Down') {
+                e.preventDefault();
+                this._leftListIndex = Math.min(items.length - 1, (typeof this._leftListIndex === 'number' ? this._leftListIndex : -1) + 1);
+            } else if (e.key === 'ArrowUp' || e.key === 'Up') {
+                e.preventDefault();
+                this._leftListIndex = Math.max(0, (typeof this._leftListIndex === 'number' ? this._leftListIndex : 0) - 1);
+            } else { return; }
+            const target = items[this._leftListIndex];
+            if (!target) return;
+            target.click();
+            try { target.scrollIntoView({ block: 'nearest' }); } catch(_) { /* noop */ }
+        } catch(_) { /* noop */ }
+    }
 
 		async _loadMapSeats(site, floorNumber) {
 			try {
@@ -1242,6 +1313,123 @@
 				const hit = tokens.every(t => seat.toLowerCase().includes(t.toLowerCase()) || dept.toLowerCase().includes(t.toLowerCase()));
 				el.style.display = hit ? '' : 'none';
 			});
+		}
+
+		// 左リスト：選択中アイテムの簡易プレビューを表示
+		_renderListPreview(model) {
+			try {
+				if (!this.listPreviewBoxEl) return;
+				this.listPreviewBoxEl.innerHTML = '';
+				if (!model) return;
+				const box = this.listPreviewBoxEl;
+				const w = box.clientWidth || 140;
+				const h = box.clientHeight || 100;
+				const canvas = document.createElement('canvas');
+				canvas.width = w; canvas.height = h; canvas.style.width = '100%'; canvas.style.height = '100%';
+				box.appendChild(canvas);
+				const ctx = canvas.getContext('2d');
+				ctx.clearRect(0,0,w,h);
+				const pw = Math.max(10, Number(model.width) || 120);
+				const ph = Math.max(10, Number(model.height) || 60);
+				// スケールを算出（余白込み）
+				const margin = 6;
+				const sx = (w - margin * 2) / pw;
+				const sy = (h - margin * 2) / ph;
+				const s = Math.min(sx, sy);
+				const vw = Math.round(pw * s);
+				const vh = Math.round(ph * s);
+				const ox = Math.round((w - vw) / 2);
+				const oy = Math.round((h - vh) / 2);
+				const settings = model.settings || {};
+				const type = String(model.objectType || '').trim();
+				ctx.save();
+				ctx.translate(ox, oy);
+                // 座席（seat）: 内部行と代表文字列（座席番号/内線/PC/部署）
+                if (!type || type === '座席' || (!['図形','テキスト','線'].includes(type) && (!settings.type))) {
+                    // 正方形にして描画
+                    const side = Math.min(vw, vh);
+                    const x0 = Math.round((vw - side) / 2);
+                    const y0 = Math.round((vh - side) / 2);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.strokeStyle = '#333';
+                    ctx.lineWidth = 1;
+                    ctx.fillRect(x0, y0, side, side);
+                    ctx.strokeRect(x0 + 0.5, y0 + 0.5, side - 1, side - 1);
+                    // 行分割（seatRows 準拠）
+                    const rows = Math.max(6, (this.seatRows || 6));
+                    const rh = side / rows;
+                    ctx.strokeStyle = '#ddd';
+                    for (let i = 1; i < rows; i++) {
+                        const yy = y0 + Math.round(rh * i);
+                        ctx.beginPath();
+                        ctx.moveTo(x0, yy);
+                        ctx.lineTo(x0 + side, yy);
+                        ctx.stroke();
+                    }
+                    // テキスト（1〜4行目に中央寄せ）
+                    ctx.font = `${Math.max(8, Math.round(12 * s))}px sans-serif`;
+                    ctx.fillStyle = '#111';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    const seat = String(model.seatNumber || '');
+                    const ext = String(model.extNumber || '');
+                    const pc  = String(model.pcNumber || '');
+                    const dept = String(model.deptName || '');
+                    const values = [seat, ext, pc, dept];
+                    values.forEach((val, idx) => {
+                        const cy = y0 + rh * (idx + 0.5);
+                        ctx.fillText(val, x0 + side / 2, cy);
+                    });
+                    ctx.restore();
+                    return;
+                }
+				// 図形
+				if (type === '図形') {
+					ctx.fillStyle = settings.fill || '#FFE08A';
+					ctx.strokeStyle = settings.stroke || '#C77700';
+					ctx.lineWidth = 1;
+					ctx.fillRect(0, 0, vw, vh);
+					ctx.strokeRect(0.5, 0.5, vw-1, vh-1);
+					// ラベル
+					if (settings.label && settings.label.value) {
+						ctx.fillStyle = settings.label.color || '#333';
+						ctx.font = `${settings.label.bold ? 'bold ' : ''}${Math.max(8, Math.round((settings.label.fontSize || 14) * s))}px sans-serif`;
+						ctx.textAlign = settings.label.align || 'center';
+						const ty = (settings.label.verticalAlign === 'top') ? 0 : (settings.label.verticalAlign === 'bottom') ? vh : vh/2;
+						const tx = (settings.label.align === 'left') ? 0 : (settings.label.align === 'right') ? vw : vw/2;
+						ctx.textBaseline = (settings.label.verticalAlign === 'top') ? 'top' : (settings.label.verticalAlign === 'bottom') ? 'bottom' : 'middle';
+						ctx.fillText(String(settings.label.value), tx, ty);
+					}
+				} else if (type === 'テキスト') {
+					// 背景
+					if (settings.background) {
+						ctx.fillStyle = settings.background;
+						ctx.fillRect(0, 0, vw, vh);
+					}
+					// 文字
+					ctx.fillStyle = settings.color || '#333';
+					ctx.font = `${settings.bold ? 'bold ' : ''}${Math.max(8, Math.round((settings.fontSize || 14) * s))}px sans-serif`;
+					ctx.textAlign = settings.align || 'left';
+					ctx.textBaseline = (settings.verticalAlign === 'top') ? 'top' : (settings.verticalAlign === 'bottom') ? 'bottom' : 'middle';
+					const tx = (settings.align === 'left') ? 0 : (settings.align === 'right') ? vw : vw/2;
+					const ty = (settings.verticalAlign === 'top') ? 0 : (settings.verticalAlign === 'bottom') ? vh : vh/2;
+					const text = String(settings.value || '');
+					text.split(/\n/).forEach((line, idx, arr) => {
+						const lineHeight = Math.max(8, Math.round((settings.fontSize || 14) * s)) * 1.2;
+						const y = ty + (idx - (arr.length-1)/2) * lineHeight;
+						ctx.fillText(line, tx, y);
+					});
+				} else if (type === '線') {
+					ctx.strokeStyle = settings.stroke || '#1E88E5';
+					ctx.lineWidth = 2;
+					ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(vw, vh); ctx.stroke();
+				} else {
+					// その他: 単純な枠
+					ctx.strokeStyle = '#94a3b8';
+					ctx.strokeRect(0.5, 0.5, vw-1, vh-1);
+				}
+				ctx.restore();
+			} catch(_) { /* noop */ }
 		}
 
 		_enterPanZoom() {
