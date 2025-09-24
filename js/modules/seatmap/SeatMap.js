@@ -1599,10 +1599,45 @@
 				} catch(_) { /* noop */ }
 				this._applySnap(group); this._syncSeatMeta(group); this._updateSizeLabel(group);
 			});
-			group.on('transform', () => { this._updateSizeLabel(group); });
+			group.on('transform', () => {
+				try {
+					const tx = group.findOne('Text');
+					const bg = group.findOne('.text-bg-rect');
+					if (tx) {
+						const sx = group.scaleX() || 1;
+						const sy = group.scaleY() || 1;
+						const newW = Math.max(1, Math.round((tx.width && tx.width()) ? tx.width() * sx : 0));
+						const newH = Math.max(1, Math.round((tx.height && tx.height()) ? tx.height() * sy : 0));
+						tx.width(newW); tx.height(newH);
+						if (bg) { bg.position({ x: tx.x(), y: tx.y() }); bg.size({ width: newW, height: newH }); }
+						group.clip({ x: 0, y: 0, width: newW, height: newH });
+						group.scale({ x: 1, y: 1 });
+					}
+				} catch(_) { /* noop */ }
+				this._updateSizeLabel(group);
+			});
 			group.on('transformend', () => { this._syncSeatMeta(group); this._updateSizeLabel(group); });
 			this.transformer.on('transform', () => { const nodes = this.transformer.nodes(); nodes && nodes.forEach(n => this._updateSizeLabel(n)); });
-			this.transformer.on('transformend', () => { const nodes = this.transformer.nodes(); nodes && nodes.forEach(n => { this._syncSeatMeta(n); this._updateSizeLabel(n); }); });
+			this.transformer.on('transformend', () => {
+				const nodes = this.transformer.nodes();
+				nodes && nodes.forEach(n => {
+					this._syncSeatMeta(n);
+					// テキストパーツの背景とクリップ最終追従
+					try {
+						const s = n.getAttr && (n.getAttr('partSettings') || {});
+						if (s && s.type === 'text') {
+							const tx = n.findOne && n.findOne('Text');
+							const bg = n.findOne && n.findOne('.text-bg-rect');
+							if (tx && bg) {
+								bg.position({ x: tx.x(), y: tx.y() });
+								bg.size({ width: tx.width(), height: tx.height() });
+								try { n.clip({ x: 0, y: 0, width: tx.width(), height: tx.height() }); } catch(_) {}
+							}
+						}
+					} catch(_) { /* noop */ }
+					this._updateSizeLabel(n);
+				});
+			});
 			// トランスフォーマのハンドル色を強調
 			try {
 				this.transformer.stroke('#1976d2');
@@ -1894,6 +1929,25 @@
 							}
 						}
 					} catch(_) { /* noop */ }
+					// テキストパーツはスケールをサイズへ即時反映してズレを防止
+					try {
+						const s = n.getAttr && (n.getAttr('partSettings') || {});
+						if (s && s.type === 'text') {
+							const tx = n.findOne && n.findOne('Text');
+							if (tx) {
+								const sx = n.scaleX && (n.scaleX() || 1);
+								const sy = n.scaleY && (n.scaleY() || 1);
+								const newW = Math.max(1, Math.round((tx.width && tx.width()) ? tx.width() * sx : 0));
+								const newH = Math.max(1, Math.round((tx.height && tx.height()) ? tx.height() * sy : 0));
+								tx.width(newW);
+								tx.height(newH);
+								const bg = n.findOne && n.findOne('.text-bg-rect');
+								if (bg) { bg.position({ x: tx.x(), y: tx.y() }); bg.size({ width: newW, height: newH }); }
+								try { n.clip({ x: 0, y: 0, width: newW, height: newH }); } catch(_) {}
+								n.scale({ x: 1, y: 1 });
+							}
+						}
+					} catch(_) { /* noop */ }
 					// テキストパーツ: リサイズ中も背景矩形を追従
 					try {
 						const s = n.getAttr && (n.getAttr('partSettings') || {});
@@ -1907,6 +1961,7 @@
 								const h = Math.max(1, Math.round((tx.height && tx.height()) ? tx.height() * sy : 0));
 								bg.position({ x: tx.x(), y: tx.y() });
 								bg.size({ width: w, height: h });
+								try { n.clip({ x: 0, y: 0, width: w, height: h }); } catch(_) { /* noop */ }
 							}
 						}
 					} catch(_) { /* noop */ }
