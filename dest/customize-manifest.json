@@ -11,6 +11,7 @@
           "js/modules/api/UserListAPI.js",
           "js/modules/api/FieldInfoAPI.js",
           "js/modules/ui/FormBuilder.js",
+          "js/modules/ui/BulkUpdate.js",
           "js/modules/ui/TabManager.js",
           "js/modules/ui/LendingManager.js",
           "js/modules/search/SearchEngine.js",

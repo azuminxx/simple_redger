@@ -61,6 +61,22 @@
     width: 100%;
 }
 
+/* === 一括変更タブの統一スタイル === */
+.bulk-update-container,
+.bulk-update-container * {
+    font-size: 12px;
+}
+.bulk-desc { font-size: 12px; color: #495057; margin-bottom: 4px; }
+.bulk-paste-error-row textarea.bulk-paste-input,
+.bulk-paste-input { font-size: 12px; }
+.bulk-btn-row button { font-size: 12px; padding: 6px 12px; }
+.bulk-error-panel { font-size: 12px; }
+.bulk-error-title { font-weight: 600; color: #495057; }
+.bulk-error-body ul { margin: 0; padding-left: 18px; }
+.bulk-mode-row label { font-size: 12px; }
+.bulk-field-config-row label { font-size: 12px; }
+.bulk-field-config-row select { font-size: 12px; }
+
 /* タブメニュー */
 .tab-menu {
     display: flex;

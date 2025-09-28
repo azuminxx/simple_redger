@@ -117,7 +117,20 @@ class TabManager {
         }
         tabContainer.appendChild(seatmapContent);
 
-        // 更新履歴タブのタブコンテンツを追加
+        // 一括変更タブのタブコンテンツを追加（履歴の前）
+        const bulkContent = DOMHelper.createElement('div', { id: 'tab-bulk' }, 'tab-content');
+        try {
+            this.bulkUpdate = new BulkUpdate();
+            const bulkView = this.bulkUpdate.buildTabContent();
+            bulkContent.appendChild(bulkView);
+        } catch (e) {
+            const errorMessage = DOMHelper.createElement('div', {}, 'error-message');
+            errorMessage.textContent = '一括変更タブの初期化に失敗しました';
+            bulkContent.appendChild(errorMessage);
+        }
+        tabContainer.appendChild(bulkContent);
+
+        // 更新履歴タブのタブコンテンツを追加（位置は一括変更の後）
         const historyContent = DOMHelper.createElement('div', { id: 'tab-history' }, 'tab-content');
         const historyContainer = DOMHelper.createElement('div', {}, 'history-container');
         // 初期表示用の空テーブル（列ヘッダのみ）
@@ -266,6 +279,13 @@ class TabManager {
             tabButton.addEventListener('click', () => this.switchTab(appId));
             tabMenu.appendChild(tabButton);
         });
+
+        // 一括変更タブ（履歴の前）
+        const bulkTabButton = DOMHelper.createElement('button', {}, 'tab-button bulk-tab');
+        bulkTabButton.setAttribute('data-app', 'bulk');
+        bulkTabButton.textContent = '🧾 一括変更';
+        bulkTabButton.addEventListener('click', () => this.switchTab('bulk'));
+        tabMenu.appendChild(bulkTabButton);
 
         // 更新履歴タブ
         const historyTabButton = DOMHelper.createElement('button', {}, 'tab-button history-tab');

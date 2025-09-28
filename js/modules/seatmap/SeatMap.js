@@ -426,8 +426,12 @@
 			const addShapeBtn = document.createElement('button');
 			addShapeBtn.className = 'seatmap-btn';
 			addShapeBtn.textContent = '🔳';
-			addShapeBtn.title = '図形（矩形）のパーツを保存します';
-			addShapeBtn.addEventListener('click', () => this.createPartRecord('図形'));
+            addShapeBtn.title = '図形パーツを保存します';
+            let shapeKindSelectEl = null;
+            addShapeBtn.addEventListener('click', () => {
+                const kind = (shapeKindSelectEl && shapeKindSelectEl.value) ? shapeKindSelectEl.value : 'rect';
+                this.createPartRecord('図形', { kind });
+            });
 
 			const addTextBtn = document.createElement('button');
 			addTextBtn.className = 'seatmap-btn';
@@ -520,7 +524,20 @@
 			const partGrp = document.createElement('div'); partGrp.className = 'seatmap-part-group';
 			partGrp.classList.add('edit-only');
 			const partTitle = document.createElement('span'); partTitle.className = 'seatmap-edit-group-title'; partTitle.textContent = '挿入';
-			partGrp.appendChild(partTitle);
+            partGrp.appendChild(partTitle);
+            // 図形種類プルダウン
+            const shapeKindLabel = document.createElement('span');
+            shapeKindLabel.textContent = '種類:';
+            shapeKindLabel.style.marginLeft = '6px';
+            const shapeKindSelect = document.createElement('select');
+            shapeKindSelect.className = 'seatmap-shape-kind';
+            ['rect:長方形','roundRect:角丸長方形','ellipse:楕円','circle:円','triangle:三角形','pentagon:五角形','hexagon:六角形'].forEach(s => {
+                const [val, label] = s.split(':');
+                const opt = document.createElement('option'); opt.value = val; opt.textContent = label; shapeKindSelect.appendChild(opt);
+            });
+            shapeKindSelectEl = shapeKindSelect;
+            partGrp.appendChild(shapeKindLabel);
+            partGrp.appendChild(shapeKindSelect);
 			partGrp.appendChild(addShapeBtn);
 			partGrp.appendChild(addTextBtn);
 			partGrp.appendChild(addLineBtn);
@@ -1847,23 +1864,36 @@
 			return group;
 		}
 
-		_createPartNode(meta) {
+        _createPartNode(meta) {
 			const group = new Konva.Group({ x: meta.x, y: meta.y, draggable: this.isEditing, name: 'part-node', id: `part-${meta.recordId}` });
 			group.setAttr('recordId', meta.recordId);
 			group.setAttr('objectType', meta.objectType || '');
 			group.setAttr('partSettings', meta.settings || {});
 			const type = (meta.settings && meta.settings.type) || '';
-			if (type === 'shape') {
-				const fill = meta.settings.fill || '#FFE08A';
-				const stroke = meta.settings.stroke || '#C77700';
-				const strokeWidth = Number(meta.settings.strokeWidth) || 2;
-				const kind = meta.settings.kind || 'rect';
-				if (kind === 'ellipse') {
-					group.add(new Konva.Ellipse({ x: meta.width/2, y: meta.height/2, radius: { x: meta.width/2, y: meta.height/2 }, fill, stroke, strokeWidth }));
-				} else {
-					const cr = Number(meta.settings.cornerRadius) || 0;
-					group.add(new Konva.Rect({ width: meta.width, height: meta.height, cornerRadius: cr, fill, stroke, strokeWidth }));
-				}
+            if (type === 'shape') {
+                const fill = meta.settings.fill || '#FFE08A';
+                const stroke = meta.settings.stroke || '#C77700';
+                const strokeWidth = Number(meta.settings.strokeWidth) || 2;
+                const kind = meta.settings.kind || 'rect';
+                const w = Math.max(1, Number(meta.width) || 120);
+                const h = Math.max(1, Number(meta.height) || 80);
+                if (kind === 'ellipse') {
+                    group.add(new Konva.Ellipse({ x: w/2, y: h/2, radius: { x: w/2, y: h/2 }, fill, stroke, strokeWidth }));
+                } else if (kind === 'circle') {
+                    const r = Math.round(Math.min(w, h) / 2);
+                    group.add(new Konva.Circle({ x: r, y: r, radius: r, fill, stroke, strokeWidth }));
+                } else if (kind === 'roundRect') {
+                    const cr = Math.min(20, Math.round(Math.min(w, h) / 4));
+                    group.add(new Konva.Rect({ width: w, height: h, cornerRadius: cr, fill, stroke, strokeWidth }));
+                } else if (kind === 'triangle') {
+                    group.add(new Konva.RegularPolygon({ x: w/2, y: h/2, sides: 3, radius: Math.min(w, h) / 2, fill, stroke, strokeWidth }));
+                } else if (kind === 'pentagon') {
+                    group.add(new Konva.RegularPolygon({ x: w/2, y: h/2, sides: 5, radius: Math.min(w, h) / 2, fill, stroke, strokeWidth }));
+                } else if (kind === 'hexagon') {
+                    group.add(new Konva.RegularPolygon({ x: w/2, y: h/2, sides: 6, radius: Math.min(w, h) / 2, fill, stroke, strokeWidth }));
+                } else {
+                    group.add(new Konva.Rect({ width: w, height: h, cornerRadius: 0, fill, stroke, strokeWidth }));
+                }
 				// ラベル（任意）
 				try {
 					const label = (meta.settings && meta.settings.label) || {};
@@ -1871,10 +1901,10 @@
 					const pad = Number(label.padding != null ? label.padding : 4);
 					const t = new Konva.Text({
 						name: 'shape-label',
-						x: pad,
-						y: pad,
-						width: Math.max(1, (meta.width - pad * 2)),
-						height: Math.max(1, (meta.height - pad * 2)),
+                        x: pad,
+                        y: pad,
+                        width: Math.max(1, (w - pad * 2)),
+                        height: Math.max(1, (h - pad * 2)),
 					text: textVal,
 					wrap: 'word',
 					ellipsis: false,
@@ -1888,8 +1918,11 @@
 						lineHeight: 1.2
 					});
 					group.add(t);
-					// クリップで枠内に収める
-					group.clip({ x: 0, y: 0, width: Math.max(1, meta.width), height: Math.max(1, meta.height) });
+                    // クリップで枠内に収める（線の太さぶん余白を加味）
+                    try {
+                        const margin = Math.ceil((strokeWidth || 0) / 2) + 1;
+                        group.clip({ x: -margin, y: -margin, width: Math.max(1, w) + margin * 2, height: Math.max(1, h) + margin * 2 });
+                    } catch(_) { /* noop */ }
 				} catch(_) { /* noop */ }
 			} else if (type === 'text') {
 				const text = meta.settings.value || '';
@@ -2067,14 +2100,20 @@
                     // 図形選択時: ラベルがあれば文字系も編集可能、色/塗り/線太さは常に編集可
 					try {
 						// 図形: 枠線色は「線・文字色…」、塗りは「背景色…」、線太さは有効
-						if (this.lineWidthInputEl) {
-							this.lineWidthInputEl.disabled = false;
-							const r = group.findOne('Rect');
-							const e = group.findOne('Ellipse');
-							const sw = (r && r.strokeWidth && r.strokeWidth()) || (e && e.strokeWidth && e.strokeWidth()) || 2;
-							this.lineWidthInputEl.value = String(sw);
-						}
-					if (this.lineColorBtnEl) this.lineColorBtnEl.disabled = false; // 図形の枠線色
+                    if (this.lineWidthInputEl) {
+                        this.lineWidthInputEl.disabled = false;
+                        const r = group.findOne('Rect');
+                        const e = group.findOne('Ellipse');
+                        const c = group.findOne('Circle');
+                        const p = group.findOne('RegularPolygon');
+                        const sw = (r && r.strokeWidth && r.strokeWidth())
+                                || (e && e.strokeWidth && e.strokeWidth())
+                                || (c && c.strokeWidth && c.strokeWidth())
+                                || (p && p.strokeWidth && p.strokeWidth())
+                                || 2;
+                        this.lineWidthInputEl.value = String(sw);
+                    }
+                    if (this.lineColorBtnEl) this.lineColorBtnEl.disabled = false; // 図形の枠線色
 					if (this.textColorBtnEl) this.textColorBtnEl.disabled = (group.findOne('.shape-label') ? false : true); // 図形ラベル文字色
 					if (this.textBgColorBtnEl) this.textBgColorBtnEl.disabled = false; // 図形の塗り
                         const lbl = group.findOne('.shape-label');
@@ -2324,10 +2363,14 @@
 				}
 				// 図形の枠線太さ
 				if (this._selectedShapeGroup) {
-					const r = this._selectedShapeGroup.findOne('Rect');
-					const e = this._selectedShapeGroup.findOne('Ellipse');
-					if (r) r.strokeWidth(v);
-					if (e) e.strokeWidth(v);
+                    const r = this._selectedShapeGroup.findOne('Rect');
+                    const e = this._selectedShapeGroup.findOne('Ellipse');
+                    const c = this._selectedShapeGroup.findOne('Circle');
+                    const p = this._selectedShapeGroup.findOne('RegularPolygon');
+                    if (r) r.strokeWidth(v);
+                    if (e) e.strokeWidth(v);
+                    if (c) c.strokeWidth(v);
+                    if (p) p.strokeWidth(v);
 					const settings = this._selectedShapeGroup.getAttr('partSettings') || {}; settings.strokeWidth = v; this._selectedShapeGroup.setAttr('partSettings', settings);
 					this.pendingChanges.set(String(this._selectedShapeGroup.getAttr('recordId')), this._buildPendingFromGroup(this._selectedShapeGroup));
 				}
@@ -2340,11 +2383,15 @@
 			try {
 				const color = String(this._pendingPickedColor || '#1E88E5');
 				// 図形の枠線色（stroke）
-				if (this._selectedShapeGroup) {
-					const r = this._selectedShapeGroup.findOne('Rect');
-					const e = this._selectedShapeGroup.findOne('Ellipse');
-					if (r) r.stroke(color);
-					if (e) e.stroke(color);
+                if (this._selectedShapeGroup) {
+                    const r = this._selectedShapeGroup.findOne('Rect');
+                    const e = this._selectedShapeGroup.findOne('Ellipse');
+                    const c = this._selectedShapeGroup.findOne('Circle');
+                    const p = this._selectedShapeGroup.findOne('RegularPolygon');
+                    if (r) r.stroke(color);
+                    if (e) e.stroke(color);
+                    if (c) c.stroke(color);
+                    if (p) p.stroke(color);
 					const settings = this._selectedShapeGroup.getAttr('partSettings') || {}; settings.stroke = color; this._selectedShapeGroup.setAttr('partSettings', settings);
 					this.pendingChanges.set(String(this._selectedShapeGroup.getAttr('recordId')), this._buildPendingFromGroup(this._selectedShapeGroup));
 				}
@@ -2381,11 +2428,15 @@
 			try {
 				const color = String(this._pendingPickedColor || '#FFFFFF');
 				// 図形背景色（塗り）
-				if (this._selectedShapeGroup) {
-					const r = this._selectedShapeGroup.findOne('Rect');
-					const e = this._selectedShapeGroup.findOne('Ellipse');
-					if (r) r.fill(color);
-					if (e) e.fill(color);
+                if (this._selectedShapeGroup) {
+                    const r = this._selectedShapeGroup.findOne('Rect');
+                    const e = this._selectedShapeGroup.findOne('Ellipse');
+                    const c = this._selectedShapeGroup.findOne('Circle');
+                    const p = this._selectedShapeGroup.findOne('RegularPolygon');
+                    if (r) r.fill(color);
+                    if (e) e.fill(color);
+                    if (c) c.fill(color);
+                    if (p) p.fill(color);
 					const settingsShape = this._selectedShapeGroup.getAttr('partSettings') || {}; settingsShape.fill = color; this._selectedShapeGroup.setAttr('partSettings', settingsShape);
 					this.pendingChanges.set(String(this._selectedShapeGroup.getAttr('recordId')), this._buildPendingFromGroup(this._selectedShapeGroup));
 				}
@@ -2937,11 +2988,13 @@
                         }
                         try { group.clip({ x: 0, y: 0, width, height }); } catch(_) { /* noop */ }
                     } catch(_) { /* noop */ }
-				} else if (ellipse) {
-					const rx = Math.max(5, Math.round(ellipse.radiusX() * scaleX));
-					const ry = Math.max(5, Math.round(ellipse.radiusY() * scaleY));
-					ellipse.radius({ x: rx, y: ry });
+                } else if (ellipse) {
+                    const rx = Math.max(5, Math.round(ellipse.radiusX() * scaleX));
+                    const ry = Math.max(5, Math.round(ellipse.radiusY() * scaleY));
+                    ellipse.radius({ x: rx, y: ry });
                     width = rx * 2; height = ry * 2;
+                    // 楕円の中心を新しい外接矩形の中央へ
+                    try { ellipse.position({ x: Math.round(width / 2), y: Math.round(height / 2) }); } catch(_) { /* noop */ }
                     // 図形ラベルとクリップを更新
                     try {
                         const s = group.getAttr('partSettings') || {};
@@ -2951,7 +3004,43 @@
                             lbl.position({ x: pad, y: pad });
                             lbl.size({ width: Math.max(1, width - pad * 2), height: Math.max(1, height - pad * 2) });
                         }
-                        try { group.clip({ x: 0, y: 0, width, height }); } catch(_) { /* noop */ }
+                        try { const m = Math.ceil((ellipse.strokeWidth && ellipse.strokeWidth()) || 0 / 2) + 1; group.clip({ x: -m, y: -m, width: width + m * 2, height: height + m * 2 }); } catch(_) { /* noop */ }
+                    } catch(_) { /* noop */ }
+                } else if (group.findOne('Circle')) {
+                    const circle = group.findOne('Circle');
+                    const sUni = Math.min(scaleX, scaleY);
+                    const r = Math.max(5, Math.round((circle.radius && circle.radius()) ? circle.radius() * sUni : Math.min((group.width && group.width()) || 60, (group.height && group.height()) || 60) * sUni / 2));
+                    circle.radius(r);
+                    width = height = r * 2;
+                    try { circle.position({ x: r, y: r }); } catch(_) { /* noop */ }
+                    // ラベルとクリップ
+                    try {
+                        const s = group.getAttr('partSettings') || {};
+                        const pad = Number(s.label && s.label.padding != null ? s.label.padding : 4);
+                        const lbl = group.findOne('.shape-label');
+                        if (lbl) {
+                            lbl.position({ x: pad, y: pad });
+                            lbl.size({ width: Math.max(1, width - pad * 2), height: Math.max(1, height - pad * 2) });
+                        }
+                        try { const m = Math.ceil((circle.strokeWidth && circle.strokeWidth()) || 0 / 2) + 1; group.clip({ x: -m, y: -m, width: width + m * 2, height: height + m * 2 }); } catch(_) { /* noop */ }
+                    } catch(_) { /* noop */ }
+                } else if (group.findOne('RegularPolygon')) {
+                    const poly = group.findOne('RegularPolygon');
+                    const sUni = Math.min(scaleX, scaleY);
+                    const newR = Math.max(5, Math.round((poly.radius && poly.radius()) ? poly.radius() * sUni : Math.min((group.width && group.width()) || 60, (group.height && group.height()) || 60) * sUni / 2));
+                    poly.radius(newR);
+                    width = height = newR * 2;
+                    try { poly.position({ x: Math.round(width / 2), y: Math.round(height / 2) }); } catch(_) { /* noop */ }
+                    // クリップ・ラベル
+                    try {
+                        const s = group.getAttr('partSettings') || {};
+                        const pad = Number(s.label && s.label.padding != null ? s.label.padding : 4);
+                        const lbl = group.findOne('.shape-label');
+                        if (lbl) {
+                            lbl.position({ x: pad, y: pad });
+                            lbl.size({ width: Math.max(1, width - pad * 2), height: Math.max(1, height - pad * 2) });
+                        }
+                        try { const m = Math.ceil((poly.strokeWidth && poly.strokeWidth()) || 0 / 2) + 1; group.clip({ x: -m, y: -m, width: width + m * 2, height: height + m * 2 }); } catch(_) { /* noop */ }
                     } catch(_) { /* noop */ }
 				} else {
 					// テキスト
@@ -3179,8 +3268,9 @@
 
 				// デフォルト設定
 				let defaults = {};
-				if (objectType === '図形') {
-					defaults = { type: 'shape', kind: 'rect', fill: '#FFE08A', stroke: '#C77700' };
+                if (objectType === '図形') {
+                    const kind = (arguments && arguments[1] && arguments[1].kind) ? String(arguments[1].kind) : 'rect';
+                    defaults = { type: 'shape', kind, fill: '#FFE08A', stroke: '#C77700' };
 				} else if (objectType === 'テキスト') {
 					defaults = { type: 'text', value: 'テキスト', fontSize: 14, color: '#333333' };
 				} else if (objectType === '線') {

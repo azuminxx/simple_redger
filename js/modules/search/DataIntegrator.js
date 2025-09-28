@@ -335,12 +335,24 @@ class DataIntegrator {
             });
         });
 
-        // 統合キーが存在しないレコード用の一意キーを生成
+        // 統合キーが存在しないレコード用の一意キーを生成（座席表パーツは除外）
         const recordsWithoutIntegrationKey = [];
         Object.entries(allLedgerData).forEach(([appId, records]) => {
             records.forEach(record => {
                 const keyField = record[CONFIG.integrationKey];
                 if (!keyField || !keyField.value) {
+                    // 座席台帳の「座席表パーツ（図形/テキスト/線）」は統合対象から除外
+                    try {
+                        const ledgerName = (CONFIG.apps && CONFIG.apps[appId] && CONFIG.apps[appId].name) ? CONFIG.apps[appId].name : '';
+                        if (ledgerName === '座席台帳') {
+                            const otField = record['オブジェクト種別'];
+                            const ot = (otField && otField.value !== undefined) ? String(otField.value) : String(otField || '');
+                            if (['図形','テキスト','線'].includes(ot)) {
+                                return; // skip seatmap parts
+                            }
+                        }
+                    } catch (e) { /* noop */ }
+
                     const recordId = record['$id'] && record['$id'].value !== undefined 
                         ? record['$id'].value 
                         : record['$id'];
@@ -370,6 +382,17 @@ class DataIntegrator {
                         item.key === integrationKey && item.appId === appId
                     );
                     if (emptyRecord) {
+                        // 座席表パーツ（図形/テキスト/線）はここでも防波堤として除外
+                        try {
+                            const ledgerName = (window.CONFIG && window.CONFIG.apps && window.CONFIG.apps[appId]) ? window.CONFIG.apps[appId].name : '';
+                            if (ledgerName === '座席台帳') {
+                                const otField = emptyRecord.record['オブジェクト種別'];
+                                const ot = (otField && otField.value !== undefined) ? String(otField.value) : String(otField || '');
+                                if (['図形','テキスト','線'].includes(ot)) {
+                                    continue; // skip adding this record entirely
+                                }
+                            }
+                        } catch (e) { /* noop */ }
                         matchingRecord = emptyRecord.record;
                     }
                 } else {

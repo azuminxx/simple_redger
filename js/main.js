@@ -64,6 +64,7 @@
 
                 // モジュールインスタンスを作成
                 this.tabManager = new TabManager();
+                this.bulkUpdate = new BulkUpdate();
                 this.searchEngine = new SearchEngine();
                 this.dataIntegrator = new DataIntegrator();
                 this.tableRenderer = new TableRenderer();
@@ -75,6 +76,7 @@
                 }
                 window.fieldInfoAPI = this.fieldInfoAPI;
                 window.tabManager = this.tabManager;
+                window.bulkUpdate = this.bulkUpdate;
                 window.searchEngine = this.searchEngine;
                 window.dataIntegrator = this.dataIntegrator;
                 window.apiCounter = this.apiCounter;

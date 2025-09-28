@@ -34,6 +34,23 @@ const CONFIG = {
         8: { name: '座席台帳' }
     },
 
+    // 一括変更機能用: 主キー参照先マスタ設定（既存appsへの影響なし）
+    masters: {
+        pc:  { appId: 6, fieldCode: 'PC番号' },
+        ext: { appId: 7, fieldCode: '内線番号' },
+        seat:{ appId: 8, fieldCode: '座席番号' }
+    },
+
+    // 一括変更機能設定
+    bulkUpdate: {
+        maxRows: 1000,
+        progressMessages: {
+            parsing: '取り込み中...\n（貼り付けデータを解析しています）',
+            validating: '存在確認中...\n（PC/内線/座席の存在チェック）',
+            building: '影響行抽出中...\n（変更後の状態を構成しています）'
+        }
+    },
+
     // 履歴管理アプリ設定
     historyApp: {
         appId: 17,
