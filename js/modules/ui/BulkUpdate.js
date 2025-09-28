@@ -137,13 +137,33 @@ class BulkUpdate {
             if (!select) return;
             select.innerHTML = '';
             const cols = CONFIG.integratedTableConfig.columns
-                .filter(c => c.ledger === ledger && !c.primaryKey && !c.isChangeFlag && !c.isDetailLink);
+                .filter(c => c.ledger === ledger
+                    && !c.primaryKey
+                    && !c.isChangeFlag
+                    && !c.isDetailLink
+                    && !c.readOnly // 読み取り専用は更新対象から除外
+                );
             cols.forEach(c => {
                 const opt = document.createElement('option');
                 opt.value = c.fieldCode; opt.textContent = c.label || c.fieldCode; select.appendChild(opt);
             });
             this.updatePlaceholder();
         } catch (e) { /* noop */ }
+    }
+
+    // 指定台帳の更新可能なフィールドコード集合（readOnly除外）
+    getUpdatableFieldCodesForLedger(ledger) {
+        try {
+            return CONFIG.integratedTableConfig.columns
+                .filter(c => c.ledger === ledger
+                    && !c.primaryKey
+                    && !c.isChangeFlag
+                    && !c.isDetailLink
+                    && !c.readOnly)
+                .map(c => c.fieldCode);
+        } catch (_) {
+            return [];
+        }
     }
 
     getTargetLedgerName() {
@@ -205,7 +225,15 @@ class BulkUpdate {
                 // フィールド一括更新モード
                 const ledger = this.getTargetLedgerName();
                 const pkField = ledger === 'PC台帳' ? 'PC番号' : (ledger === '内線台帳' ? '内線番号' : '座席番号');
-                const selectedFields = this.getSelectedFieldCodes();
+                const selectedFieldsRaw = this.getSelectedFieldCodes();
+                // 読み取り専用フィールドが混ざっていないか最終チェック
+                const allowedSet = new Set(this.getUpdatableFieldCodesForLedger(ledger));
+                const selectedFields = selectedFieldsRaw.filter(code => allowedSet.has(code));
+                if (selectedFields.length !== selectedFieldsRaw.length) {
+                    this.hideProgress();
+                    this.showErrorPanel(['読み取り専用のフィールドが選択されています。更新対象から外してください。']);
+                    return;
+                }
                 if (!selectedFields || selectedFields.length === 0) {
                     this.hideProgress();
                     this.showErrorPanel(['更新フィールドを1つ以上選択してください']);
@@ -293,8 +321,10 @@ class BulkUpdate {
                 const fields = await window.fieldInfoAPI.getAppFields(appId);
                 const optionMap = new Map(); // code -> Set(options)
                 const selected = new Set(this.getSelectedFieldCodes());
+                // ドロップダウン以外（ラジオ/チェックボックス等）でも選択肢を持つものは全て対象
                 fields.forEach(f => {
-                    if (selected.has(f.code) && f.type === 'dropdown' && Array.isArray(f.options)) {
+                    if (!selected.has(f.code)) return;
+                    if (Array.isArray(f.options) && f.options.length > 0) {
                         optionMap.set(f.code, new Set(f.options.map(o => String(o))));
                     }
                 });

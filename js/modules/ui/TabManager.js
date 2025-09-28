@@ -830,9 +830,9 @@ class TabManager {
         const table = DOMHelper.createElement('table', {}, 'history-table');
 
         // ヘッダー
-        const thead = DOMHelper.createElement('thead');
+		const thead = DOMHelper.createElement('thead');
 		const headerRow = DOMHelper.createElement('tr');
-		const headers = ['バッチ日時', '更新者', 'バッチID', 'PC台帳', '内線台帳', '座席台帳', '統合キー―', '更新内容', '結果', '詳細'];
+		const headers = ['バッチ日時', '更新者', 'バッチID', 'PC台帳', '内線台帳', '座席台帳', '統合キー(前)', '統合キー(後)', '更新内容', '結果', '詳細'];
 		headers.forEach(text => {
 			const th = DOMHelper.createElement('th');
 			th.textContent = text;
@@ -1057,7 +1057,23 @@ class TabManager {
         let currentBatchId = null;
         let alternate = false;
         const seen = new Set();
-        Array.from(aggregatedMap.values()).forEach(entry => {
+        // 並び替え: バッチ日時(降順) → バッチID(降順) → 統合キー(前)(昇順)
+        const aggSorted = Array.from(aggregatedMap.values()).sort((e1, e2) => {
+            const r1 = e1.base, r2 = e2.base;
+            const b1 = r1[CONFIG.historyApp.fields.batchId]?.value || '';
+            const b2 = r2[CONFIG.historyApp.fields.batchId]?.value || '';
+            const t1 = batchIdToEpoch(b1);
+            const t2 = batchIdToEpoch(b2);
+            if (t1 !== t2) return t2 - t1; // 降順
+            if (b1 !== b2) return b2.localeCompare(b1);
+            // 統合キー(前)を PC→EXT→SEAT の順で昇順比較
+            const c = (a, b) => String(a || '').localeCompare(String(b || ''), 'ja', { numeric: true, sensitivity: 'base' });
+            const cPC = c(e1.bPC, e2.bPC); if (cPC) return cPC;
+            const cEX = c(e1.bEX, e2.bEX); if (cEX) return cEX;
+            const cSE = c(e1.bSE, e2.bSE); if (cSE) return cSE;
+            return 0;
+        });
+        aggSorted.forEach(entry => {
             const rec = entry.base;
             const updater = rec[CONFIG.historyApp.fields.updater]?.value || {};
             const updaterName = updater?.name || '';
@@ -1156,20 +1172,38 @@ class TabManager {
             const c4 = makeLedgerCell('内線台帳');
             const c5 = makeLedgerCell('座席台帳');
 
-            const c6 = DOMHelper.createElement('td');
-            // build compactKey nodes
-            const keyWrap = document.createElement('span');
-            keyWrap.appendChild(buildKeyNode('PC', b.PC, a.PC));
-            keyWrap.appendChild(buildKeyNode('内線', b.EXT, a.EXT));
-            keyWrap.appendChild(buildKeyNode('座席', b.SEAT, a.SEAT));
-            // trim trailing separator
-            if (keyWrap.lastChild && keyWrap.lastChild.nodeType === Node.TEXT_NODE) {
-                keyWrap.lastChild.textContent = keyWrap.lastChild.textContent.replace(/\s\|\s?$/, '');
-            }
-            c6.appendChild(keyWrap);
-            const c7 = DOMHelper.createElement('td');
-            // 1行ずつ構築し、「→」以降（変更後の値）を太字・赤で表示
-            contentLines.forEach(line => {
+			const c6 = DOMHelper.createElement('td');
+			const c7 = DOMHelper.createElement('td');
+			// 変更前・変更後を別セルに分割表示
+			const keyWrapBefore = document.createElement('div');
+			const keyWrapAfter  = document.createElement('div');
+			const buildKeyLineBefore = (label, val) => {
+				const line = document.createElement('div');
+				const lbl = document.createElement('span'); lbl.textContent = `${label}:`;
+				const txt = document.createElement('span'); txt.textContent = val || '(空)';
+				line.appendChild(lbl); line.appendChild(txt);
+				return line;
+			};
+			const buildKeyLineAfter = (label, beforeVal, afterVal) => {
+				const line = document.createElement('div');
+				const lbl = document.createElement('span'); lbl.textContent = `${label}:`;
+				const txt = document.createElement('span'); txt.textContent = afterVal || '(空)';
+				if ((beforeVal || '') !== (afterVal || '')) { txt.className = 'diff-after'; }
+				line.appendChild(lbl); line.appendChild(txt);
+				return line;
+			};
+			keyWrapBefore.appendChild(buildKeyLineBefore('PC', b.PC));
+			keyWrapBefore.appendChild(buildKeyLineBefore('内線', b.EXT));
+			keyWrapBefore.appendChild(buildKeyLineBefore('座席', b.SEAT));
+			keyWrapAfter.appendChild(buildKeyLineAfter('PC', b.PC, a.PC));
+			keyWrapAfter.appendChild(buildKeyLineAfter('内線', b.EXT, a.EXT));
+			keyWrapAfter.appendChild(buildKeyLineAfter('座席', b.SEAT, a.SEAT));
+			c6.appendChild(keyWrapBefore);
+			c7.appendChild(keyWrapAfter);
+			// 更新内容セルを作成
+			const c8 = DOMHelper.createElement('td');
+			// 1行ずつ構築し、「→」以降（変更後の値）を太字・赤で表示
+			contentLines.forEach(line => {
                 const row = document.createElement('div');
                 // ラベル【...】がある場合はラベル部分は装飾せず、その後ろの値のみを装飾
                 const labelMatch = line.match(/^【[^】]+】\s*/);
@@ -1201,16 +1235,16 @@ class TabManager {
                         row.textContent = line;
                     }
                 }
-                c7.appendChild(row);
+				c8.appendChild(row);
             });
-            // 結果
-            const c8 = DOMHelper.createElement('td');
-            const resultVal = rec[CONFIG.historyApp.fields.result]?.value || '';
-            c8.textContent = resultVal;
-            c8.className = resultVal === 'success' ? 'success' : (resultVal ? 'failure' : '');
+			// 結果
+			const c9 = DOMHelper.createElement('td');
+			const resultVal = rec[CONFIG.historyApp.fields.result]?.value || '';
+			c9.textContent = resultVal;
+			c9.className = resultVal === 'success' ? 'success' : (resultVal ? 'failure' : '');
 
             // 詳細（request/response をモーダルで表示）
-            const c9 = DOMHelper.createElement('td');
+			const c10 = DOMHelper.createElement('td');
             const detailBtn = DOMHelper.createElement('button', {}, 'detail-btn');
             detailBtn.textContent = '詳細';
             detailBtn.addEventListener('click', () => {
@@ -1227,10 +1261,10 @@ class TabManager {
                 } catch (e) {
                     alert('詳細の取得に失敗しました');
                 }
-            });
-            c9.appendChild(detailBtn);
+			});
+			c10.appendChild(detailBtn);
 
-            [c0,c1,c2,c3,c4,c5,c6,c7,c8,c9].forEach(td => tr.appendChild(td));
+			[c0,c1,c2,c3,c4,c5,c6,c7,c8,c9,c10].forEach(td => tr.appendChild(td));
             tbody.appendChild(tr);
         });
 
@@ -1245,11 +1279,11 @@ class TabManager {
         const tbody = table.querySelector('tbody');
         if (!tbody) return;
         // 現在のヘッダー構成に基づく列インデックス
-        // 0:バッチ日時,1:更新者,2:バッチID,3:PC台帳,4:内線台帳,5:座席台帳,6:統合キー―,7:更新内容,8:結果,9:詳細
+        // 0:バッチ日時,1:更新者,2:バッチID,3:PC台帳,4:内線台帳,5:座席台帳,6:統合キー(前),7:統合キー(後),8:更新内容,9:結果,10:詳細
         const batchColIdx = 2;
-        const maxCols = 10;
-        // 更新内容(7)・詳細(9)は結合しない（結果(8)は結合対象）
-        const colsToMerge = [0,1,2,3,4,5,6,8];
+        const maxCols = 11;
+        // 更新内容(8)・詳細(10)は結合しない（結果(9)は結合対象）
+        const colsToMerge = [0,1,2,3,4,5,6,7,9];
         colsToMerge.forEach(colIdx => {
             let prevCell = null;
             let prevValue = null;

@@ -58,6 +58,7 @@
 			this.textVAlignButtons = [];
 			this._selectedShapeGroup = null;
 			this._selectedLineGroup = null;
+			this.zOrderSelectEl = null;
 			this._selectedTextGroup = null;
 			this.textValueInputEl = null;
 			this._seatListCtxMenuEl = null;
@@ -551,6 +552,39 @@
 			// 2行目: 編集系をグループ化
 			const editTitle = document.createElement('span'); editTitle.className = 'seatmap-edit-group-title'; editTitle.textContent = '編集';
 			row2.appendChild(editTitle);
+			// Z順ドロップダウン
+			const zLabel = document.createElement('span');
+			zLabel.textContent = '前後:';
+			zLabel.style.marginLeft = '8px';
+			zLabel.style.marginRight = '4px';
+			const zSelect = document.createElement('select');
+			zSelect.className = 'seatmap-select edit-only';
+			[ ['','— 選択 —'], ['top','前面へ'], ['up','一層前へ'], ['down','一層後へ'], ['bottom','最背面へ']].forEach(([v, t]) => { const o = document.createElement('option'); o.value = v; o.textContent = t; zSelect.appendChild(o); });
+			zSelect.disabled = true;
+			zSelect.addEventListener('change', () => {
+				try {
+					const nodes = (this.transformer && this.transformer.nodes && this.transformer.nodes()) || [];
+					if (!nodes.length) { zSelect.value = ''; return; }
+					nodes.forEach(g => {
+						if (!(g && g.hasName && (g.hasName('seat-node') || g.hasName('part-node')))) return;
+						switch (zSelect.value) {
+							case 'top': g.moveToTop && g.moveToTop(); break;
+							case 'up': g.moveUp && g.moveUp(); break;
+							case 'down': g.moveDown && g.moveDown(); break;
+							case 'bottom': g.moveToBottom && g.moveToBottom(); break;
+							default: break;
+						}
+					});
+					// Z順の変更を保存対象に反映
+					this._persistZOrder();
+					this.layer && this.layer.draw();
+				} finally {
+					zSelect.value = '';
+				}
+			});
+			this.zOrderSelectEl = zSelect;
+			row2.appendChild(zLabel);
+			row2.appendChild(zSelect);
 			// パーツ複製ボタン
 			const dupBtn = document.createElement('button');
 			dupBtn.className = 'seatmap-btn';
@@ -629,6 +663,7 @@
 				const targets = root.querySelectorAll('.edit-only');
 				targets.forEach(el => { el.style.display = show ? '' : 'none'; });
 				if (this.duplicateButtonEl) this.duplicateButtonEl.disabled = !show;
+				if (this.zOrderSelectEl) this.zOrderSelectEl.disabled = !show;
 			} catch(_) { /* noop */ }
 		}
 
@@ -731,7 +766,7 @@
 						this._closeSeatListContextMenu();
 					}
 				});
-				menu.appendChild(del);
+			menu.appendChild(del);
 				document.body.appendChild(menu);
 				this._seatListCtxMenuEl = menu;
 				this._onDocClickCtxMenu = (ev) => {
@@ -755,6 +790,19 @@
 				if (this._onDocClickCtxMenu) {
 					document.removeEventListener('mousedown', this._onDocClickCtxMenu, true);
 					this._onDocClickCtxMenu = null;
+				}
+			} catch(_) { /* noop */ }
+		}
+
+		_closeStageContextMenu() {
+			try {
+				if (this._stageCtxMenuEl && this._stageCtxMenuEl.parentNode) {
+					this._stageCtxMenuEl.parentNode.removeChild(this._stageCtxMenuEl);
+				}
+				this._stageCtxMenuEl = null;
+				if (this._onDocClickStageCtx) {
+					document.removeEventListener('mousedown', this._onDocClickStageCtx, true);
+					this._onDocClickStageCtx = null;
 				}
 			} catch(_) { /* noop */ }
 		}
@@ -1290,7 +1338,16 @@
 				if (Number.isFinite(floorNumber)) parts.push(`階 = ${floorNumber}`);
 				const query = parts.join(' and ');
 				const records = await window.searchEngine.searchRecordsWithQuery(String(appId), query);
-				(records || []).forEach(rec => {
+				// まず描画順フィールドでソート（座席は末尾、パーツは数値昇順。未設定は大きな値）
+				(records || []).sort((a, b) => {
+					const av = (a['描画順'] && a['描画順'].value != null) ? Number(a['描画順'].value) : Number.MAX_SAFE_INTEGER;
+					const bv = (b['描画順'] && b['描画順'].value != null) ? Number(b['描画順'].value) : Number.MAX_SAFE_INTEGER;
+					const aIsPart = String((a['オブジェクト種別'] && a['オブジェクト種別'].value) || '') !== '';
+					const bIsPart = String((b['オブジェクト種別'] && b['オブジェクト種別'].value) || '') !== '';
+					if (aIsPart && !bIsPart) return -1;
+					if (!aIsPart && bIsPart) return 1;
+					return av - bv;
+				}).forEach(rec => {
 					const get = (f) => (f && f.value !== undefined) ? f.value : (f || '');
 					const recordId = get(rec['$id']);
 					const x = Number(get(rec['座標X'])) || 20;
@@ -1689,6 +1746,10 @@
 							this.layer.draw();
 						}
 					} catch(_) { /* noop */ }
+				});
+				// ステージ上の右クリックメニューは廃止（編集グループのドロップダウンで操作）
+				this.stage.on('contextmenu', (e) => {
+					try { this._closeStageContextMenu(); if (e && e.evt && e.evt.preventDefault) e.evt.preventDefault(); } catch(_) { /* noop */ }
 				});
 			} catch(_) { /* noop */ }
 		}
@@ -2295,6 +2356,10 @@
 		_showPropsPanelFor(group) {
 			try {
 				if (!this.propsPanelEl) return;
+				// 座席ノードではプロパティパネルを表示しない
+				try {
+					if (group && group.hasName && group.hasName('seat-node')) { this._hidePropsPanel(); return; }
+				} catch(_) { /* noop */ }
 				const settings = group.getAttr('partSettings') || {};
 				let type = settings.type || '';
 				// 復元時にpartSettingsが空のケース: ノードから推定
@@ -2413,6 +2478,31 @@
 				}
 				// 図形ラベルの文字色
 				if (this._paletteApplyTarget === 'text' && this._selectedShapeGroup) {
+					const lbl = this._selectedShapeGroup.findOne('.shape-label');
+					if (lbl) {
+						lbl.fill(color);
+						const s = this._selectedShapeGroup.getAttr('partSettings') || {}; s.label = s.label || {}; s.label.color = color; this._selectedShapeGroup.setAttr('partSettings', s);
+						this.pendingChanges.set(String(this._selectedShapeGroup.getAttr('recordId')), this._buildPendingFromGroup(this._selectedShapeGroup));
+					}
+				}
+				this.layer && this.layer.batchDraw();
+			} catch(_) { /* noop */ }
+		}
+
+		_applyTextColorOnly() {
+			try {
+				const color = String(this._pendingPickedColor || '#333333');
+				// テキストパーツ
+				if (this._selectedTextGroup) {
+					const tx = this._selectedTextGroup.findOne('Text');
+					if (tx) {
+						tx.fill(color);
+						const s = this._selectedTextGroup.getAttr('partSettings') || {}; s.color = color; this._selectedTextGroup.setAttr('partSettings', s);
+						this.pendingChanges.set(String(this._selectedTextGroup.getAttr('recordId')), this._buildPendingFromGroup(this._selectedTextGroup));
+					}
+				}
+				// 図形ラベル（shape内のText）
+				if (this._selectedShapeGroup) {
 					const lbl = this._selectedShapeGroup.findOne('.shape-label');
 					if (lbl) {
 						lbl.fill(color);
@@ -2680,6 +2770,8 @@
 						this._pendingPickedColor = c;
 						if (this._paletteApplyTarget === 'textBg') {
 							this._applyTextBgColorFromControls();
+						} else if (this._paletteApplyTarget === 'text') {
+							this._applyTextColorOnly();
 						} else {
 							this._applyLineColorFromControls();
 						}
@@ -2884,6 +2976,26 @@
 				}
 				if (this.layer) this.layer.batchDraw();
 			} catch (_) { /* noop */ }
+		}
+
+		_persistZOrder() {
+			try {
+				// レイヤーの子の順序を走査し、図形/テキスト/線（part-node）のみ順番を保存
+				if (!this.layer) return;
+				const children = this.layer.getChildren() || [];
+				let order = 0;
+				children.forEach(node => {
+					try {
+						if (!(node && node.hasName && node.hasName('part-node'))) return; // 座席（seat-node）は対象外
+						const recordId = String(node.getAttr('recordId') || '');
+						if (!recordId) return;
+						// 既存のpendingを維持しつつ zOrder を上書き
+						const prev = this.pendingChanges.get(recordId) || this._buildPendingFromGroup(node);
+						this.pendingChanges.set(recordId, { ...prev, display: prev.display !== false, zOrder: order });
+						order += 1;
+					} catch(_) { /* noop */ }
+				});
+			} catch(_) { /* noop */ }
 		}
 
 		_moveGroupToLeftList(group) {
@@ -3196,6 +3308,13 @@
 							'座席表表示': { value: (meta.display === false ? 'false' : 'true') }
 						}
 					};
+					// Z順序（パーツのみ保存）
+					try {
+						const node = this.seatIdToNode.get(String(recordId));
+						if (node && node.hasName && node.hasName('part-node') && meta.zOrder != null) {
+							rec.record['描画順'] = { value: Number(meta.zOrder) };
+						}
+					} catch(_) { /* noop */ }
 					// パーツ設定JSON（線の太さ/色など）も保存
 					try {
 						const group = this.seatIdToNode.get(String(recordId));
