@@ -868,70 +868,74 @@
 			} catch(_) { /* noop */ }
 		}
 
-		async _prefetchLedgers(siteFloor) {
-			try {
-				const { site, floor } = this._parseSiteFloor(siteFloor);
-				// PC台帳・内線台帳の簡易取得（同じ拠点+階でフィルタ）。但し本関数は未使用へ（別関数で安全に対象PC/内線のみ取得）
-				this._pcByNumber.clear();
-				this._extByNumber.clear();
-				const pcApp = CONFIG.getAppIdByLedgerName('PC台帳');
-				const extApp = CONFIG.getAppIdByLedgerName('内線台帳');
-				if (pcApp) {
-					const conds = [];
-					if (site) conds.push(`拠点 in ("${site}")`);
-					if (Number.isFinite(floor)) conds.push(`階 = ${Number(floor)}`);
-					const query = conds.join(' and ');
-					const pcs = await kintone.api(kintone.api.url('/k/v1/records', true), 'GET', { app: String(pcApp), query });
-					(pcs.records || []).forEach(r => {
-						const num = (r['PC番号'] && r['PC番号'].value) || '';
-						if (num) this._pcByNumber.set(String(num), r);
-					});
-				}
-				if (extApp) {
-					const conds = [];
-					if (site) conds.push(`拠点 in ("${site}")`);
-					if (Number.isFinite(floor)) conds.push(`階 = ${Number(floor)}`);
-					const query = conds.join(' and ');
-					const exts = await kintone.api(kintone.api.url('/k/v1/records', true), 'GET', { app: String(extApp), query });
-					(exts.records || []).forEach(r => {
-						const num = (r['内線番号'] && r['内線番号'].value) || '';
-						if (num) this._extByNumber.set(String(num), r);
-					});
-				}
-			} catch(_) { /* noop */ }
-		}
-
-		async _prefetchLedgersFromSeats() {
-			try {
-				this._pcByNumber.clear();
-				this._extByNumber.clear();
-				// 画面上の座席からPC/内線の一覧を集計
-				const pcSet = new Set();
-				const extSet = new Set();
-				this.seatIdToNode.forEach(group => {
-					if (group && group.hasName && group.hasName('seat-node')) {
-						const pc = String(group.getAttr('pcNumber') || '').trim();
-						const ext = String(group.getAttr('extNumber') || '').trim();
-						if (pc) pcSet.add(pc);
-						if (ext) extSet.add(ext);
-					}
+	async _prefetchLedgers(siteFloor) {
+		try {
+			const { site, floor } = this._parseSiteFloor(siteFloor);
+			// PC台帳・内線台帳の簡易取得（同じ拠点+階でフィルタ）。但し本関数は未使用へ（別関数で安全に対象PC/内線のみ取得）
+			this._pcByNumber.clear();
+			this._extByNumber.clear();
+			const pcApp = CONFIG.getAppIdByLedgerName('PC台帳');
+			const extApp = CONFIG.getAppIdByLedgerName('内線台帳');
+			if (pcApp) {
+				const conds = [];
+				if (site) conds.push(`拠点 in ("${site}")`);
+				if (Number.isFinite(floor)) conds.push(`階 = ${Number(floor)}`);
+				const query = conds.join(' and ');
+				// カーソルAPIを使用して全件取得（500件ずつ、1000件以上にも対応）
+				const pcs = await window.searchEngine.searchRecordsWithQuery(String(pcApp), query);
+				(pcs || []).forEach(r => {
+					const num = (r['PC番号'] && r['PC番号'].value) || '';
+					if (num) this._pcByNumber.set(String(num), r);
 				});
-				const pcApp = CONFIG.getAppIdByLedgerName('PC台帳');
-				const extApp = CONFIG.getAppIdByLedgerName('内線台帳');
-				if (pcApp && pcSet.size > 0) {
-					const ors = Array.from(pcSet).map(v => `PC番号 in ("${String(v).replace(/"/g, '\"')}")`);
-					const query = ors.join(' or ');
-					const res = await kintone.api(kintone.api.url('/k/v1/records', true), 'GET', { app: String(pcApp), query });
-					(res.records || []).forEach(r => { const num = (r['PC番号'] && r['PC番号'].value) || ''; if (num) this._pcByNumber.set(String(num), r); });
+			}
+			if (extApp) {
+				const conds = [];
+				if (site) conds.push(`拠点 in ("${site}")`);
+				if (Number.isFinite(floor)) conds.push(`階 = ${Number(floor)}`);
+				const query = conds.join(' and ');
+				// カーソルAPIを使用して全件取得（500件ずつ、1000件以上にも対応）
+				const exts = await window.searchEngine.searchRecordsWithQuery(String(extApp), query);
+				(exts || []).forEach(r => {
+					const num = (r['内線番号'] && r['内線番号'].value) || '';
+					if (num) this._extByNumber.set(String(num), r);
+				});
+			}
+		} catch(_) { /* noop */ }
+	}
+
+	async _prefetchLedgersFromSeats() {
+		try {
+			this._pcByNumber.clear();
+			this._extByNumber.clear();
+			// 画面上の座席からPC/内線の一覧を集計
+			const pcSet = new Set();
+			const extSet = new Set();
+			this.seatIdToNode.forEach(group => {
+				if (group && group.hasName && group.hasName('seat-node')) {
+					const pc = String(group.getAttr('pcNumber') || '').trim();
+					const ext = String(group.getAttr('extNumber') || '').trim();
+					if (pc) pcSet.add(pc);
+					if (ext) extSet.add(ext);
 				}
-				if (extApp && extSet.size > 0) {
-					const ors = Array.from(extSet).map(v => `内線番号 in ("${String(v).replace(/"/g, '\"')}")`);
-					const query = ors.join(' or ');
-					const res = await kintone.api(kintone.api.url('/k/v1/records', true), 'GET', { app: String(extApp), query });
-					(res.records || []).forEach(r => { const num = (r['内線番号'] && r['内線番号'].value) || ''; if (num) this._extByNumber.set(String(num), r); });
-				}
-			} catch(_) { /* noop */ }
-		}
+			});
+			const pcApp = CONFIG.getAppIdByLedgerName('PC台帳');
+			const extApp = CONFIG.getAppIdByLedgerName('内線台帳');
+			if (pcApp && pcSet.size > 0) {
+				const ors = Array.from(pcSet).map(v => `PC番号 in ("${String(v).replace(/"/g, '\"')}")`);
+				const query = ors.join(' or ');
+				// カーソルAPIを使用して全件取得（500件ずつ、1000件以上にも対応）
+				const res = await window.searchEngine.searchRecordsWithQuery(String(pcApp), query);
+				(res || []).forEach(r => { const num = (r['PC番号'] && r['PC番号'].value) || ''; if (num) this._pcByNumber.set(String(num), r); });
+			}
+			if (extApp && extSet.size > 0) {
+				const ors = Array.from(extSet).map(v => `内線番号 in ("${String(v).replace(/"/g, '\"')}")`);
+				const query = ors.join(' or ');
+				// カーソルAPIを使用して全件取得（500件ずつ、1000件以上にも対応）
+				const res = await window.searchEngine.searchRecordsWithQuery(String(extApp), query);
+				(res || []).forEach(r => { const num = (r['内線番号'] && r['内線番号'].value) || ''; if (num) this._extByNumber.set(String(num), r); });
+			}
+		} catch(_) { /* noop */ }
+	}
 
 		_showLoading(text) {
 			try {
