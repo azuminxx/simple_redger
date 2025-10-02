@@ -10,6 +10,7 @@ class VirtualScroll {
         this.savedScrollTop = 0; // スクロール位置を保存
         this.savedScrollLeft = 0; // 横スクロール位置を保存
         this.ledgerModal = new LedgerDetailsModal(); // モーダルインスタンス
+        this.autoFill = new AutoFill(); // オートフィルインスタンス
     }
     /**
      * 仮想スクロール対応テーブルを作成
@@ -785,6 +786,11 @@ class VirtualScroll {
                     const inputElement = await this.createEditableInput(column, value, i, columnIndex);
                     td.appendChild(inputElement);
                     td.className = 'editable-cell';
+                    
+                    // オートフィル機能：フィルハンドルを追加
+                    if (this.autoFill) {
+                        this.autoFill.addFillHandleToCell(td, inputElement, i, column.key);
+                    }
                 } else {
                     // 読み取り専用フィールドの場合は通常のテキスト表示
                     if (value === null || value === undefined || value === '') {

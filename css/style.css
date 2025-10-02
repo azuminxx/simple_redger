@@ -1445,3 +1445,27 @@ td.editable-cell select,
 .seat-item.selected { outline: 2px solid #4da3ff; outline-offset: 0; background: #f0f7ff; }
 .seat-item:active { cursor: grabbing; }
 
+/* オートフィル機能 */
+/* セルの右下10px四方の領域でカーソルを＋に変更（JavaScriptで動的制御） */
+.editable-cell.has-fill-handle {
+    position: relative;
+}
+
+/* オートフィルのソースセル（フィル開始セル） */
+.autofill-source {
+    outline: 2px solid #007bff;
+    outline-offset: -1px;
+}
+
+/* オートフィルのターゲットセル（コピー先セル） */
+.autofill-target {
+    background-color: rgba(0, 123, 255, 0.1) !important;
+    outline: 1px dashed #007bff;
+    outline-offset: -1px;
+}
+
+/* オートフィル実行中のカーソル */
+body.autofill-dragging {
+    cursor: crosshair !important;
+}
+
